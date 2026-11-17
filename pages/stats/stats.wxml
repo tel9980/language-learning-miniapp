@@ -39,6 +39,31 @@
     </view>
   </view>
 
+  <view class="card calendar-card">
+    <view class="section-title">打卡日历 <text class="muted">（近 4 周）</text></view>
+    <view class="cal-grid">
+      <view wx:for="{{calendar}}" wx:key="key" class="cal-cell {{item.active?'active':''}} {{item.speak?'speak':''}}" title="{{item.key}}">
+        {{item.day}}
+      </view>
+    </view>
+    <view class="cal-legend">
+      <view class="legend-item"><view class="legend-dot done"></view>已打卡</view>
+      <view class="legend-item"><view class="legend-dot sp"></view>有口语</view>
+      <view class="legend-item"><view class="legend-dot none"></view>未打卡</view>
+    </view>
+  </view>
+
+  <view class="card badges-card">
+    <view class="section-title">成就徽章 <text class="muted">（已解锁 {{unlockedCount}}/{{badges.length}}）</text></view>
+    <view class="badge-grid">
+      <view wx:for="{{badges}}" wx:key="id" class="badge-item {{item.unlocked?'unlocked':'locked'}}">
+        <view class="badge-icon">{{item.icon}}</view>
+        <view class="badge-name">{{item.name}}</view>
+        <view class="badge-progress">{{item.unlocked?'已解锁':item.progress}}</view>
+      </view>
+    </view>
+  </view>
+
   <view class="card levels-card">
     <view class="section-title">词汇掌握分布</view>
     <view wx:for="{{levels}}" wx:key="name" class="level-row">

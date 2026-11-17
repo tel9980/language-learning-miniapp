@@ -1,11 +1,15 @@
 const storage = require('../../utils/storage')
 const speaking = require('../../utils/speaking')
+const sentences = require('../../utils/sentences')
+const recordings = require('../../utils/recordings')
+const achievements = require('../../utils/achievements')
 const { getWords } = require('../../utils/words')
 
 Page({
   data: {
     stats: {}, mastered: 0, accuracy: 0, dailyGoal: 20,
-    levels: [], days: [], speak: {}
+    levels: [], days: [], speak: {},
+    calendar: [], unlockedCount: 0, badges: []
   },
   onShow() {
     this.refresh()
@@ -15,6 +19,7 @@ Page({
     const stats = storage.getStats()
     const prog = storage.getProgress()
     const words = getWords(lang)
+    const allSpeakingItems = words.concat(sentences.getAllItems(lang))
 
     // 总正确率
     const accuracy = stats.totalReviews > 0
@@ -45,9 +50,24 @@ Page({
       days.push({ label: (d.getMonth() + 1) + '/' + d.getDate(), value: (daily[key] && daily[key].reviewed) || 0 })
     }
 
+    // 口语汇总 + 打卡日历
+    const speak = speaking.getSummary(lang, allSpeakingItems)
+    const cal = achievements.calendar(storage.getDaily(), speaking.getDaily(), 28)
+
+    // 成就徽章
+    const badges = achievements.compute({
+      speakTimes: speak.speakTimes,
+      fluent: speak.fluent,
+      streak: stats.streak || 0,
+      mastered: storage.getMasteredCount(lang),
+      dialogues: speak.dialogues,
+      recordings: recordings.list().length
+    })
+    const unlockedCount = badges.filter(b => b.unlocked).length
+
     this.setData({
-      stats, accuracy, levels, days,
-      speak: speaking.getSummary(lang),
+      stats, accuracy, levels, days, speak,
+      calendar: cal, badges, unlockedCount,
       mastered: storage.getMasteredCount(lang),
       dailyGoal: storage.getSettings().dailyGoal || 20
     }, () => this.drawChart())

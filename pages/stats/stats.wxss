@@ -2,7 +2,7 @@
 .summary-item { flex: 1; text-align: center; }
 .s-num { font-size: 52rpx; font-weight: 800; color: #4A6CF7; }
 .s-label { font-size: 22rpx; color: #8A94A6; margin-top: 8rpx; }
-.chart-card, .levels-card, .goal-card, .data-card, .speak-card { margin-bottom: 24rpx; }
+.chart-card, .levels-card, .goal-card, .data-card, .speak-card, .calendar-card, .badges-card { margin-bottom: 24rpx; }
 .section-title { font-size: 30rpx; font-weight: 700; margin-bottom: 24rpx; }
 .muted { font-size: 24rpx; color: #8A94A6; line-height: 1.6; }
 .row.between { display: flex; justify-content: space-between; align-items: center; }
@@ -29,3 +29,30 @@
 .data-btn:last-child { margin-right: 0; }
 .data-btn.export { background: #4A6CF7; color: #fff; }
 .data-btn.import { background: #EDF1FF; color: #4A6CF7; }
+
+/* 打卡日历 */
+.cal-grid { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.cal-cell {
+  width: calc((100% - 6 * 12rpx) / 7);
+  aspect-ratio: 1;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22rpx; color: #B7BFCC; background: #F4F6FC; border-radius: 10rpx;
+}
+.cal-cell.active { background: #7E9BFF; color: #fff; }
+.cal-cell.active.speak { background: #4A6CF7; }
+.cal-legend { display: flex; gap: 24rpx; margin-top: 20rpx; }
+.legend-item { display: flex; align-items: center; font-size: 22rpx; color: #8A94A6; }
+.legend-dot { width: 18rpx; height: 18rpx; border-radius: 4rpx; margin-right: 8rpx; }
+.legend-dot.done { background: #7E9BFF; }
+.legend-dot.sp { background: #4A6CF7; }
+.legend-dot.none { background: #F4F6FC; border: 1rpx solid #E4E8F2; }
+
+/* 成就徽章 */
+.badge-grid { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.badge-item { width: calc((100% - 32rpx) / 3); text-align: center; padding: 20rpx 8rpx; border-radius: 16rpx; background: #F7F9FE; }
+.badge-item.unlocked { background: #FFF8E8; }
+.badge-icon { font-size: 52rpx; filter: grayscale(1); opacity: .4; }
+.badge-item.unlocked .badge-icon { filter: none; opacity: 1; }
+.badge-name { font-size: 24rpx; font-weight: 600; margin-top: 8rpx; color: #8A94A6; }
+.badge-item.unlocked .badge-name { color: #E08A1E; }
+.badge-progress { font-size: 20rpx; color: #B7BFCC; margin-top: 6rpx; }

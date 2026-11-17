@@ -43,5 +43,6 @@ Page({
   goQuiz()  { wx.navigateTo({ url: '/pages/quiz/quiz' }) },
   goStats() { wx.navigateTo({ url: '/pages/stats/stats' }) },
   goSearch() { wx.navigateTo({ url: '/pages/search/search' }) },
-  goWrong() { wx.navigateTo({ url: '/pages/wrong/wrong' }) }
+  goWrong() { wx.navigateTo({ url: '/pages/wrong/wrong' }) },
+  goRecordings() { wx.navigateTo({ url: '/pages/recordings/recordings' }) }
 })

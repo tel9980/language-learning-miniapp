@@ -6,7 +6,8 @@
     "pages/quiz/quiz",
     "pages/stats/stats",
     "pages/search/search",
-    "pages/wrong/wrong"
+    "pages/wrong/wrong",
+    "pages/recordings/recordings"
   ],
   "window": {
     "navigationBarBackgroundColor": "#4A6CF7",

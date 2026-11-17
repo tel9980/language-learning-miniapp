@@ -2,44 +2,67 @@
 .header .subtitle { margin-top: 8rpx; }
 .today-badge { background: #EEF2FF; color: #4A6CF7; font-size: 24rpx; padding: 12rpx 20rpx; border-radius: 999rpx; white-space: nowrap; }
 .row.between { display: flex; justify-content: space-between; align-items: center; }
-.focus-bar { display: flex; align-items: center; justify-content: space-between; margin-top: 28rpx; padding: 24rpx; background: #FFF7EC; border-radius: 16rpx; }
+
+/* 跟读类型切换 */
+.track-tabs { display: flex; gap: 12rpx; margin-top: 28rpx; background: #F4F6FC; padding: 8rpx; border-radius: 16rpx; }
+.tab { flex: 1; text-align: center; font-size: 26rpx; padding: 16rpx 0; border-radius: 12rpx; color: #8A94A6; }
+.tab.on { background: #fff; color: #4A6CF7; font-weight: 600; box-shadow: 0 2rpx 10rpx rgba(74,108,247,.12); }
+.scene-picker { margin-top: 20rpx; padding: 20rpx 24rpx; background: #F7F9FE; border-radius: 14rpx; font-size: 28rpx; color: #4A6CF7; }
+
+.focus-bar { display: flex; align-items: center; justify-content: space-between; margin-top: 24rpx; padding: 24rpx; background: #FFF7EC; border-radius: 16rpx; }
 .focus-bar.returning { background: #EEF2FF; }
 .focus-info { flex: 1; }
 .focus-title { font-size: 28rpx; font-weight: 600; color: #E08A1E; margin-bottom: 6rpx; }
 .focus-bar.returning .focus-title { color: #4A6CF7; }
 .arrow { font-size: 44rpx; color: #C7CEDB; margin-left: 8rpx; }
+.record-entry { display: flex; align-items: center; justify-content: space-between; margin-top: 16rpx; padding: 20rpx 24rpx; background: #F0FBF6; border-radius: 14rpx; font-size: 26rpx; color: #17A873; }
+
+/* 跟读舞台 */
 .stage { text-align: center; }
 .progress-dots { display: flex; justify-content: center; flex-wrap: wrap; gap: 10rpx; margin-bottom: 40rpx; }
 .dot { width: 14rpx; height: 14rpx; border-radius: 50%; background: #E4E8F2; }
 .dot.on { background: #4A6CF7; width: 36rpx; border-radius: 999rpx; }
 .dot.done { background: #A9BCFF; }
-.stage-word { font-size: 64rpx; font-weight: 800; color: #4A6CF7; }
+.role-tag { display: inline-block; font-size: 22rpx; color: #E08A1E; background: #FFF7EC; padding: 6rpx 18rpx; border-radius: 999rpx; margin-bottom: 16rpx; }
+.stage-word { font-size: 64rpx; font-weight: 800; color: #4A6CF7; line-height: 1.3; }
+.stage-word.sentence { font-size: 36rpx; line-height: 1.5; font-weight: 700; }
 .stage-phonetic { font-size: 28rpx; color: #8A94A6; margin-top: 12rpx; }
-.stage-meaning { font-size: 32rpx; margin-top: 16rpx; }
+.stage-meaning { font-size: 30rpx; margin-top: 16rpx; }
+.scene-tag { display: inline-block; font-size: 22rpx; color: #8A94A6; margin-top: 12rpx; }
 .player-btns { display: flex; gap: 20rpx; margin: 36rpx 0 24rpx; }
 .play-btn { flex: 1; font-size: 28rpx; border-radius: 999rpx; background: #EEF2FF; color: #4A6CF7; padding: 12rpx 0; }
 .play-btn.primary { background: #4A6CF7; color: #fff; }
 .play-btn::after { border: none; }
 .example-box { background: #F7F9FE; border-radius: 20rpx; padding: 32rpx; text-align: left; }
 .example-title { font-size: 22rpx; color: #8A94A6; margin-bottom: 16rpx; }
-.example-en { font-size: 32rpx; line-height: 1.5; }
+.example-en { font-size: 30rpx; line-height: 1.5; }
 .example-cn { font-size: 24rpx; color: #8A94A6; margin-top: 12rpx; line-height: 1.5; }
 .play-example { margin-top: 24rpx; font-size: 26rpx; color: #4A6CF7; background: none; padding: 0; }
 .play-example::after { border: none; }
+
+/* 录音 & 评分 */
 .record-zone { margin-top: 32rpx; }
 .record-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 180rpx; border: 3rpx dashed #4A6CF7; border-radius: 24rpx; background: #F7F9FF; }
 .record-btn.recording { border-color: #FF5C5C; background: #FFF1F1; }
 .mic { font-size: 64rpx; line-height: 1; }
 .record-label { font-size: 26rpx; color: #4A6CF7; margin-top: 16rpx; }
 .record-btn.recording .record-label { color: #FF5C5C; }
-.playback { margin-top: 24rpx; }
+.score-box { margin-top: 24rpx; padding: 24rpx; background: #FAFBFF; border-radius: 18rpx; }
+.score-wait { font-size: 26rpx; color: #4A6CF7; }
+.score-num { font-size: 64rpx; font-weight: 800; line-height: 1; }
+.score-num.high { color: #17A873; }
+.score-num.mid { color: #E08A1E; }
+.score-num.low { color: #FF6B6B; }
+.score-unit { font-size: 26rpx; margin-left: 6rpx; }
+.score-recognized { font-size: 24rpx; color: #5A6474; margin: 12rpx 0; }
+.playback { margin-top: 20rpx; }
 .play-mine { display: inline-block; font-size: 28rpx; color: #4A6CF7; background: #EEF2FF; padding: 16rpx 40rpx; border-radius: 999rpx; }
 .play-mine.playing { background: #4A6CF7; color: #fff; }
 .playback .muted { margin-top: 14rpx; }
 .rate-area { margin-top: 32rpx; }
 .rate-title { font-size: 26rpx; color: #5A6474; margin-bottom: 20rpx; }
 .rate-btns { display: flex; gap: 14rpx; }
-.rate-btn { flex: 1; font-size: 26rpx; padding: 20rpx 0; border-radius: 16rpx; }
+.rate-btn { flex: 1; font-size: 24rpx; padding: 20rpx 0; border-radius: 16rpx; }
 .rate-btn.again { background: #FFF1F1; color: #FF6B6B; }
 .rate-btn.ok { background: #FFF7EC; color: #E08A1E; }
 .rate-btn.great { background: #E9F8F1; color: #17A873; }

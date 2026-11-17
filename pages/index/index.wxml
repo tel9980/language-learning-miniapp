@@ -86,5 +86,13 @@
       </view>
       <view class="arrow">›</view>
     </view>
+    <view class="entry card" bindtap="goRecordings">
+      <view class="entry-icon record">🎧</view>
+      <view class="entry-body">
+        <view class="entry-title">我的录音</view>
+        <view class="muted">回听练习轨迹，对比进步</view>
+      </view>
+      <view class="arrow">›</view>
+    </view>
   </view>
 </view>

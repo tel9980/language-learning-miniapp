@@ -1,5 +1,8 @@
 const storage = require('../../utils/storage')
-const { getWords, getLangMeta } = require('../../utils/words')
+const {
+  getWords, getLangMeta, getExamCategories, getWordsByCategory
+} = require('../../utils/words')
+const audio = require('../../utils/audio')
 
 Page({
   data: {
@@ -8,44 +11,34 @@ Page({
     langName: '英语',
     categories: ['全部'],
     catIndex: 0,
+    catInfo: [],
     results: [],
     expandedId: '',
     resultCount: 0
   },
 
-  onLoad() {
-    const lang = storage.getCurrentLang()
+  _applyLang(lang) {
     const meta = getLangMeta(lang)
-    const words = getWords(lang)
-    const catSet = []
-    words.forEach(function (w) {
-      if (catSet.indexOf(w.category) < 0) catSet.push(w.category)
-    })
+    const cats = getExamCategories(lang)
     this.setData({
       lang: lang,
       langName: meta.name,
-      categories: ['全部'].concat(catSet),
-      resultCount: words.length
+      catInfo: cats,
+      categories: ['全部'].concat(cats.map(c => `${c.name}(${c.count})`))
     })
-    this._audio = null
+  },
+
+  onLoad() {
+    const lang = storage.getCurrentLang()
+    this._applyLang(lang)
     this.doSearch()
   },
 
   onShow() {
-    // 语种可能在首页切换过，进来时同步
     const lang = storage.getCurrentLang()
     if (lang !== this.data.lang) {
-      const meta = getLangMeta(lang)
-      const words = getWords(lang)
-      const catSet = []
-      words.forEach(function (w) {
-        if (catSet.indexOf(w.category) < 0) catSet.push(w.category)
-      })
-      this.setData({
-        lang: lang,
-        langName: meta.name,
-        categories: ['全部'].concat(catSet)
-      })
+      this._applyLang(lang)
+      this.setData({ catIndex: 0 })
       this.doSearch()
     }
   },
@@ -64,11 +57,10 @@ Page({
 
   doSearch() {
     const kw = (this.data.keyword || '').trim().toLowerCase()
-    const cat = this.data.categories[this.data.catIndex]
-    const words = getWords(this.data.lang)
+    const catInfo = this.data.catInfo[this.data.catIndex - 1]
+    const cat = catInfo ? catInfo.name : ''
+    const words = getWordsByCategory(this.data.lang, cat)
     const list = words.filter(function (w) {
-      const catOk = !cat || cat === '全部' || w.category === cat
-      if (!catOk) return false
       if (!kw) return true
       return (w.word || '').toLowerCase().indexOf(kw) >= 0 ||
         (w.meaning || '').toLowerCase().indexOf(kw) >= 0 ||
@@ -85,16 +77,11 @@ Page({
   playWord(e) {
     const word = e.currentTarget.dataset.word
     if (!word) return
-    const url = 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(word) + '&type=2'
-    if (!this._audio) this._audio = wx.createInnerAudioContext()
-    this._audio.src = url
-    this._audio.play()
+    if (this._player) this._player.destroy()
+    this._player = audio.speak(word, false, {})
   },
 
   onUnload() {
-    if (this._audio) {
-      this._audio.destroy()
-      this._audio = null
-    }
+    if (this._player) { this._player.destroy(); this._player = null }
   }
 })

@@ -1,7 +1,8 @@
-// 本地存储 + 间隔重复（艾宾浩斯简化版）引擎
+// 本地存储 + 复习调度（SM-2 风格动态间隔，见 utils/fsrs.js）
 const { getWords } = require('./words')
+const fsrs = require('./fsrs')
 
-const KEY_PROGRESS = 'lp_progress_v1'   // { [wordId]: { level, dueAt, reps, lapses } }
+const KEY_PROGRESS = 'lp_progress_v1'   // { [wordId]: { level, ef, reps, lapses, dueAt } }
 const KEY_STATS    = 'lp_stats_v1'      // 累计统计
 const KEY_SETTINGS = 'lp_settings_v1'   // 设置
 const KEY_DAILY    = 'lp_daily_v1'      // { 'YYYY-MM-DD': { learned, reviewed, correct, total } }
@@ -76,30 +77,28 @@ function getNewWords(lang, limit) {
   return limit ? fresh.slice(0, limit) : fresh
 }
 
-// 复习打分：quality 0=不记得 3=模糊 5=记得
+// 复习打分：quality 0=不记得 3=模糊 5=记得（兼容口语三档 0/1/2）
 function review(wordId, quality) {
   const prog = getProgress()
   const stats = getStats()
   const daily = getDaily()
   const tk = todayKey()
-  const old = prog[wordId] || { level: 0, reps: 0, lapses: 0, dueAt: Date.now() }
+  const old = prog[wordId] || { level: 0, reps: 0, lapses: 0, ef: 2.5, dueAt: Date.now() }
   const p = Object.assign({}, old)
 
-  if (quality >= 3) {
-    p.reps += 1
-    p.level = Math.min(p.level + 1, 6)
-    if (p.level > 1) stats.totalCorrect += 1
-  } else {
-    p.lapses += 1
-    p.level = 1
-  }
-  const gapDays = INTERVALS[p.level]
-  p.dueAt = Date.now() + gapDays * 24 * 60 * 60 * 1000
+  // 用 fsrs 计算动态间隔
+  const sched = fsrs.schedule(old, quality)
+  p.level = sched.level
+  p.ef = sched.ef
+  p.reps = sched.reps
+  p.lapses = sched.lapses
+  p.dueAt = fsrs.dueAt(sched.intervalDays)
   prog[wordId] = p
 
   // 累计统计
   stats.totalReviews += 1
-  if (quality >= 3 && p.reps === 1) stats.totalLearned += 1
+  if (sched.quality >= 1) stats.totalCorrect += 1
+  if (sched.quality >= 1 && old.reps === 0) stats.totalLearned += 1
 
   // 连续打卡
   if (stats.lastActive !== tk) {
@@ -113,8 +112,8 @@ function review(wordId, quality) {
   const d = daily[tk] || { learned: 0, reviewed: 0, correct: 0, total: 0 }
   d.reviewed += 1
   d.total += 1
-  if (quality >= 3) d.correct += 1
-  if (quality >= 3 && p.reps === 1) d.learned += 1
+  if (sched.quality >= 1) d.correct += 1
+  if (sched.quality >= 1 && old.reps === 0) d.learned += 1
   daily[tk] = d
 
   write(KEY_PROGRESS, prog)
@@ -149,36 +148,53 @@ function getMasteredCount(lang) {
   return getWords(lang).filter(w => prog[w.id] && prog[w.id].level >= 4).length
 }
 
-// 导出全部学习数据：返回可序列化的普通对象
+// 导出全部学习数据：返回可序列化的普通对象（v2 含口语数据）
 function exportData() {
+  let speak = null
+  try { speak = require('./speaking').exportData() } catch (e) {}
   return {
     format: 'yuban-lang-backup',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     progress: getProgress(),
     stats: getStats(),
     settings: getSettings(),
-    daily: getDaily()
+    daily: getDaily(),
+    speak: speak
   }
 }
 
-// 导入学习数据：校验格式后覆盖本地存储，返回 {ok, reason}
+// 迁移：把 v1（无 ef 字段）的 progress 补齐 ef 默认值
+function migrateProgress(prog) {
+  if (!prog || typeof prog !== 'object') return {}
+  Object.keys(prog).forEach(id => {
+    if (prog[id].ef == null) prog[id].ef = 2.5
+    if (prog[id].level > 8) prog[id].level = 8
+  })
+  return prog
+}
+
+// 导入学习数据：校验格式 + 版本迁移后覆盖本地存储，返回 {ok, reason}
 function importData(data) {
   if (!data || typeof data !== 'object') return { ok: false, reason: '数据格式不正确' }
   if (data.format !== 'yuban-lang-backup') return { ok: false, reason: '不是语伴的备份数据' }
   if (!data.progress || !data.stats || !data.settings || !data.daily) {
     return { ok: false, reason: '备份内容不完整' }
   }
-  write(KEY_PROGRESS, data.progress)
+  write(KEY_PROGRESS, migrateProgress(data.progress))
   write(KEY_STATS, data.stats)
   write(KEY_SETTINGS, data.settings)
   write(KEY_DAILY, data.daily)
-  return { ok: true }
+  // v2：恢复口语数据
+  if (data.speak && data.version === 2) {
+    try { require('./speaking').importData(data.speak) } catch (e) {}
+  }
+  return { ok: true, version: data.version || 1 }
 }
 
 module.exports = {
   init, todayKey, getSettings, setLang, getCurrentLang, setDailyGoal,
   getProgress, getStats, getDaily, getDueWords, getNewWords, getToday,
   review, quizAnswer, getMasteredCount, INTERVALS,
-  exportData, importData
+  exportData, importData, migrateProgress
 }

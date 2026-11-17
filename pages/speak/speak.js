@@ -1,79 +1,144 @@
 const storage = require('../../utils/storage')
 const speaking = require('../../utils/speaking')
+const sentences = require('../../utils/sentences')
+const audio = require('../../utils/audio')
+const speechScore = require('../../utils/speech-score')
+const recordings = require('../../utils/recordings')
 const { getWords } = require('../../utils/words')
 
-function ttsUrl(text, slow) {
-  return 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=' + (slow ? 1 : 2)
-}
-
+// 跟读模式：word=单词 | sentence=句子 | dialogue=情景对话
 Page({
   data: {
-    mode: 'train',            // train=跟读练习 | focus=重点复练
+    mode: 'train',            // train | focus
+    track: 'sentence',        // word | sentence | dialogue
+    sceneIndex: 0, scenes: [], sceneNames: [],
     queue: [], index: 0, current: null,
     recording: false, hasRecording: false, playingMine: false,
-    focusCount: 0, justRated: false, todayCount: 0
+    focusCount: 0, justRated: false, todayCount: 0,
+    // 客观评分
+    scoreSupported: false, scoring: false, score: null, recognized: '',
+    // 对话展示
+    showLine: 0
+  },
+
+  _audioPlayer: null,
+  _recManager: null,
+  _recognizer: null,
+  _recFilePath: null,
+  _lastScore: null,
+  _lastRecognized: '',
+
+  onLoad() {
+    this.setData({ scoreSupported: speechScore.isSupported() })
   },
 
   onShow() {
-    const lang = storage.getCurrentLang()
-    const focusWords = speaking.getFocusWords(lang)
-    this.setData({
-      mode: 'train', index: 0,
-      queue: this.buildQueue(lang),
-      focusCount: focusWords.length,
-      todayCount: speaking.getToday().count
-    }, () => this.loadCurrent())
+    this.setData({ sceneIndex: 0 })
+    this.refreshScenes()
+    this.buildQueueAndLoad()
   },
 
   onHide() { this.stopAll() },
   onUnload() { this.stopAll() },
 
-  buildQueue(lang) {
-    const all = getWords(lang)
-    if (!all.length) return []
-    // 今日优先练没练过的词，练过的排后面
+  // ---------- 场景（按考试分类/对话场景） ----------
+  refreshScenes() {
+    const lang = storage.getCurrentLang()
+    let scenes = []
+    if (this.data.track === 'dialogue') {
+      scenes = sentences.getDialogues(lang).map((d, i) => ({ name: d.scene, index: i }))
+    }
+    this.setData({
+      scenes: scenes,
+      sceneNames: scenes.map(s => s.name),
+      focusCount: speaking.getFocusItems(this.allItems(lang)).length,
+      todayCount: speaking.getToday().count
+    })
+  },
+
+  // 汇总某语种下全部可跟读条目（词 + 句 + 对话台词）
+  allItems(lang) {
+    return getWords(lang).concat(sentences.getAllItems(lang))
+  },
+
+  buildQueueAndLoad() {
+    const lang = storage.getCurrentLang()
+    const all = this.allItems(lang)
+    let pool = []
+    if (this.data.track === 'word') {
+      pool = getWords(lang).map(w => Object.assign({}, w, { kind: 'word' }))
+    } else if (this.data.track === 'sentence') {
+      pool = sentences.getSentences(lang).map(s => sentences.toItem(s, 'st'))
+    } else {
+      const dlg = sentences.getDialogues(lang)[this.data.sceneIndex]
+      pool = dlg ? dlg.lines.map(l => sentences.toItem(Object.assign({ scene: dlg.scene }, l), 'dl')) : []
+    }
     const records = speaking.getRecords()
-    const fresh = all.filter(w => !records[w.id])
-    const done = all.filter(w => records[w.id])
-    return (fresh.length ? fresh : all).concat(fresh.length ? done : [])
+    const fresh = pool.filter(w => !records[w.id])
+    const done = pool.filter(w => records[w.id])
+    const queue = fresh.concat(done)
+    this.setData({
+      queue, index: 0,
+      showLine: 0,
+      mode: 'train'
+    }, () => this.loadCurrent())
+  },
+
+  switchTrack(e) {
+    const track = e.currentTarget.dataset.track
+    this.stopAll()
+    this.setData({ track, sceneIndex: 0 }, () => {
+      this.refreshScenes()
+      this.buildQueueAndLoad()
+    })
+  },
+  switchScene(e) {
+    const idx = Number(e.detail.value)
+    this.stopAll()
+    this.setData({ sceneIndex: idx }, () => this.buildQueueAndLoad())
   },
 
   loadCurrent() {
-    const w = this.data.queue[this.data.index] || null
     this.stopAll()
-    this.setData({ current: w, hasRecording: false, justRated: false })
+    const w = this.data.queue[this.data.index] || null
+    this._recFilePath = null
+    this._lastScore = null
+    this._lastRecognized = ''
+    this.setData({
+      current: w, hasRecording: false, justRated: false,
+      score: null, recognized: '', playingMine: false,
+      showLine: 0
+    })
   },
 
-  // ---------- 音频 ----------
-  _audio: null,
-  _recManager: null,
-  _play(url, cb) {
-    this.stopAll()
-    const audio = wx.createInnerAudioContext()
-    this._audio = audio
-    audio.src = url
-    audio.onEnded(() => { this.setData({ playingMine: false }); if (cb) cb() })
-    audio.onError(() => {
-      this.setData({ playingMine: false })
-      wx.showToast({ title: '发音需联网，请检查网络', icon: 'none' })
+  // ---------- 音频播放（带降级兜底） ----------
+  playText(text, slow) {
+    this.stopAudio()
+    const that = this
+    this._audioPlayer = audio.speak(text, slow, {
+      onFallback() { wx.showToast({ title: '切换备用发音源…', icon: 'none' }) },
+      onError() { wx.showToast({ title: '发音需联网，请检查网络', icon: 'none' }) }
     })
-    audio.play()
   },
-  stopAll() {
-    if (this._audio) { try { this._audio.stop(); this._audio.destroy() } catch (e) {} this._audio = null }
-    if (this._recManager && this.data.recording) { try { this._recManager.stop() } catch (e) {} }
-    if (this.data.recording) this.setData({ recording: false })
-    if (this.data.playingMine) this.setData({ playingMine: false })
+  stopAudio() {
+    if (this._audioPlayer) { try { this._audioPlayer.destroy() } catch (e) {} this._audioPlayer = null }
   },
-  playStd() { if (this.data.current) this._play(ttsUrl(this.data.current.word, false)) },
-  playSlow() { if (this.data.current) this._play(ttsUrl(this.data.current.word, true)) },
-  playExample() { if (this.data.current) this._play(ttsUrl(this.data.current.example, false)) },
+  playStd() { if (this.data.current) this.playText(this.data.current.word, false) },
+  playSlow() { if (this.data.current) this.playText(this.data.current.word, true) },
+  playExample() { if (this.data.current) this.playText(this.data.current.example, false) },
   playMine() {
     if (!this._recFilePath) return
-    this._play(this._recFilePath)
+    this.stopAudio()
+    const that = this
+    this._audioPlayer = audio.createPlayer({
+      onEnded() { that.setData({ playingMine: false }) },
+      onError() { that.setData({ playingMine: false }); wx.showToast({ title: '回放失败', icon: 'none' }) }
+    })
+    this._audioPlayer.play(this._recFilePath)
     this.setData({ playingMine: true })
   },
 
+  // ---------- 录音（并行启动客观识别） ----------
   toggleRecord() {
     if (this.data.recording) { this.stopRecord(); return }
     const that = this
@@ -82,6 +147,16 @@ Page({
       this._recManager.onStop(res => {
         that._recFilePath = res.tempFilePath
         that.setData({ hasRecording: true, recording: false })
+        // 保存录音到永久文件（异步，不阻塞）
+        const cur = that.data.current
+        recordings.save(res.tempFilePath, {
+          itemId: cur ? cur.id : '',
+          label: cur ? cur.word : '',
+          cn: cur ? cur.meaning : '',
+          kind: that.data.track,
+          score: that._lastScore,
+          recognized: that._lastRecognized
+        })
         wx.showToast({ title: '录好了，点「听我的」对比', icon: 'none' })
       })
       this._recManager.onError(() => {
@@ -89,14 +164,47 @@ Page({
         wx.showToast({ title: '录音失败，请检查麦克风权限', icon: 'none' })
       })
     }
-    this.stopAll()
-    this._recManager.start({ duration: 60000, format: 'mp3', sampleRate: 16000, numberOfChannels: 1 })
-    this.setData({ recording: true, hasRecording: false })
+    this.stopAudio()
+    // 并行启动识别器（若插件可用）
+    this._lastScore = null
+    this._lastRecognized = ''
+    const cur = this.data.current
+    if (this.data.scoreSupported && cur) {
+      this._recognizer = speechScore.createRecognizer({
+        targetText: cur.word,
+        lang: storage.getCurrentLang() === 'ja' ? 'ja_JP' : 'en_US',
+        onResult(res) {
+          that._lastScore = res.score
+          that._lastRecognized = res.recognized
+          that.setData({
+            scoring: false,
+            score: res.score,
+            recognized: res.recognized
+          })
+        },
+        onError() { that.setData({ scoring: false }) }
+      })
+      if (this._recognizer.supported) {
+        this._recognizer.start()
+        this.setData({ scoring: true, score: null, recognized: '' })
+      }
+    }
+    try {
+      this._recManager.start({ duration: 60000, format: 'mp3', sampleRate: 16000, numberOfChannels: 1 })
+      this.setData({ recording: true, hasRecording: false })
+    } catch (e) {
+      wx.showToast({ title: '录音启动失败', icon: 'none' })
+    }
   },
+
   stopRecord() {
     if (this._recManager && this.data.recording) {
-      this._recManager.stop()
+      try { this._recManager.stop() } catch (e) {}
       this.setData({ recording: false })
+    }
+    if (this._recognizer) {
+      this._recognizer.stop()
+      // 结果在 onStop 回调里异步到达，保留 recognizer 直到结果返回
     }
   },
 
@@ -104,28 +212,37 @@ Page({
   rate(e) {
     const q = Number(e.currentTarget.dataset.q)
     if (!this.data.current || this.data.justRated) return
-    speaking.record(this.data.current.id, q)
+    const cur = this.data.current
+    speaking.record(cur.id, q, this._lastScore)
+    // 口语评分也驱动复习调度（句子 id 进 progress，影响 due，不占词库统计）
+    const schedQ = q === 0 ? 0 : (q === 1 ? 3 : 5)
+    storage.review(cur.id, schedQ)
+
     const msg = ['已加入重点复练 💪', '不错，继续！', '很流利，赞！'][q] || '已记录'
     wx.showToast({ title: msg, icon: 'none' })
     this.setData({
       justRated: true,
       todayCount: speaking.getToday().count,
-      focusCount: speaking.getFocusWords(storage.getCurrentLang()).length
+      focusCount: speaking.getFocusItems(this.allItems(storage.getCurrentLang())).length
     })
     setTimeout(() => this.next(), 700)
   },
+
   next() {
     const i = this.data.index + 1
     if (i < this.data.queue.length) {
       this.setData({ index: i }, () => this.loadCurrent())
     } else if (this.data.mode === 'focus') {
-      this.setData({ mode: 'train', queue: this.buildQueue(storage.getCurrentLang()), index: 0 }, () => this.loadCurrent())
+      this.setData({ mode: 'train', sceneIndex: this.data.sceneIndex }, () => {
+        this.refreshScenes(); this.buildQueueAndLoad()
+      })
       wx.showToast({ title: '重点复练完成！', icon: 'success' })
     } else {
-      wx.showToast({ title: '今日口语练习完成！', icon: 'success' })
+      wx.showToast({ title: '本组跟读完成！', icon: 'success' })
       this.setData({ index: 0 }, () => this.loadCurrent())
     }
   },
+
   prev() {
     const i = this.data.index - 1
     if (i >= 0) this.setData({ index: i }, () => this.loadCurrent())
@@ -134,14 +251,27 @@ Page({
   // ---------- 重点复练 ----------
   startFocus() {
     const lang = storage.getCurrentLang()
-    const list = speaking.getFocusWords(lang)
+    const list = speaking.getFocusItems(this.allItems(lang))
     if (!list.length) {
-      wx.showToast({ title: '还没有重点词，练习时点「再练练」加入', icon: 'none' })
+      wx.showToast({ title: '还没有重点条目，练习时点「再练练」加入', icon: 'none' })
       return
     }
+    this.stopAll()
     this.setData({ mode: 'focus', queue: list, index: 0 }, () => this.loadCurrent())
   },
   backToTrain() {
-    this.setData({ mode: 'train', queue: this.buildQueue(storage.getCurrentLang()), index: 0 }, () => this.loadCurrent())
+    this.stopAll()
+    this.setData({ mode: 'train' }, () => this.buildQueueAndLoad())
+  },
+
+  goRecordings() { wx.navigateTo({ url: '/pages/recordings/recordings' }) },
+
+  // ---------- 清理 ----------
+  stopAll() {
+    this.stopAudio()
+    if (this._recManager && this.data.recording) { try { this._recManager.stop() } catch (e) {} }
+    if (this._recognizer) { try { this._recognizer.stop() } catch (e) {} this._recognizer = null }
+    if (this.data.recording) this.setData({ recording: false })
+    if (this.data.playingMine) this.setData({ playingMine: false })
   }
 })

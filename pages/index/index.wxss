@@ -24,6 +24,7 @@
 .entry-icon.stats { background: #F3EEFF; }
 .entry-icon.search { background: #E8F4FF; }
 .entry-icon.wrong { background: #FDEDED; }
+.entry-icon.record { background: #EDEBFF; }
 .entry-body { flex: 1; }
 .entry-title { font-size: 30rpx; font-weight: 600; margin-bottom: 6rpx; }
 .entry-badge { background: #FF6B6B; color: #fff; font-size: 20rpx; padding: 6rpx 14rpx; border-radius: 999rpx; margin-right: 10rpx; }

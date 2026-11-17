@@ -1,0 +1,36 @@
+<view class="container">
+  <view class="header card">
+    <view class="row between">
+      <view>
+        <view class="title">我的录音 🎧</view>
+        <view class="muted">回听练习轨迹，对比进步</view>
+      </view>
+      <view class="count">共 {{list.length}} 条</view>
+    </view>
+  </view>
+
+  <block wx:if="{{list.length}}">
+    <view class="rec-item card" wx:for="{{list}}" wx:key="id">
+      <view class="rec-top">
+        <view class="rec-label">{{item.label}}</view>
+        <view class="score-badge" wx:if="{{item.score}}">{{item.score}}分</view>
+      </view>
+      <view class="rec-cn" wx:if="{{item.cn}}">{{item.cn}}</view>
+      <view class="rec-recognized" wx:if="{{item.recognized}}">识别：{{item.recognized}}</view>
+      <view class="rec-bottom">
+        <view class="rec-time">{{item.timeText}} · {{item.kind==='dialogue'?'对话':(item.kind==='sentence'?'句子':'单词')}}</view>
+        <view class="rec-actions">
+          <view class="btn-play {{playingId===item.id?'playing':''}}" bindtap="play" data-id="{{item.id}}">{{playingId===item.id?'⏸ 停止':'▶️ 播放'}}</view>
+          <view class="btn-del" bindtap="remove" data-id="{{item.id}}">删除</view>
+        </view>
+      </view>
+    </view>
+    <view class="clear-btn" bindtap="clearAll">清空全部录音</view>
+  </block>
+
+  <view class="empty card" wx:else>
+    <view class="empty-icon">🎙️</view>
+    <view class="title">还没有录音</view>
+    <view class="muted">去口语练习页录音后，会自动保存在这里</view>
+  </view>
+</view>

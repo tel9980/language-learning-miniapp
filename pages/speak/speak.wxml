@@ -3,24 +3,39 @@
     <view class="row between">
       <view>
         <view class="title">口语练习 🎤</view>
-        <view class="subtitle">听标准音 → 录音跟读 → 回放对比 → 自评</view>
+        <view class="subtitle">跟读 → 录音 → 回放 → 自评/机评</view>
       </view>
       <view class="today-badge">今日 {{todayCount}} 次</view>
     </view>
+
+    <!-- 跟读类型切换 -->
+    <view class="track-tabs">
+      <view class="tab {{track==='sentence'?'on':''}}" data-track="sentence" bindtap="switchTrack">💬 句子</view>
+      <view class="tab {{track==='dialogue'?'on':''}}" data-track="dialogue" bindtap="switchTrack">🎭 对话</view>
+      <view class="tab {{track==='word'?'on':''}}" data-track="word" bindtap="switchTrack">📖 单词</view>
+    </view>
+
+    <!-- 对话场景选择 -->
+    <picker wx:if="{{track==='dialogue' && scenes.length}}" mode="selector" range="{{sceneNames}}" bindchange="switchScene">
+      <view class="scene-picker">场景：{{sceneNames[sceneIndex]}} ▾</view>
+    </picker>
+
     <view class="focus-bar" bindtap="startFocus" wx:if="{{mode==='train'}}">
       <view class="focus-info">
         <view class="focus-title">🎯 重点复练</view>
-        <view class="muted">{{focusCount ? '有 ' + focusCount + ' 个词说得不够流利，点此集中练' : '练习时点「再练练」可加入重点清单'}}</view>
+        <view class="muted">{{focusCount ? '有 ' + focusCount + ' 条说得不够流利，点此集中练' : '练习时点「再练练」可加入重点清单'}}</view>
       </view>
       <view class="arrow">›</view>
     </view>
     <view class="focus-bar returning" bindtap="backToTrain" wx:else>
       <view class="focus-info">
         <view class="focus-title">↩ 返回日常练习</view>
-        <view class="muted">重点复练模式 · 共 {{queue.length}} 词</view>
+        <view class="muted">重点复练模式 · 共 {{queue.length}} 条</view>
       </view>
       <view class="arrow">›</view>
     </view>
+
+    <view class="record-entry" bindtap="goRecordings">🎧 我的录音 <view class="arrow">›</view></view>
   </view>
 
   <view class="card stage" wx:if="{{current}}">
@@ -28,16 +43,18 @@
       <view wx:for="{{queue}}" wx:key="id" wx:for-index="idx" class="dot {{index===idx?'on':(idx<index?'done':'')}}"></view>
     </view>
 
-    <view class="stage-word">{{current.word}}</view>
+    <view wx:if="{{track==='dialogue' && current.role}}" class="role-tag">{{current.role}}</view>
+    <view class="stage-word {{track==='sentence'||track==='dialogue'?'sentence':''}}">{{current.word}}</view>
     <view class="stage-phonetic" wx:if="{{current.phonetic}}">{{current.phonetic}}</view>
     <view class="stage-meaning">{{current.meaning}}</view>
+    <view class="scene-tag" wx:if="{{current.scene}}">#{{current.scene}}</view>
 
     <view class="player-btns">
       <button class="play-btn" bindtap="playSlow">🐢 慢速</button>
       <button class="play-btn primary" bindtap="playStd">▶️ 标准发音</button>
     </view>
 
-    <view class="example-box">
+    <view class="example-box" wx:if="{{current.example && current.example !== current.word}}">
       <view class="example-title">开口例句 · 跟着说</view>
       <view class="example-en">{{current.example}}</view>
       <view class="example-cn">{{current.exampleCn}}</view>
@@ -49,6 +66,18 @@
         <view class="mic">{{recording?'⏹':'🎤'}}</view>
         <view class="record-label">{{recording?'点此停止录音':'点此开始录音跟读'}}</view>
       </view>
+
+      <!-- 客观评分（插件可用时） -->
+      <view class="score-box" wx:if="{{scoreSupported}}">
+        <block wx:if="{{scoring}}"><view class="score-wait">🔍 正在识别发音…</view></block>
+        <block wx:elif="{{score !== null}}">
+          <view class="score-num {{score>=80?'high':(score>=60?'mid':'low')}}">{{score}}<text class="score-unit">分</text></view>
+          <view class="score-recognized" wx:if="{{recognized}}">识别到：{{recognized}}</view>
+          <view class="muted">客观参考分，结合自评一起看</view>
+        </block>
+        <block wx:else><view class="muted">录音后将给出客观发音参考分</view></block>
+      </view>
+
       <view class="playback" wx:if="{{hasRecording}}">
         <view class="play-mine {{playingMine?'playing':''}}" bindtap="playMine">▶️ 听我的回放</view>
         <view class="muted">对比标准音，看看哪里可以更像</view>
@@ -72,7 +101,7 @@
 
   <view class="empty card" wx:else>
     <view class="empty-icon">🎧</view>
-    <view class="title">词库为空</view>
-    <view class="muted">去「学习」页添加一些单词再来吧</view>
+    <view class="title">暂无跟读内容</view>
+    <view class="muted">切换类型或场景试试</view>
   </view>
 </view>
