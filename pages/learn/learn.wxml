@@ -1,0 +1,53 @@
+<view class="container">
+  <!-- 模式切换 -->
+  <view class="mode-tabs">
+    <view class="mode-tab {{mode==='due'?'active':''}}" bindtap="setMode" data-mode="due">待复习 ({{dueCount}})</view>
+    <view class="mode-tab {{mode==='new'?'active':''}}" bindtap="setMode" data-mode="new">学新词</view>
+  </view>
+
+  <!-- 卡片 -->
+  <view class="card-wrap" wx:if="{{current}}">
+    <view class="flashcard {{flipped?'flipped':''}}" bindtap="flip">
+      <view class="face front">
+        <view class="category">{{current.category}}</view>
+        <view class="word">{{current.word}}</view>
+        <view class="phonetic" wx:if="{{current.phonetic}}">{{current.phonetic}}</view>
+        <view class="tap-hint">点击卡片查看释义 👆</view>
+      </view>
+      <view class="face back">
+        <view class="word-small">{{current.word}}</view>
+        <view class="meaning">{{current.meaning}}</view>
+        <view class="divider"></view>
+        <view class="example">{{current.example}}</view>
+        <view class="example-cn">{{current.exampleCn}}</view>
+      </view>
+    </view>
+
+    <!-- 发音按钮 -->
+    <view class="speak-btn" catchtap="speak" wx:if="{{flipped || mode==='new'}}">🔊 听发音</view>
+
+    <!-- 评分按钮 -->
+    <view class="rate-area" wx:if="{{flipped}}">
+      <view class="rate-title">你记得怎么样？</view>
+      <view class="rate-btns">
+        <button class="rate-btn forgot" bindtap="rate" data-q="0">不记得</button>
+        <button class="rate-btn fuzzy" bindtap="rate" data-q="3">有印象</button>
+        <button class="rate-btn known" bindtap="rate" data-q="5">记得</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty card" wx:else>
+    <view class="empty-icon">{{mode==='due'?'🎉':'📚'}}</view>
+    <view class="title" wx:if="{{mode==='due'}}">暂无待复习单词</view>
+    <view class="title" wx:else>新词都学完了</view>
+    <view class="muted" wx:if="{{mode==='due'}}">去「学新词」添加新内容吧</view>
+    <view class="muted" wx:else>全部 {{totalWords}} 个词都已学过，坚持复习巩固记忆</view>
+    <button class="btn-primary empty-btn" bindtap="setMode" data-mode="{{mode==='due'?'new':'due'}}">
+      {{mode==='due'?'去学新词':'查看复习'}}
+    </button>
+  </view>
+
+  <view class="progress-line" wx:if="{{current}}">{{index+1}} / {{queue.length}} · {{langName}}</view>
+</view>

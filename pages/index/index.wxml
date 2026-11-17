@@ -1,0 +1,90 @@
+<view class="container">
+  <view class="hero card">
+    <view class="row between">
+      <view>
+        <view class="greeting">你好，学习者 👋</view>
+        <view class="hero-title">今天也开口说一说吧</view>
+      </view>
+      <view class="lang-badge" bindtap="switchLang">{{langFlag}} {{langName}} ▾</view>
+    </view>
+    <view class="hero-stats">
+      <view class="hero-stat">
+        <view class="num">{{speakCount}}</view>
+        <view class="label">今日口语(次)</view>
+      </view>
+      <view class="hero-stat">
+        <view class="num">{{stats.streak}}</view>
+        <view class="label">连续打卡(天)</view>
+      </view>
+      <view class="hero-stat">
+        <view class="num">{{mastered}}</view>
+        <view class="label">已掌握(词)</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="speak-cta card" bindtap="goSpeak">
+    <view class="cta-icon">🎤</view>
+    <view class="cta-body">
+      <view class="cta-title">开始口语练习</view>
+      <view class="cta-sub">听标准音 → 录音跟读 → 回放对比 → 自评</view>
+    </view>
+    <view class="cta-badge" wx:if="{{focusCount > 0}}">{{focusCount}} 个重点词</view>
+    <view class="arrow">›</view>
+  </view>
+
+  <view class="goal card">
+    <view class="row between">
+      <view class="title">今日复习目标</view>
+      <view class="muted">{{today.reviewed}} / {{dailyGoal}}</view>
+    </view>
+    <view class="progress-track">
+      <view class="progress-fill" style="width:{{goalPercent}}%"></view>
+    </view>
+    <view class="muted goal-tip">{{goalTip}}</view>
+  </view>
+
+  <view class="entry-list">
+    <view class="entry card" bindtap="goLearn">
+      <view class="entry-icon learn">📚</view>
+      <view class="entry-body">
+        <view class="entry-title">单词学习</view>
+        <view class="muted">卡片翻转 + 间隔重复复习</view>
+      </view>
+      <view class="entry-badge" wx:if="{{dueCount > 0}}">{{dueCount}} 待复习</view>
+      <view class="arrow">›</view>
+    </view>
+    <view class="entry card" bindtap="goQuiz">
+      <view class="entry-icon quiz">✏️</view>
+      <view class="entry-body">
+        <view class="entry-title">小测验</view>
+        <view class="muted">选择题 + 拼写，记录正确率</view>
+      </view>
+      <view class="arrow">›</view>
+    </view>
+    <view class="entry card" bindtap="goStats">
+      <view class="entry-icon stats">📊</view>
+      <view class="entry-body">
+        <view class="entry-title">进度统计</view>
+        <view class="muted">打卡 · 口语数据 · 掌握曲线</view>
+      </view>
+      <view class="arrow">›</view>
+    </view>
+    <view class="entry card" bindtap="goSearch">
+      <view class="entry-icon search">🔎</view>
+      <view class="entry-body">
+        <view class="entry-title">查词</view>
+        <view class="muted">按单词、释义或例句快速查找</view>
+      </view>
+      <view class="arrow">›</view>
+    </view>
+    <view class="entry card" bindtap="goWrong">
+      <view class="entry-icon wrong">📕</view>
+      <view class="entry-body">
+        <view class="entry-title">错词本</view>
+        <view class="muted">答错的词集中重练</view>
+      </view>
+      <view class="arrow">›</view>
+    </view>
+  </view>
+</view>

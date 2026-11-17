@@ -1,0 +1,30 @@
+.hero { background: linear-gradient(135deg, #4A6CF7 0%, #6E8BFF 100%); color: #fff; }
+.greeting { font-size: 26rpx; opacity: 0.9; }
+.hero-title { font-size: 32rpx; font-weight: 700; margin-top: 8rpx; }
+.lang-badge { background: rgba(255,255,255,0.2); padding: 10rpx 20rpx; border-radius: 999rpx; font-size: 24rpx; }
+.hero-stats { display: flex; margin-top: 40rpx; }
+.hero-stat { flex: 1; text-align: center; }
+.hero-stat .num { font-size: 44rpx; font-weight: 700; }
+.hero-stat .label { font-size: 22rpx; opacity: 0.85; margin-top: 6rpx; }
+.speak-cta { display: flex; align-items: center; margin-top: 24rpx; padding: 36rpx 32rpx; background: linear-gradient(135deg, #FFFFFF 0%, #FFF6E9 100%); border: 2rpx solid #FFE0B2; }
+.cta-icon { width: 96rpx; height: 96rpx; border-radius: 24rpx; background: #FFEDD3; display: flex; align-items: center; justify-content: center; font-size: 52rpx; margin-right: 24rpx; }
+.cta-body { flex: 1; }
+.cta-title { font-size: 34rpx; font-weight: 700; }
+.cta-sub { font-size: 24rpx; color: #8A94A6; margin-top: 8rpx; }
+.cta-badge { background: #FF8A3D; color: #fff; font-size: 20rpx; padding: 8rpx 14rpx; border-radius: 999rpx; margin-right: 8rpx; white-space: nowrap; }
+.goal { margin-top: 24rpx; }
+.progress-track { height: 14rpx; background: #EEF1FB; border-radius: 999rpx; margin-top: 20rpx; overflow: hidden; }
+.progress-fill { height: 100%; background: #4A6CF7; border-radius: 999rpx; transition: width 0.3s; }
+.goal-tip { margin-top: 14rpx; }
+.entry-list { margin-top: 24rpx; }
+.entry { display: flex; align-items: center; margin-bottom: 20rpx; }
+.entry-icon { width: 88rpx; height: 88rpx; border-radius: 22rpx; display: flex; align-items: center; justify-content: center; font-size: 44rpx; margin-right: 24rpx; }
+.entry-icon.learn { background: #EEF2FF; }
+.entry-icon.quiz { background: #E9F8F1; }
+.entry-icon.stats { background: #F3EEFF; }
+.entry-icon.search { background: #E8F4FF; }
+.entry-icon.wrong { background: #FDEDED; }
+.entry-body { flex: 1; }
+.entry-title { font-size: 30rpx; font-weight: 600; margin-bottom: 6rpx; }
+.entry-badge { background: #FF6B6B; color: #fff; font-size: 20rpx; padding: 6rpx 14rpx; border-radius: 999rpx; margin-right: 10rpx; }
+.arrow { font-size: 44rpx; color: #C7CEDB; margin-left: 8rpx; }

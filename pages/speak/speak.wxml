@@ -1,0 +1,78 @@
+<view class="container">
+  <view class="header card">
+    <view class="row between">
+      <view>
+        <view class="title">口语练习 🎤</view>
+        <view class="subtitle">听标准音 → 录音跟读 → 回放对比 → 自评</view>
+      </view>
+      <view class="today-badge">今日 {{todayCount}} 次</view>
+    </view>
+    <view class="focus-bar" bindtap="startFocus" wx:if="{{mode==='train'}}">
+      <view class="focus-info">
+        <view class="focus-title">🎯 重点复练</view>
+        <view class="muted">{{focusCount ? '有 ' + focusCount + ' 个词说得不够流利，点此集中练' : '练习时点「再练练」可加入重点清单'}}</view>
+      </view>
+      <view class="arrow">›</view>
+    </view>
+    <view class="focus-bar returning" bindtap="backToTrain" wx:else>
+      <view class="focus-info">
+        <view class="focus-title">↩ 返回日常练习</view>
+        <view class="muted">重点复练模式 · 共 {{queue.length}} 词</view>
+      </view>
+      <view class="arrow">›</view>
+    </view>
+  </view>
+
+  <view class="card stage" wx:if="{{current}}">
+    <view class="progress-dots">
+      <view wx:for="{{queue}}" wx:key="id" wx:for-index="idx" class="dot {{index===idx?'on':(idx<index?'done':'')}}"></view>
+    </view>
+
+    <view class="stage-word">{{current.word}}</view>
+    <view class="stage-phonetic" wx:if="{{current.phonetic}}">{{current.phonetic}}</view>
+    <view class="stage-meaning">{{current.meaning}}</view>
+
+    <view class="player-btns">
+      <button class="play-btn" bindtap="playSlow">🐢 慢速</button>
+      <button class="play-btn primary" bindtap="playStd">▶️ 标准发音</button>
+    </view>
+
+    <view class="example-box">
+      <view class="example-title">开口例句 · 跟着说</view>
+      <view class="example-en">{{current.example}}</view>
+      <view class="example-cn">{{current.exampleCn}}</view>
+      <button class="play-example" bindtap="playExample">🔊 听例句</button>
+    </view>
+
+    <view class="record-zone">
+      <view class="record-btn {{recording?'recording':''}}" bindtap="toggleRecord">
+        <view class="mic">{{recording?'⏹':'🎤'}}</view>
+        <view class="record-label">{{recording?'点此停止录音':'点此开始录音跟读'}}</view>
+      </view>
+      <view class="playback" wx:if="{{hasRecording}}">
+        <view class="play-mine {{playingMine?'playing':''}}" bindtap="playMine">▶️ 听我的回放</view>
+        <view class="muted">对比标准音，看看哪里可以更像</view>
+      </view>
+    </view>
+
+    <view class="rate-area" wx:if="{{hasRecording}}">
+      <view class="rate-title">说得怎么样？</view>
+      <view class="rate-btns">
+        <view class="rate-btn again" data-q="0" bindtap="rate">🔁 再练练</view>
+        <view class="rate-btn ok" data-q="1" bindtap="rate">👍 基本流利</view>
+        <view class="rate-btn great" data-q="2" bindtap="rate">🌟 很流利</view>
+      </view>
+    </view>
+
+    <view class="stage-actions">
+      <button class="btn-ghost" bindtap="prev" wx:if="{{index>0}}">上一个</button>
+      <button class="btn-ghost" bindtap="next">跳过 ›</button>
+    </view>
+  </view>
+
+  <view class="empty card" wx:else>
+    <view class="empty-icon">🎧</view>
+    <view class="title">词库为空</view>
+    <view class="muted">去「学习」页添加一些单词再来吧</view>
+  </view>
+</view>

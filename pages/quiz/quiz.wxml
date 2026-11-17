@@ -1,0 +1,58 @@
+<view class="container">
+  <block wx:if="{{!finished && current}}">
+    <view class="quiz-head">
+      <view class="row between">
+        <view class="title">小测验</view>
+        <view class="muted">{{index+1}} / {{total}}</view>
+      </view>
+      <view class="progress-track"><view class="progress-fill" style="width:{{progress}}%"></view></view>
+      <view class="score-row">
+        <view class="score-chip correct">✅ 正确 {{correctCount}}</view>
+        <view class="score-chip wrong">❌ 错误 {{wrongCount}}</view>
+      </view>
+    </view>
+
+    <view class="card question-card">
+      <view class="q-type">{{current.type==='choice'?'选择题':'拼写题'}}</view>
+      <view class="q-prompt" wx:if="{{current.type==='choice'}}">“{{current.question}}” 的意思是？</view>
+      <view class="q-prompt" wx:else>根据释义拼写单词</view>
+      <view class="q-hint" wx:if="{{current.type==='spell'}}">{{current.question}}</view>
+
+      <!-- 选择题 -->
+      <view class="options" wx:if="{{current.type==='choice'}}">
+        <view wx:for="{{current.options}}" wx:key="*this" wx:for-index="oi"
+              class="option {{selected===item?'selected':''}} {{revealed?(item===current.answer?'right':(selected===item?'wrong':'')):''}}"
+              bindtap="choose" data-val="{{item}}">
+          <text class="opt-letter">{{indexLetters[oi]}}</text>{{item}}
+        </view>
+      </view>
+
+      <!-- 拼写题 -->
+      <view class="spell-box" wx:if="{{current.type==='spell'}}">
+        <input class="spell-input" placeholder="输入单词后点提交" value="{{spellInput}}"
+               bindinput="onSpellInput" disabled="{{revealed}}" confirm-type="done" bindconfirm="submitSpell" />
+      </view>
+
+      <view class="feedback {{isRight?'fb-right':'fb-wrong'}}" wx:if="{{revealed}}">
+        <view class="fb-title">{{isRight?'✅ 回答正确':'❌ 回答错误'}}</view>
+        <view class="fb-answer" wx:if="{{!isRight}}">正确答案：{{current.answer}}</view>
+        <view class="fb-example">{{current.example}}</view>
+      </view>
+
+      <button class="btn-primary action-btn" wx:if="{{current.type==='choice' && selected && !revealed}}" bindtap="submitChoice">提交答案</button>
+      <button class="btn-primary action-btn" wx:if="{{current.type==='spell' && !revealed}}" bindtap="submitSpell">提交答案</button>
+      <button class="btn-primary action-btn" wx:if="{{revealed}}" bindtap="nextQuestion">{{index===total-1?'查看结果':'下一题 ›'}}</button>
+    </view>
+  </block>
+
+  <!-- 结果页 -->
+  <view class="card result" wx:if="{{finished}}">
+    <view class="result-emoji">{{accuracy>=80?'🎉':(accuracy>=60?'👍':'💪')}}</view>
+    <view class="result-title">测验完成</view>
+    <view class="result-accuracy">{{accuracy}}%</view>
+    <view class="result-sub">正确率</view>
+    <view class="result-detail">答对 {{correctCount}} 题 · 共 {{total}} 题</view>
+    <button class="btn-primary result-btn" bindtap="restart">再来一组</button>
+    <button class="btn-ghost result-btn" bindtap="goStats">查看统计</button>
+  </view>
+</view>

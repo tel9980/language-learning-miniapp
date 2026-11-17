@@ -1,0 +1,42 @@
+<view class="container">
+  <view class="search-bar card">
+    <view class="search-icon">🔍</view>
+    <input class="search-input" placeholder="搜索单词、释义或例句" confirm-type="search"
+           value="{{keyword}}" bindinput="onInput" />
+    <view class="clear-btn" wx:if="{{keyword}}" bindtap="clearKeyword">✕</view>
+  </view>
+
+  <view class="filter-row">
+    <view class="filter-label">{{langName}} · 分类</view>
+    <picker bindchange="onCatChange" value="{{catIndex}}" range="{{categories}}">
+      <view class="filter-picker">{{categories[catIndex]}} ▾</view>
+    </picker>
+    <view class="result-count">共 {{resultCount}} 词</view>
+  </view>
+
+  <view class="result-list">
+    <view class="word-item card" wx:for="{{results}}" wx:for-index="idx" wx:key="id"
+          data-id="{{item.id}}" bindtap="toggleDetail">
+      <view class="word-head">
+        <view class="word-main">
+          <text class="word-text">{{item.word}}</text>
+          <text class="word-phonetic">{{item.phonetic}}</text>
+        </view>
+        <view class="play-btn" data-word="{{item.word}}" catchtap="playWord">🔊</view>
+      </view>
+      <view class="word-meaning">{{item.meaning}}</view>
+      <view class="word-cat">{{item.category}}</view>
+
+      <view class="word-detail" wx:if="{{expandedId === item.id}}">
+        <view class="detail-label">例句</view>
+        <view class="detail-en">{{item.example}}</view>
+        <view class="detail-cn">{{item.exampleCn}}</view>
+      </view>
+    </view>
+
+    <view class="empty" wx:if="{{resultCount === 0}}">
+      <view class="empty-icon">🔎</view>
+      <view>没有找到匹配的单词，换个关键词试试</view>
+    </view>
+  </view>
+</view>

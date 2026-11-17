@@ -1,0 +1,80 @@
+<view class="container">
+  <!-- 列表模式 -->
+  <block wx:if="{{mode === 'list'}}">
+    <view class="header card">
+      <view class="header-title">📕 我的错词本</view>
+      <view class="header-sub">记错过的词都在这里，优先重练薄弱词</view>
+      <view class="header-stats">
+        <view class="hstat"><view class="hnum">{{total}}</view><view class="hlabel">错词总数</view></view>
+        <view class="hstat"><view class="hnum">{{items.length}}</view><view class="hlabel">待加强</view></view>
+      </view>
+      <button class="primary-btn" wx:if="{{total > 0}}" bindtap="startReview">开始重练</button>
+    </view>
+
+    <view class="word-list">
+      <view class="word-item card" wx:for="{{items}}" wx:key="id"
+            data-id="{{item.id}}" bindtap="toggleDetail">
+        <view class="word-head">
+          <view class="word-main">
+            <text class="word-text">{{item.word}}</text>
+            <text class="word-phonetic">{{item.phonetic}}</text>
+          </view>
+          <view class="lapse-badge">错 {{item.lapses}} 次</view>
+        </view>
+        <view class="word-meaning">{{item.meaning}}</view>
+        <view class="word-meta">当前等级 L{{item.level}} · 复习间隔 {{item.interval}} 天
+          <text class="play" data-word="{{item.word}}" catchtap="playWord">🔊</text>
+        </view>
+        <view class="word-detail" wx:if="{{expandedId === item.id}}">
+          <view class="detail-en">{{item.example}}</view>
+          <view class="detail-cn">{{item.exampleCn}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty" wx:if="{{total === 0}}">
+      <view class="empty-icon">🎉</view>
+      <view>还没有错词，继续保持！</view>
+      <view class="empty-sub">答错过的单词会自动收进这里</view>
+    </view>
+  </block>
+
+  <!-- 重练模式 -->
+  <block wx:if="{{mode === 'review'}}">
+    <view class="review-head">
+      <view class="progress-info">重练进度 {{reviewIndex + 1}} / {{reviewTotal}}</view>
+      <view class="progress-track"><view class="progress-fill" style="width:{{(reviewIndex)/reviewTotal*100}}%"></view></view>
+    </view>
+    <view class="review-card card" wx:if="{{current}}">
+      <view class="review-word">{{current.word}}</view>
+      <view class="review-phonetic">{{current.phonetic}}
+        <text class="play" data-word="{{current.word}}" catchtap="playWord">🔊</text>
+      </view>
+      <view class="review-hint">想想它是什么意思？</view>
+      <view class="answer-area" wx:if="{{showAnswer}}">
+        <view class="answer-meaning">{{current.meaning}}</view>
+        <view class="answer-example">{{current.example}}</view>
+        <view class="answer-cn">{{current.exampleCn}}</view>
+      </view>
+      <view class="answer-placeholder" wx:if="{{!showAnswer}}">点击下面按钮查看答案</view>
+    </view>
+    <view class="grade-btns" wx:if="{{!showAnswer}}">
+      <button class="grade-btn show" bindtap="showAnswer">显示答案</button>
+    </view>
+    <view class="grade-btns" wx:if="{{showAnswer}}">
+      <button class="grade-btn bad" data-q="0" bindtap="grade">不记得</button>
+      <button class="grade-btn mid" data-q="3" bindtap="grade">有印象</button>
+      <button class="grade-btn good" data-q="5" bindtap="grade">记得</button>
+    </view>
+  </block>
+
+  <!-- 完成模式 -->
+  <block wx:if="{{mode === 'done'}}">
+    <view class="done-view">
+      <view class="done-icon">✅</view>
+      <view class="done-title">重练完成！</view>
+      <view class="done-sub">共复习 {{doneCount}} 个错词</view>
+      <button class="primary-btn" bindtap="backToList">返回错词本</button>
+    </view>
+  </block>
+</view>

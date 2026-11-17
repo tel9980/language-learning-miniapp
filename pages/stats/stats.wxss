@@ -1,0 +1,31 @@
+.summary { display: flex; margin-bottom: 24rpx; }
+.summary-item { flex: 1; text-align: center; }
+.s-num { font-size: 52rpx; font-weight: 800; color: #4A6CF7; }
+.s-label { font-size: 22rpx; color: #8A94A6; margin-top: 8rpx; }
+.chart-card, .levels-card, .goal-card, .data-card, .speak-card { margin-bottom: 24rpx; }
+.section-title { font-size: 30rpx; font-weight: 700; margin-bottom: 24rpx; }
+.muted { font-size: 24rpx; color: #8A94A6; line-height: 1.6; }
+.row.between { display: flex; justify-content: space-between; align-items: center; }
+.speak-stats { display: flex; }
+.speak-item { flex: 1; text-align: center; }
+.speak-item .s-num { font-size: 52rpx; }
+.chart-wrap { width: 100%; height: 360rpx; }
+.chart { width: 100%; height: 360rpx; }
+.level-row { display: flex; align-items: center; margin-bottom: 20rpx; }
+.level-name { width: 120rpx; font-size: 24rpx; color: #5A6474; }
+.level-track { flex: 1; height: 18rpx; background: #EEF1FB; border-radius: 999rpx; overflow: hidden; }
+.level-fill { height: 100%; border-radius: 999rpx; transition: width 0.3s; }
+.level-count { width: 50rpx; text-align: right; font-size: 24rpx; color: #8A94A6; }
+.goal-edit { font-size: 24rpx; color: #4A6CF7; }
+.data-btns { display: flex; margin-top: 24rpx; }
+.data-btn {
+  flex: 1;
+  text-align: center;
+  font-size: 28rpx;
+  padding: 20rpx 0;
+  border-radius: 16rpx;
+  margin-right: 16rpx;
+}
+.data-btn:last-child { margin-right: 0; }
+.data-btn.export { background: #4A6CF7; color: #fff; }
+.data-btn.import { background: #EDF1FF; color: #4A6CF7; }

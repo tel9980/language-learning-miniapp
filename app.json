@@ -1,0 +1,34 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/speak/speak",
+    "pages/learn/learn",
+    "pages/quiz/quiz",
+    "pages/stats/stats",
+    "pages/search/search",
+    "pages/wrong/wrong"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#4A6CF7",
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "语伴 · 外语学习",
+    "backgroundColor": "#F5F7FB",
+    "backgroundTextStyle": "light",
+    "enablePullDownRefresh": false
+  },
+  "tabBar": {
+    "color": "#8A94A6",
+    "selectedColor": "#4A6CF7",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "首页" },
+      { "pagePath": "pages/speak/speak", "text": "口语" },
+      { "pagePath": "pages/learn/learn", "text": "学习" },
+      { "pagePath": "pages/quiz/quiz", "text": "测验" },
+      { "pagePath": "pages/stats/stats", "text": "统计" }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}
