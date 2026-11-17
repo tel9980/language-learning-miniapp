@@ -1,0 +1,11 @@
+.header { margin-bottom: 20rpx; }
+.header .title { font-size: 36rpx; font-weight: 700; color: #1F2430; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; padding: 28rpx 24rpx; margin-bottom: 16rpx; }
+.label { font-size: 28rpx; color: #1F2430; }
+.switch { width: 88rpx; height: 48rpx; border-radius: 24rpx; background: #D5DAE6; position: relative; transition: background .2s; }
+.switch.on { background: #4A6CF7; }
+.knob { width: 40rpx; height: 40rpx; border-radius: 50%; background: #fff; position: absolute; top: 4rpx; left: 4rpx; box-shadow: 0 2rpx 6rpx rgba(0,0,0,.15); transition: left .2s; }
+.switch.on .knob { left: 44rpx; }
+.picker-val { color: #4A6CF7; font-size: 28rpx; }
+.note .section-title { margin-bottom: 12rpx; }
+.note .muted { display: block; line-height: 1.7; margin-bottom: 8rpx; }

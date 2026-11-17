@@ -71,6 +71,34 @@ ok(sentences.getAllItems('en').length > 30, 'all speaking items > 30')
 ok(sentences.getLevels().indexOf('B2') >= 0, 'has B2 level')
 ok(sentences.getSentences('en', 'A1').every(x => x.level === 'A1'), 'level filter works')
 
+// ---- profile + family (with minimal wx storage mock) ----
+const _store = {}
+global.wx = {
+  getStorageSync: k => (k in _store ? _store[k] : ''),
+  setStorageSync: (k, v) => { _store[k] = v },
+  removeStorageSync: k => { delete _store[k] },
+  removeSavedFile: () => {}
+}
+const profile = require('../utils/profile')
+eq(profile.list().length, 1, 'default profile created')
+eq(profile.current(), profile.DEFAULT_ID, 'current is default')
+const p2 = profile.add('妈妈', 'elder')
+eq(profile.list().length, 2, 'profile added')
+eq(profile.get(p2).mode, 'elder', 'added profile keeps mode')
+ok(profile.nsKey('lp_stats_v1', p2).indexOf('@' + p2) > 0, 'nsKey namespaced by profile')
+ok(profile.nsKey('lp_stats_v1') === 'lp_stats_v1@' + profile.current(), 'nsKey uses current profile')
+ok(profile.switchTo(p2), 'switch to profile 2')
+eq(profile.current(), p2, 'current switched')
+const rf = profile.remove(p2)
+ok(rf.ok, 'non-default profile removable')
+ok(!profile.remove(profile.DEFAULT_ID).ok, 'default profile not removable')
+const family = require('../utils/family')
+ok(family.addComment('r_test', '加油'), 'add comment ok')
+eq(family.getComments('r_test').length, 1, 'comment stored')
+family.removeComment('r_test', family.getComments('r_test')[0].id)
+eq(family.getComments('r_test').length, 0, 'comment removed')
+ok(Array.isArray(family.leaderboard()), 'leaderboard returns array')
+
 console.log(`\n单元测试结果：${pass} 通过 / ${fail} 失败`)
 if (fail) {
   failures.forEach(f => console.log('  ✗ ' + f))

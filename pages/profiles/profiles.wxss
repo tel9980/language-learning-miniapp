@@ -1,0 +1,17 @@
+.profiles-placeholder {}
+.header { margin-bottom: 24rpx; }
+.header .title { font-size: 36rpx; font-weight: 700; color: #1F2430; }
+.profile { display: flex; align-items: center; padding: 24rpx; margin-bottom: 20rpx; }
+.profile.current { border: 2rpx solid #4A6CF7; }
+.avatar { width: 88rpx; height: 88rpx; border-radius: 50%; background: #EEF2FF; text-align: center; line-height: 88rpx; font-size: 44rpx; margin-right: 20rpx; flex-shrink: 0; }
+.info { flex: 1; min-width: 0; }
+.name-row { display: flex; align-items: center; }
+.name { font-size: 30rpx; font-weight: 600; color: #1F2430; }
+.tag { font-size: 20rpx; color: #4A6CF7; background: #EEF2FF; border-radius: 8rpx; padding: 2rpx 10rpx; margin-left: 12rpx; }
+.tag.mode { color: #8A94A6; background: #F2F4F9; }
+.actions { display: flex; flex-direction: column; gap: 8rpx; margin-left: 12rpx; }
+.mini-btn { font-size: 20rpx; color: #4A6CF7; border: 1rpx solid #C9D4FF; border-radius: 8rpx; padding: 4rpx 12rpx; text-align: center; }
+.mini-btn.danger { color: #E5484D; border-color: #FFC9CB; }
+.add-btn { background: #4A6CF7; color: #fff; text-align: center; padding: 24rpx; border-radius: 16rpx; font-size: 30rpx; font-weight: 600; margin: 12rpx 0 24rpx; }
+.tip-card { background: #F7F9FD; }
+.tip { line-height: 1.6; }

@@ -4,15 +4,16 @@
 
 const KEY = 'lp_recordings_v1'
 const MAX_KEEP = 30
+const profile = require('./profile')
 
 function read() {
   try {
-    const v = wx.getStorageSync(KEY)
+    const v = wx.getStorageSync(profile.nsKey(KEY))
     return v ? JSON.parse(v) : []
   } catch (e) { return [] }
 }
 function write(list) {
-  try { wx.setStorageSync(KEY, JSON.stringify(list)) } catch (e) {}
+  try { wx.setStorageSync(profile.nsKey(KEY), JSON.stringify(list)) } catch (e) {}
 }
 
 // 保存一条录音：tempFilePath 是 RecorderManager.onStop 给的临时路径

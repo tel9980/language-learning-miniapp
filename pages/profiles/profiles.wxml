@@ -1,0 +1,29 @@
+<view class="container {{themeClass}}">
+  <view class="header card">
+    <view class="title">👨‍👩‍👧‍👦 家人档案</view>
+    <view class="muted">每人一份独立进度，互不干扰</view>
+  </view>
+
+  <view wx:for="{{profiles}}" wx:key="id" class="profile card {{item.isCurrent?'current':''}}" bindtap="choose" data-id="{{item.id}}">
+    <view class="avatar">{{item.avatar}}</view>
+    <view class="info">
+      <view class="name-row">
+        <view class="name">{{item.name}}</view>
+        <view class="tag" wx:if="{{item.isCurrent}}">当前</view>
+        <view class="tag mode">{{item.modeName}}</view>
+      </view>
+      <view class="muted">连续 {{item.streak}} 天 · 已学 {{item.learned}} 词</view>
+    </view>
+    <view class="actions" catchtap="noop">
+      <view class="mini-btn" catchtap="rename" data-id="{{item.id}}">改名</view>
+      <view class="mini-btn" catchtap="changeMode" data-id="{{item.id}}">模式</view>
+      <view class="mini-btn danger" wx:if="{{!item.isCurrent}}" catchtap="remove" data-id="{{item.id}}">删除</view>
+    </view>
+  </view>
+
+  <view class="add-btn" bindtap="addProfile">＋ 新增家人档案</view>
+
+  <view class="card tip-card">
+    <view class="muted tip">切换档案后，首页、口语、学习、测验、统计里的数据都会跟着切换。数据只存在这台设备的微信里，不会上传。</view>
+  </view>
+</view>

@@ -2,10 +2,15 @@
   <view class="hero card">
     <view class="row between">
       <view>
-        <view class="greeting">你好，学习者 👋</view>
+        <view class="greeting">你好，{{myName}} 👋</view>
         <view class="hero-title">今天也开口说一说吧</view>
       </view>
       <view class="lang-badge" bindtap="switchLang">{{langFlag}} {{langName}} ▾</view>
+    </view>
+    <view class="profile-bar" bindtap="goProfiles">
+      <view class="avatar">{{myAvatar}}</view>
+      <view class="profile-name">{{myName}} · {{modeName}}模式</view>
+      <view class="muted">切换家人档案 ›</view>
     </view>
     <view class="hero-stats">
       <view class="hero-stat">
@@ -91,6 +96,42 @@
       <view class="entry-body">
         <view class="entry-title">我的录音</view>
         <view class="muted">回听练习轨迹，对比进步</view>
+      </view>
+      <view class="arrow">›</view>
+    </view>
+  </view>
+
+  <view class="family-section">
+    <view class="section-label">👨‍👩‍👧‍👦 家人朋友</view>
+    <view class="entry card" bindtap="goFamily">
+      <view class="entry-icon family">🏆</view>
+      <view class="entry-body">
+        <view class="entry-title">家庭排行榜</view>
+        <view class="muted">看看今天谁最用功</view>
+      </view>
+      <view class="arrow">›</view>
+    </view>
+    <view class="entry card" bindtap="goFamilyRecordings">
+      <view class="entry-icon famrec">🎧</view>
+      <view class="entry-body">
+        <view class="entry-title">全家录音墙</view>
+        <view class="muted">听家人练习，互相点评</view>
+      </view>
+      <view class="arrow">›</view>
+    </view>
+    <view class="entry card" bindtap="goShare">
+      <view class="entry-icon share">📣</view>
+      <view class="entry-body">
+        <view class="entry-title">邀请朋友</view>
+        <view class="muted">转发卡片，一起练口语</view>
+      </view>
+      <view class="arrow">›</view>
+    </view>
+    <view class="entry card" bindtap="goReminder">
+      <view class="entry-icon remind">⏰</view>
+      <view class="entry-body">
+        <view class="entry-title">学习提醒</view>
+        <view class="muted">设个时间，别忘了练</view>
       </view>
       <view class="arrow">›</view>
     </view>

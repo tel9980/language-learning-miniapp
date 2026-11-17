@@ -1,6 +1,7 @@
 // 本地存储 + 复习调度（SM-2 风格动态间隔，见 utils/fsrs.js）
 const { getWords } = require('./words')
 const fsrs = require('./fsrs')
+const profile = require('./profile')
 
 const KEY_PROGRESS = 'lp_progress_v1'   // { [wordId]: { level, ef, reps, lapses, dueAt } }
 const KEY_STATS    = 'lp_stats_v1'      // 累计统计
@@ -33,7 +34,7 @@ function defaults() {
 
 function read(key, fallback) {
   try {
-    const v = wx.getStorageSync(key)
+    const v = wx.getStorageSync(profile.nsKey(key))
     return v ? JSON.parse(v) : fallback
   } catch (e) {
     return fallback
@@ -41,18 +42,26 @@ function read(key, fallback) {
 }
 
 function write(key, value) {
-  try { wx.setStorageSync(key, JSON.stringify(value)) } catch (e) {}
+  try { wx.setStorageSync(profile.nsKey(key), JSON.stringify(value)) } catch (e) {}
+}
+
+function rawHas(key) {
+  try { return !!wx.getStorageSync(profile.nsKey(key)) } catch (e) { return false }
 }
 
 function init() {
+  // 把升级前的老数据搬到默认档案，只做一次
+  profile.migrateLegacy([KEY_PROGRESS, KEY_STATS, KEY_SETTINGS, KEY_DAILY, KEY_CUSTOM, KEY_THEME,
+    'lp_speak_records_v1', 'lp_speak_focus_v1', 'lp_speak_daily_v1', 'lp_recordings_v1'])
+  profile.list() // 确保默认档案存在
   const d = defaults()
   d.stats.firstDay = todayKey()
-  if (!wx.getStorageSync(KEY_SETTINGS)) write(KEY_SETTINGS, d.settings)
-  if (!wx.getStorageSync(KEY_STATS)) write(KEY_STATS, d.stats)
-  if (!wx.getStorageSync(KEY_DAILY)) write(KEY_DAILY, d.daily)
-  if (!wx.getStorageSync(KEY_PROGRESS)) write(KEY_PROGRESS, d.progress)
-  if (!wx.getStorageSync(KEY_CUSTOM)) write(KEY_CUSTOM, d.custom)
-  if (!wx.getStorageSync(KEY_THEME)) write(KEY_THEME, d.theme)
+  if (!rawHas(KEY_SETTINGS)) write(KEY_SETTINGS, d.settings)
+  if (!rawHas(KEY_STATS)) write(KEY_STATS, d.stats)
+  if (!rawHas(KEY_DAILY)) write(KEY_DAILY, d.daily)
+  if (!rawHas(KEY_PROGRESS)) write(KEY_PROGRESS, d.progress)
+  if (!rawHas(KEY_CUSTOM)) write(KEY_CUSTOM, d.custom)
+  if (!rawHas(KEY_THEME)) write(KEY_THEME, d.theme)
   // 老用户补齐新增设置字段
   const s = getSettings()
   let changed = false

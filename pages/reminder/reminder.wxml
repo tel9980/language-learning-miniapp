@@ -1,0 +1,21 @@
+<view class="container {{themeClass}}">
+  <view class="header card">
+    <view class="title">⏰ 学习提醒</view>
+    <view class="muted">每天固定时间提醒家人练口语</view>
+  </view>
+  <view class="card setting-row">
+    <view class="label">开启提醒偏好</view>
+    <view class="switch {{enabled?'on':''}}" bindtap="toggle"><view class="knob"></view></view>
+  </view>
+  <view class="card setting-row">
+    <view class="label">提醒时间</view>
+    <picker mode="time" value="{{time}}" bindchange="changeTime"><view class="picker-val">{{time}} ›</view></picker>
+  </view>
+  <view class="card note">
+    <view class="section-title">为什么还收不到通知？</view>
+    <view class="muted">微信的"定时推送"需要小程序后台服务 + 订阅消息模板 ID，属于付费服务器功能，本项目坚持零后端所以没有接入。</view>
+    <view class="muted">现在仅保存你的提醒偏好到本机。真要实现，有两种免费替代：</view>
+    <view class="muted">① 用手机自带的"闹钟/日历提醒"，每天 {{time}} 提醒；</view>
+    <view class="muted">② 正式发布后，在微信公众平台申请订阅消息模板并接一个云函数（微信云开发有免费额度）即可推送。</view>
+  </view>
+</view>

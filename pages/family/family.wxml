@@ -1,0 +1,20 @@
+<view class="container {{themeClass}}">
+  <view class="header card">
+    <view class="title">🏆 家庭排行榜</view>
+    <view class="muted">看看今天谁最用功，数据都在本机</view>
+  </view>
+  <view class="sorts">
+    <view class="sort {{sortKey=='todaySpeak'?'active':''}}" bindtap="setSort" data-key="todaySpeak">今日口语</view>
+    <view class="sort {{sortKey=='streak'?'active':''}}" bindtap="setSort" data-key="streak">连续天数</view>
+    <view class="sort {{sortKey=='learned'?'active':''}}" bindtap="setSort" data-key="learned">累计学词</view>
+  </view>
+  <view wx:for="{{rows}}" wx:key="id" class="row card {{item.isCurrent?'me':''}}">
+    <view class="rank {{item.rank<=3?'top':''}}">{{item.rank}}</view>
+    <view class="avatar">{{item.avatar}}</view>
+    <view class="info">
+      <view class="name">{{item.name}} <text class="me-tag" wx:if="{{item.isCurrent}}">我</text></view>
+      <view class="muted">连续 {{item.streak}} 天 · 口语 {{item.speaks}} 次</view>
+    </view>
+    <view class="score">{{sortKey=='todaySpeak'?item.todaySpeak:(sortKey=='streak'?item.streak:item.learned)}}</view>
+  </view>
+</view>

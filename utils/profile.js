@@ -1,0 +1,148 @@
+// 多档案：一家人共用一台设备时，各人有各人独立的进度/统计/录音。
+// 做法：所有业务数据的 Storage key 加 "@档案id" 命名空间；老数据自动迁移到默认档案。
+const KEY_LIST = 'lp_profiles_v1'
+const KEY_CURRENT = 'lp_profile_current_v1'
+const DEFAULT_ID = 'p_default'
+
+const MODES = {
+  normal: { name: '标准', fontScale: 1, darkMode: false },
+  kid:    { name: '儿童', fontScale: 1.18, darkMode: false },
+  elder:  { name: '长辈', fontScale: 1.35, darkMode: false }
+}
+
+function rawRead(key, fallback) {
+  try { const v = wx.getStorageSync(key); return v ? JSON.parse(v) : fallback } catch (e) { return fallback }
+}
+function rawWrite(key, value) {
+  try { wx.setStorageSync(key, JSON.stringify(value)) } catch (e) {}
+}
+
+// 档案列表：首次自动建默认档案
+function list() {
+  let arr = rawRead(KEY_LIST, null)
+  if (!Array.isArray(arr) || arr.length === 0) {
+    arr = [{ id: DEFAULT_ID, name: '我', avatar: '😀', mode: 'normal', createdAt: Date.now() }]
+    rawWrite(KEY_LIST, arr)
+  }
+  return arr
+}
+
+function current() {
+  let id = ''
+  try { id = wx.getStorageSync(KEY_CURRENT) } catch (e) {}
+  if (!id || !list().some(function (p) { return p.id === id })) {
+    id = DEFAULT_ID
+    try { wx.setStorageSync(KEY_CURRENT, id) } catch (e) {}
+  }
+  return id
+}
+
+function get(id) {
+  return list().find(function (p) { return p.id === (id || current()) }) || null
+}
+function currentProfile() { return get(current()) }
+
+function switchTo(id) {
+  if (!get(id)) return false
+  try { wx.setStorageSync(KEY_CURRENT, id) } catch (e) {}
+  applyMode(id)
+  return true
+}
+
+function add(name, mode) {
+  const arr = list()
+  const id = 'p_' + Date.now() + '_' + Math.floor(Math.random() * 1000)
+  arr.push({
+    id: id,
+    name: (name || ('成员' + (arr.length + 1))).slice(0, 12),
+    avatar: ['😀', '🐱', '🦊', '🐼', '🐯', '🌸'][arr.length % 6],
+    mode: MODES[mode] ? mode : 'normal',
+    createdAt: Date.now()
+  })
+  rawWrite(KEY_LIST, arr)
+  return id
+}
+
+function rename(id, name) {
+  const arr = list()
+  const p = arr.find(function (x) { return x.id === id })
+  if (!p || !name) return false
+  p.name = String(name).slice(0, 12)
+  rawWrite(KEY_LIST, arr)
+  return true
+}
+
+function setMode(id, mode) {
+  const arr = list()
+  const p = arr.find(function (x) { return x.id === id })
+  if (!p || !MODES[mode]) return false
+  p.mode = mode
+  rawWrite(KEY_LIST, arr)
+  if (id === current()) applyMode(id)
+  return true
+}
+
+// 切换"标准/儿童/长辈"时给该档案预设字号与深色
+function applyMode(id) {
+  const p = get(id)
+  if (!p) return
+  const m = MODES[p.mode] || MODES.normal
+  try {
+    const theme = require('./storage')
+    theme.setFontScale(m.fontScale)
+    theme.setDarkMode(m.darkMode)
+  } catch (e) {}
+}
+
+// 删除档案：清理其命名空间下的数据与录音文件；默认档案/最后一个不可删
+function remove(id) {
+  const arr = list()
+  if (id === DEFAULT_ID || arr.length <= 1) return { ok: false, reason: '默认档案不能删除' }
+  const p = arr.find(function (x) { return x.id === id })
+  if (!p) return { ok: false, reason: '档案不存在' }
+  const baseKeys = ['lp_progress_v1', 'lp_stats_v1', 'lp_settings_v1', 'lp_daily_v1',
+    'lp_custom_items_v1', 'lp_theme_v1', 'lp_speak_records_v1', 'lp_speak_focus_v1',
+    'lp_speak_daily_v1', 'lp_recordings_v1']
+  baseKeys.forEach(function (k) {
+    try { wx.removeStorageSync(nsKey(k, id)) } catch (e) {}
+  })
+  // 录音物理文件
+  try {
+    const recs = rawRead(nsKey('lp_recordings_v1', id), [])
+    recs.forEach(function (r) { if (r.filePath) wx.removeSavedFile({ filePath: r.filePath, fail() {} }) })
+  } catch (e) {}
+  rawWrite(KEY_LIST, arr.filter(function (x) { return x.id !== id }))
+  if (current() === id) {
+    try { wx.setStorageSync(KEY_CURRENT, DEFAULT_ID) } catch (e) {}
+    applyMode(DEFAULT_ID)
+  }
+  return { ok: true }
+}
+
+// 命名空间 key：业务模块统一通过它读写，做到档案间数据隔离
+function nsKey(baseKey, profileId) {
+  return baseKey + '@' + (profileId || current())
+}
+
+// 老数据迁移：把无命名空间的旧 key 搬到默认档案（只搬一次，之后删除旧 key）
+function migrateLegacy(baseKeys) {
+  const keys = baseKeys || ['lp_progress_v1', 'lp_stats_v1', 'lp_settings_v1', 'lp_daily_v1',
+    'lp_custom_items_v1', 'lp_theme_v1', 'lp_speak_records_v1', 'lp_speak_focus_v1',
+    'lp_speak_daily_v1', 'lp_recordings_v1']
+  keys.forEach(function (k) {
+    try {
+      const old = wx.getStorageSync(k)
+      if (!old) return
+      const target = nsKey(k, DEFAULT_ID)
+      if (!wx.getStorageSync(target)) wx.setStorageSync(target, old)
+      wx.removeStorageSync(k)
+    } catch (e) {}
+  })
+}
+
+function modes() { return MODES }
+
+module.exports = {
+  list, current, get, currentProfile, switchTo, add, rename, setMode, remove,
+  nsKey, migrateLegacy, modes, DEFAULT_ID
+}

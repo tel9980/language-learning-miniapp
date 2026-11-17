@@ -1,0 +1,18 @@
+<view class="container {{themeClass}}">
+  <view class="hero card">
+    <view class="big">📣</view>
+    <view class="title">邀请家人朋友一起练</view>
+    <view class="muted">每人练自己的，互不干扰；还能看家庭排行榜、互相点评录音</view>
+  </view>
+  <view class="card step">
+    <view class="step-num">1</view>
+    <view><view class="step-title">点右上角「···」→ 转发给朋友</view><view class="muted">或点下方按钮复制邀请文案</view></view>
+  </view>
+  <view class="card step">
+    <view class="step-num">2</view>
+    <view><view class="step-title">对方点开卡片即可试用</view><view class="muted">体验成员无需审核；正式发布后可扫码使用</view></view>
+  </view>
+  <button class="share-btn" open-type="share">转发给朋友</button>
+  <view class="copy-btn" bindtap="copyInvite">复制邀请文案</view>
+  <view class="card tip-card"><view class="muted tip">注：小程序昵称/分享卡片需在正式发布后显示完整名称；测试号阶段可先转发给体验成员试用。</view></view>
+</view>

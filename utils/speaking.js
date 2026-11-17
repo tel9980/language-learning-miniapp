@@ -1,6 +1,7 @@
 // 口语练习数据层：练习记录、重点复练清单、口语统计、每日打卡（纯本地 Storage）
-// 支持单词 id、句子 id（st_/dl_ 前缀）统一记录。
+// 支持单词 id、句子 id（st_/dl_ 前缀）统一记录。多档案：key 经 profile 命名空间隔离。
 const { getWords } = require('./words')
+const profile = require('./profile')
 
 const KEY_RECORDS  = 'lp_speak_records_v1'
 const KEY_FOCUS    = 'lp_speak_focus_v1'
@@ -8,14 +9,14 @@ const KEY_DAILY    = 'lp_speak_daily_v1'   // { 'YYYY-MM-DD': { count, good } }
 
 function read(key, fallback) {
   try {
-    const v = wx.getStorageSync(key)
+    const v = wx.getStorageSync(profile.nsKey(key))
     return v ? JSON.parse(v) : fallback
   } catch (e) {
     return fallback
   }
 }
 function write(key, value) {
-  try { wx.setStorageSync(key, JSON.stringify(value)) } catch (e) {}
+  try { wx.setStorageSync(profile.nsKey(key), JSON.stringify(value)) } catch (e) {}
 }
 function todayKey(d) {
   const t = d || new Date()
