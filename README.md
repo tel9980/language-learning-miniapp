@@ -76,6 +76,7 @@
 │   ├── speaking.js                   口语记录 + 重点清单 + 每日打卡
 │   ├── audio.js                      TTS 地址 + 播放器 + 发音源三级降级
 │   ├── favorites.js                  生词收藏夹 + 搜索历史（按档案隔离）
+│   ├── nav.js                        统一跳转（tabBar走switchTab + 跨tab意图传参）
 │   ├── karaoke.js                    逐词高亮（K歌字幕）+ 词级时间估算
 │   ├── feedback.js                   触感反馈（震动）
 │   ├── theme.js                      无障碍主题（字号/深色）页面 Behavior

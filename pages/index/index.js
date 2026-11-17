@@ -1,4 +1,5 @@
 const theme = require('../../utils/theme')
+const nav = require('../../utils/nav')
 const storage = require('../../utils/storage')
 const speaking = require('../../utils/speaking')
 const profile = require('../../utils/profile')
@@ -46,17 +47,17 @@ Page({
     wx.showToast({ title: '已切换到 ' + getLangMeta(next).name, icon: 'none' })
     this.refresh()
   },
-  goSpeak() { wx.navigateTo({ url: '/pages/speak/speak' }) },
-  goToday() { wx.navigateTo({ url: '/pages/today/today' }) },
-  goLearn() { wx.navigateTo({ url: '/pages/learn/learn' }) },
-  goQuiz()  { wx.navigateTo({ url: '/pages/quiz/quiz' }) },
-  goStats() { wx.navigateTo({ url: '/pages/stats/stats' }) },
-  goSearch() { wx.navigateTo({ url: '/pages/search/search' }) },
-  goWrong() { wx.navigateTo({ url: '/pages/wrong/wrong' }) },
-  goRecordings() { wx.navigateTo({ url: '/pages/recordings/recordings' }) },
-  goProfiles() { wx.navigateTo({ url: '/pages/profiles/profiles' }) },
-  goFamily() { wx.navigateTo({ url: '/pages/family/family' }) },
-  goFamilyRecordings() { wx.navigateTo({ url: '/pages/family-recordings/family-recordings' }) },
-  goShare() { wx.navigateTo({ url: '/pages/share/share' }) },
-  goReminder() { wx.navigateTo({ url: '/pages/reminder/reminder' }) }
+  goSpeak() { nav.go('/pages/speak/speak') },
+  goToday() { nav.go('/pages/today/today') },
+  goLearn() { nav.go('/pages/learn/learn') },
+  goQuiz()  { nav.go('/pages/quiz/quiz') },
+  goStats() { nav.go('/pages/stats/stats') },
+  goSearch() { nav.go('/pages/search/search') },
+  goWrong() { nav.go('/pages/wrong/wrong') },
+  goRecordings() { nav.go('/pages/recordings/recordings') },
+  goProfiles() { nav.go('/pages/profiles/profiles') },
+  goFamily() { nav.go('/pages/family/family') },
+  goFamilyRecordings() { nav.go('/pages/family-recordings/family-recordings') },
+  goShare() { nav.go('/pages/share/share') },
+  goReminder() { nav.go('/pages/reminder/reminder') }
 })

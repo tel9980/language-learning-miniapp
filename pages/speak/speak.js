@@ -8,6 +8,7 @@ const karaoke = require('../../utils/karaoke')
 const feedback = require('../../utils/feedback')
 const theme = require('../../utils/theme')
 const profile = require('../../utils/profile')
+const nav = require('../../utils/nav')
 const { getWords } = require('../../utils/words')
 
 // 跟读模式：word=单词 | sentence=句子 | dialogue=情景对话 | custom=自建素材
@@ -56,9 +57,14 @@ Page({
     this.syncTheme()
     const p = profile.currentProfile() || {}
     this.setData({ isKid: p.mode === 'kid', stars: storage.getStats().totalCorrect || 0 })
+    const intent = nav.takeIntent('pages/speak/speak')
     this.setData({ sceneIndex: 0 })
     this.refreshScenes()
-    this.buildQueueAndLoad()
+    if (intent && intent.focus) {
+      this.startFocus()
+    } else {
+      this.buildQueueAndLoad()
+    }
   },
 
   onHide() { this.stopAll() },

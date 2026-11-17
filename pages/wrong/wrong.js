@@ -1,4 +1,5 @@
 const theme = require('../../utils/theme')
+const audio = require('../../utils/audio')
 const storage = require('../../utils/storage')
 const { getWords, getLangMeta } = require('../../utils/words')
 
@@ -63,10 +64,9 @@ Page({
   playWord(e) {
     const word = e.currentTarget.dataset.word
     if (!word) return
-    const url = 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(word) + '&type=2'
-    if (!this._audio) this._audio = wx.createInnerAudioContext()
-    this._audio.src = url
-    this._audio.play()
+    const lang = storage.getCurrentLang()
+    if (this._audio && this._audio.destroy) this._audio.destroy()
+    this._audio = audio.speak(word, false, { lang: lang === 'ja' ? 'ja_JP' : 'en_US' })
   },
 
   startReview() {

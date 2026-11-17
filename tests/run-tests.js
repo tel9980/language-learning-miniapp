@@ -129,6 +129,27 @@ ok(sentences.getSentences('en').length >= 100, 'English sentences >= 100')
 const allIds = sentences.getSentences('en').map(function (x) { return x.id })
 eq(new Set(allIds).size, allIds.length, 'sentence ids unique')
 
+// ---- nav（tabBar 跳转必须走 switchTab，且能跨 tab 传意图） ----
+global.wx = global.wx || {}
+let lastSwitch = null, lastNav = null
+global.wx.switchTab = function (o) { lastSwitch = o.url }
+global.wx.navigateTo = function (o) { lastNav = o.url }
+const nav = require('../utils/nav')
+ok(nav.isTabPage('/pages/speak/speak'), 'speak is a tab page')
+ok(nav.isTabPage('pages/learn/learn'), 'learn is a tab page (no leading slash)')
+ok(!nav.isTabPage('/pages/search/search'), 'search is not a tab page')
+lastSwitch = null; lastNav = null
+nav.go('/pages/learn/learn')
+eq(lastSwitch, '/pages/learn/learn', 'tab page goes through switchTab')
+eq(lastNav, null, 'tab page does not use navigateTo')
+nav.go('/pages/search/search')
+eq(lastNav, '/pages/search/search', 'normal page goes through navigateTo')
+nav.go('/pages/speak/speak', { focus: 1 })
+const intent = nav.takeIntent('pages/speak/speak')
+ok(intent && intent.focus === 1, 'intent delivered to target page')
+eq(nav.takeIntent('pages/speak/speak'), null, 'intent consumed only once')
+eq(nav.takeIntent('pages/learn/learn'), null, 'intent not leaked to other pages')
+
 // ---- speech-score tts（无插件时静默降级） ----
 let ttsCbCalled = false
 sc.tts('hello', 'en_US', function (r) { ttsCbCalled = true; ok(!r.ok, 'tts degrades when no plugin') })

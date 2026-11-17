@@ -1,5 +1,6 @@
 // 今日待练：把 FSRS 到期词、口语重点项、错词本合成一个清单，每天打开就知道练什么。
 const theme = require('../../utils/theme')
+const nav = require('../../utils/nav')
 const storage = require('../../utils/storage')
 const speaking = require('../../utils/speaking')
 const sentences = require('../../utils/sentences')
@@ -66,12 +67,14 @@ Page({
     })
   },
 
-  // 点单项跳到对应练习页
+  // 点单项跳到对应练习页（tabBar 页走 switchTab + 意图传参）
   goItem(e) {
-    const url = e.currentTarget.dataset.target
-    if (url) wx.navigateTo({ url: url })
+    const type = e.currentTarget.dataset.type
+    if (type === 'due') return this.goLearn()
+    if (type === 'focus') return this.goSpeak()
+    nav.go('/pages/wrong/wrong')
   },
-  goLearn() { wx.navigateTo({ url: '/pages/learn/learn?mode=due' }) },
-  goSpeak() { wx.navigateTo({ url: '/pages/speak/speak?focus=1' }) },
-  goWrong() { wx.navigateTo({ url: '/pages/wrong/wrong' }) }
+  goLearn() { nav.go('/pages/learn/learn', { mode: 'due' }) },
+  goSpeak() { nav.go('/pages/speak/speak', { focus: 1 }) },
+  goWrong() { nav.go('/pages/wrong/wrong') }
 })

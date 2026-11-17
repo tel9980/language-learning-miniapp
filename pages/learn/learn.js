@@ -1,6 +1,8 @@
 const theme = require('../../utils/theme')
+const nav = require('../../utils/nav')
 const storage = require('../../utils/storage')
 const { getWords, getLangMeta } = require('../../utils/words')
+const audio = require('../../utils/audio')
 
 Page({
   behaviors: [theme],
@@ -9,7 +11,13 @@ Page({
     queue: [], index: 0, langName: '英语', tts: 'en-US', totalWords: 0
   },
   onShow() {
-    this.syncTheme(); this.load() },
+    this.syncTheme()
+    const intent = nav.takeIntent('pages/learn/learn')
+    if (intent && intent.mode && intent.mode !== this.data.mode) {
+      this.setData({ mode: intent.mode })
+    }
+    this.load()
+  },
   load() {
     const lang = storage.getCurrentLang()
     const meta = getLangMeta(lang)
@@ -36,18 +44,14 @@ Page({
   speak() {
     const w = this.data.current
     if (!w) return
-    // 微信同声传译/朗读取词插件未启用时，用 web-api 兜底不可行，这里用内置 TTS 能力提示
-    // 真机发音依赖「微信同声传译」插件；无插件时给出引导
-    if (wx.createInnerAudioContext) {
-      // 使用有道词典外链朗读（公开 TTS 接口），无需插件
-      const url = 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(w.word) + '&type=2'
-      const audio = wx.createInnerAudioContext()
-      audio.src = url
-      audio.play()
-      audio.onError(() => {
+    const lang = storage.getCurrentLang()
+    if (this._player && this._player.destroy) this._player.destroy()
+    this._player = audio.speak(w.word, false, {
+      lang: lang === 'ja' ? 'ja_JP' : 'en_US',
+      onError: function () {
         wx.showToast({ title: '朗读需联网或配置同声传译插件', icon: 'none' })
-      })
-    }
+      }
+    })
   },
   rate(e) {
     const q = Number(e.currentTarget.dataset.q)
