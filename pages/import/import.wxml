@@ -1,0 +1,29 @@
+<view class="container {{themeClass}}">
+  <view class="card intro">
+    <view class="title">导入我的素材 📥</view>
+    <view class="muted">把你自己的句子/台词加进来跟读。每行一条，支持「英文|中文」格式。</view>
+  </view>
+
+  <view class="card">
+    <view class="field-label">场景名称（可选）</view>
+    <input class="input" placeholder="如：商务邮件 / 旅行用语" value="{{scene}}" bindinput="onSceneInput" />
+
+    <view class="field-label">素材内容</view>
+    <textarea class="textarea" placeholder="例如：&#10;Could you send me the report?|你能把报告发我吗？&#10;Let's schedule a call.|我们约个电话吧。" value="{{text}}" bindinput="onTextInput" auto-height />
+
+    <view class="hint">已输入 {{count}} 条 · 每行一句，用 | 分隔中文释义</view>
+  </view>
+
+  <view class="card preview-card" wx:if="{{preview.length}}">
+    <view class="field-label">预览（前 {{preview.length}} 条）</view>
+    <view class="preview-item" wx:for="{{preview}}" wx:key="index">
+      <view class="preview-text">{{item.text}}</view>
+      <view class="preview-cn" wx:if="{{item.cn}}">{{item.cn}}</view>
+    </view>
+  </view>
+
+  <view class="btn-row">
+    <button class="btn-ghost" bindtap="clear">清空</button>
+    <button class="btn-primary" bindtap="save">保存到我的素材</button>
+  </view>
+</view>

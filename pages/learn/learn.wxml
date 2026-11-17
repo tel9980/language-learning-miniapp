@@ -1,4 +1,4 @@
-<view class="container">
+<view class="container {{themeClass}}">
   <!-- 模式切换 -->
   <view class="mode-tabs">
     <view class="mode-tab {{mode==='due'?'active':''}}" bindtap="setMode" data-mode="due">待复习 ({{dueCount}})</view>

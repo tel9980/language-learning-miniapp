@@ -6,6 +6,8 @@ const KEY_PROGRESS = 'lp_progress_v1'   // { [wordId]: { level, ef, reps, lapses
 const KEY_STATS    = 'lp_stats_v1'      // 累计统计
 const KEY_SETTINGS = 'lp_settings_v1'   // 设置
 const KEY_DAILY    = 'lp_daily_v1'      // { 'YYYY-MM-DD': { learned, reviewed, correct, total } }
+const KEY_CUSTOM   = 'lp_custom_items_v1' // 用户自建跟读素材
+const KEY_THEME    = 'lp_theme_v1'      // 无障碍主题状态（字号/深色）
 
 // 复习间隔（天）：level 0..5，level 越高间隔越长
 const INTERVALS = [0, 1, 2, 4, 7, 15, 30]
@@ -22,8 +24,10 @@ function defaults() {
   return {
     progress: {},
     stats: { totalLearned: 0, totalReviews: 0, totalCorrect: 0, streak: 0, lastActive: '', firstDay: '' },
-    settings: { lang: 'en', dailyGoal: 20 },
-    daily: {}
+    settings: { lang: 'en', dailyGoal: 20, feedbackEnabled: true, guideSeen: false },
+    daily: {},
+    custom: [],
+    theme: { fontScale: 1, darkMode: false }
   }
 }
 
@@ -47,12 +51,54 @@ function init() {
   if (!wx.getStorageSync(KEY_STATS)) write(KEY_STATS, d.stats)
   if (!wx.getStorageSync(KEY_DAILY)) write(KEY_DAILY, d.daily)
   if (!wx.getStorageSync(KEY_PROGRESS)) write(KEY_PROGRESS, d.progress)
+  if (!wx.getStorageSync(KEY_CUSTOM)) write(KEY_CUSTOM, d.custom)
+  if (!wx.getStorageSync(KEY_THEME)) write(KEY_THEME, d.theme)
+  // 老用户补齐新增设置字段
+  const s = getSettings()
+  let changed = false
+  if (s.feedbackEnabled == null) { s.feedbackEnabled = true; changed = true }
+  if (s.guideSeen == null) { s.guideSeen = false; changed = true }
+  if (changed) write(KEY_SETTINGS, s)
 }
 
 function getSettings() { return read(KEY_SETTINGS, defaults().settings) }
 function setLang(lang) { const s = getSettings(); s.lang = lang; write(KEY_SETTINGS, s) }
 function getCurrentLang() { return getSettings().lang || 'en' }
 function setDailyGoal(n) { const s = getSettings(); s.dailyGoal = n; write(KEY_SETTINGS, s) }
+function setFeedbackEnabled(v) { const s = getSettings(); s.feedbackEnabled = !!v; write(KEY_SETTINGS, s) }
+function setGuideSeen(v) { const s = getSettings(); s.guideSeen = !!v; write(KEY_SETTINGS, s) }
+
+// 无障碍主题
+function getTheme() { return read(KEY_THEME, defaults().theme) }
+function setFontScale(scale) { const t = getTheme(); t.fontScale = scale; write(KEY_THEME, t) }
+function setDarkMode(on) { const t = getTheme(); t.darkMode = !!on; write(KEY_THEME, t) }
+
+// 自建跟读素材：{ id, text, cn, scene, lang, createdAt }
+function getCustomItems(lang) {
+  const all = read(KEY_CUSTOM, [])
+  return lang ? all.filter(function (x) { return x.lang === lang }) : all
+}
+function addCustomItems(items) {
+  const all = read(KEY_CUSTOM, [])
+  const seen = {}
+  all.forEach(function (x) { seen[x.id] = true })
+  let added = 0
+  items.forEach(function (it) {
+    if (!it || !it.text) return
+    const id = 'cu_' + Date.now() + '_' + (added + Math.floor(Math.random() * 1000))
+    if (seen[id]) return
+    all.unshift({
+      id: id, text: it.text, cn: it.cn || '', scene: it.scene || '我的素材',
+      lang: it.lang || 'en', createdAt: Date.now()
+    })
+    added++
+  })
+  write(KEY_CUSTOM, all)
+  return added
+}
+function removeCustomItem(id) {
+  write(KEY_CUSTOM, read(KEY_CUSTOM, []).filter(function (x) { return x.id !== id }))
+}
 
 function getProgress() { return read(KEY_PROGRESS, {}) }
 function getStats() { return read(KEY_STATS, defaults().stats) }
@@ -154,12 +200,14 @@ function exportData() {
   try { speak = require('./speaking').exportData() } catch (e) {}
   return {
     format: 'yuban-lang-backup',
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     progress: getProgress(),
     stats: getStats(),
     settings: getSettings(),
     daily: getDaily(),
+    custom: getCustomItems(),
+    theme: getTheme(),
     speak: speak
   }
 }
@@ -185,8 +233,11 @@ function importData(data) {
   write(KEY_STATS, data.stats)
   write(KEY_SETTINGS, data.settings)
   write(KEY_DAILY, data.daily)
+  // v3：恢复自建素材与主题
+  if (data.custom) write(KEY_CUSTOM, data.custom)
+  if (data.theme) write(KEY_THEME, data.theme)
   // v2：恢复口语数据
-  if (data.speak && data.version === 2) {
+  if (data.speak && data.version >= 2) {
     try { require('./speaking').importData(data.speak) } catch (e) {}
   }
   return { ok: true, version: data.version || 1 }
@@ -194,6 +245,8 @@ function importData(data) {
 
 module.exports = {
   init, todayKey, getSettings, setLang, getCurrentLang, setDailyGoal,
+  setFeedbackEnabled, setGuideSeen, getTheme, setFontScale, setDarkMode,
+  getCustomItems, addCustomItems, removeCustomItem,
   getProgress, getStats, getDaily, getDueWords, getNewWords, getToday,
   review, quizAnswer, getMasteredCount, INTERVALS,
   exportData, importData, migrateProgress

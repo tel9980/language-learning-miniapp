@@ -1,12 +1,15 @@
+const theme = require('../../utils/theme')
 const storage = require('../../utils/storage')
 const { getWords, getLangMeta } = require('../../utils/words')
 
 Page({
+  behaviors: [theme],
   data: {
     mode: 'due', dueCount: 0, current: null, flipped: false,
     queue: [], index: 0, langName: '英语', tts: 'en-US', totalWords: 0
   },
-  onShow() { this.load() },
+  onShow() {
+    this.syncTheme(); this.load() },
   load() {
     const lang = storage.getCurrentLang()
     const meta = getLangMeta(lang)

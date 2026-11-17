@@ -1,4 +1,4 @@
-<view class="container">
+<view class="container {{themeClass}}">
   <view class="summary card">
     <view class="summary-item">
       <view class="s-num">{{stats.streak}}</view>
@@ -89,6 +89,22 @@
     <view class="data-btns">
       <view class="data-btn export" bindtap="exportProgress">导出进度</view>
       <view class="data-btn import" bindtap="importProgress">导入进度</view>
+    </view>
+  </view>
+
+  <view class="card settings-card">
+    <view class="section-title">⚙️ 使用设置</view>
+    <view class="setting-row" bindtap="setFontSize">
+      <view class="setting-label">🔤 字体大小</view>
+      <view class="setting-value">{{fontScale>=1.3?'超大':(fontScale>=1.14?'大':(fontScale<=0.9?'小':'标准'))}} ›</view>
+    </view>
+    <view class="setting-row" bindtap="toggleDarkMode">
+      <view class="setting-label">🌙 深色模式</view>
+      <view class="switch {{darkMode?'on':''}}"><view class="knob"></view></view>
+    </view>
+    <view class="setting-row" bindtap="toggleFeedback">
+      <view class="setting-label">📳 触感反馈</view>
+      <view class="switch {{feedbackEnabled?'on':''}}"><view class="knob"></view></view>
     </view>
   </view>
 </view>

@@ -1,10 +1,13 @@
+const theme = require('../../utils/theme')
 const recordings = require('../../utils/recordings')
 
 Page({
+  behaviors: [theme],
   data: { list: [], playingId: '' },
   _player: null,
 
-  onShow() { this.refresh() },
+  onShow() {
+    this.syncTheme(); this.refresh() },
   onHide() { this.stopPlay() },
   onUnload() { this.stopPlay() },
 

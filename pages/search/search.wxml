@@ -1,4 +1,4 @@
-<view class="container">
+<view class="container {{themeClass}}">
   <view class="search-bar card">
     <view class="search-icon">🔍</view>
     <input class="search-input" placeholder="搜索单词、释义或例句" confirm-type="search"

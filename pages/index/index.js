@@ -1,3 +1,4 @@
+const theme = require('../../utils/theme')
 const storage = require('../../utils/storage')
 const speaking = require('../../utils/speaking')
 const { getLangMeta } = require('../../utils/words')
@@ -5,6 +6,7 @@ const { getLangMeta } = require('../../utils/words')
 const app = getApp()
 
 Page({
+  behaviors: [theme],
   data: {
     stats: {}, today: {}, mastered: 0, dueCount: 0,
     lang: 'en', langName: '英语', langFlag: '🇬🇧',
@@ -12,6 +14,7 @@ Page({
     speakCount: 0, focusCount: 0
   },
   onShow() {
+    this.syncTheme()
     storage.init()
     this.refresh()
   },

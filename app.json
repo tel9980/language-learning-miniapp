@@ -7,7 +7,8 @@
     "pages/stats/stats",
     "pages/search/search",
     "pages/wrong/wrong",
-    "pages/recordings/recordings"
+    "pages/recordings/recordings",
+    "pages/import/import"
   ],
   "window": {
     "navigationBarBackgroundColor": "#4A6CF7",

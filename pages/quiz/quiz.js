@@ -1,3 +1,4 @@
+const theme = require('../../utils/theme')
 const storage = require('../../utils/storage')
 const { getWords } = require('../../utils/words')
 
@@ -11,13 +12,15 @@ function shuffle(arr) {
 }
 
 Page({
+  behaviors: [theme],
   data: {
     queue: [], index: 0, total: 10, current: null,
     selected: '', spellInput: '', revealed: false, isRight: false,
     correctCount: 0, wrongCount: 0, finished: false, accuracy: 0,
     progress: 0, indexLetters: ['A', 'B', 'C', 'D']
   },
-  onShow() { this.buildQuiz() },
+  onShow() {
+    this.syncTheme(); this.buildQuiz() },
   buildQuiz() {
     const lang = storage.getCurrentLang()
     const words = shuffle(getWords(lang)).slice(0, 10)

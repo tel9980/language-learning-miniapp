@@ -34,3 +34,33 @@ page {
 .muted { color: #8A94A6; font-size: 24rpx; }
 .row { display: flex; align-items: center; }
 .between { justify-content: space-between; }
+
+/* ===== 无障碍：字号与深色模式（页面 root 挂 themeClass） ===== */
+.theme-sm .title, .theme-sm .stage-word { font-size: 90%; }
+.theme-sm .muted, .theme-sm .subtitle, .theme-sm .stage-meaning { font-size: 90%; }
+.theme-lg .title, .theme-lg .stage-word { font-size: 112%; }
+.theme-lg .muted, .theme-lg .subtitle, .theme-lg .stage-meaning { font-size: 112%; }
+.theme-xl .title, .theme-xl .stage-word { font-size: 125%; }
+.theme-xl .muted, .theme-xl .subtitle, .theme-xl .stage-meaning { font-size: 125%; }
+
+.theme-dark { background: #1A1F2B; color: #E8EAF0; }
+.theme-dark .card,
+.theme-dark .header,
+.theme-dark .stage,
+.theme-dark .example-box,
+.theme-dark .score-box,
+.theme-dark .badge-item,
+.theme-dark .cal-cell { background: #262D3D; color: #E8EAF0; }
+.theme-dark .muted,
+.theme-dark .subtitle,
+.theme-dark .example-cn,
+.theme-dark .stage-phonetic { color: #9AA3B5; }
+.theme-dark .stage-word,
+.theme-dark .example-en,
+.theme-dark .rec-label { color: #8FA8FF; }
+.theme-dark .scene-picker,
+.theme-dark .play-btn,
+.theme-dark .tool-btn,
+.theme-dark .focus-bar.returning,
+.theme-dark .input,
+.theme-dark .textarea { background: #333C50; color: #E8EAF0; }

@@ -2,7 +2,7 @@
 .summary-item { flex: 1; text-align: center; }
 .s-num { font-size: 52rpx; font-weight: 800; color: #4A6CF7; }
 .s-label { font-size: 22rpx; color: #8A94A6; margin-top: 8rpx; }
-.chart-card, .levels-card, .goal-card, .data-card, .speak-card, .calendar-card, .badges-card { margin-bottom: 24rpx; }
+.chart-card, .levels-card, .goal-card, .data-card, .speak-card, .calendar-card, .badges-card, .settings-card { margin-bottom: 24rpx; }
 .section-title { font-size: 30rpx; font-weight: 700; margin-bottom: 24rpx; }
 .muted { font-size: 24rpx; color: #8A94A6; line-height: 1.6; }
 .row.between { display: flex; justify-content: space-between; align-items: center; }
@@ -56,3 +56,13 @@
 .badge-name { font-size: 24rpx; font-weight: 600; margin-top: 8rpx; color: #8A94A6; }
 .badge-item.unlocked .badge-name { color: #E08A1E; }
 .badge-progress { font-size: 20rpx; color: #B7BFCC; margin-top: 6rpx; }
+
+/* 使用设置 */
+.setting-row { display: flex; justify-content: space-between; align-items: center; padding: 24rpx 0; border-bottom: 1rpx solid #F0F2F8; }
+.setting-row:last-child { border-bottom: none; }
+.setting-label { font-size: 28rpx; color: #1F2733; }
+.setting-value { font-size: 26rpx; color: #8A94A6; }
+.switch { width: 88rpx; height: 50rpx; border-radius: 999rpx; background: #E4E8F2; position: relative; transition: background .2s; }
+.switch.on { background: #4A6CF7; }
+.knob { position: absolute; top: 4rpx; left: 4rpx; width: 42rpx; height: 42rpx; border-radius: 50%; background: #fff; box-shadow: 0 2rpx 6rpx rgba(0,0,0,.15); transition: left .2s; }
+.switch.on .knob { left: 42rpx; }

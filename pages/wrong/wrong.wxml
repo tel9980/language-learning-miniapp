@@ -1,4 +1,4 @@
-<view class="container">
+<view class="container {{themeClass}}">
   <!-- 列表模式 -->
   <block wx:if="{{mode === 'list'}}">
     <view class="header card">

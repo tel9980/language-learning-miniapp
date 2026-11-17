@@ -1,3 +1,4 @@
+const theme = require('../../utils/theme')
 const storage = require('../../utils/storage')
 const {
   getWords, getLangMeta, getExamCategories, getWordsByCategory
@@ -5,6 +6,7 @@ const {
 const audio = require('../../utils/audio')
 
 Page({
+  behaviors: [theme],
   data: {
     keyword: '',
     lang: 'en',
@@ -35,6 +37,7 @@ Page({
   },
 
   onShow() {
+    this.syncTheme()
     const lang = storage.getCurrentLang()
     if (lang !== this.data.lang) {
       this._applyLang(lang)

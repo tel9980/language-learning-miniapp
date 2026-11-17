@@ -1,9 +1,11 @@
+const theme = require('../../utils/theme')
 const storage = require('../../utils/storage')
 const { getWords, getLangMeta } = require('../../utils/words')
 
 const INTERVALS = storage.INTERVALS
 
 Page({
+  behaviors: [theme],
   data: {
     lang: 'en',
     langName: '英语',
@@ -26,6 +28,7 @@ Page({
   },
 
   onShow() {
+    this.syncTheme()
     const lang = storage.getCurrentLang()
     if (lang !== this.data.lang) {
       this.setData({ lang: lang, langName: getLangMeta(lang).name })

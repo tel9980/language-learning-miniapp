@@ -3,15 +3,21 @@ const speaking = require('../../utils/speaking')
 const sentences = require('../../utils/sentences')
 const recordings = require('../../utils/recordings')
 const achievements = require('../../utils/achievements')
+const theme = require('../../utils/theme')
 const { getWords } = require('../../utils/words')
 
+const app = getApp()
+
 Page({
+  behaviors: [theme],
   data: {
     stats: {}, mastered: 0, accuracy: 0, dailyGoal: 20,
     levels: [], days: [], speak: {},
-    calendar: [], unlockedCount: 0, badges: []
+    calendar: [], unlockedCount: 0, badges: [],
+    feedbackEnabled: true, fontScale: 1, darkMode: false
   },
   onShow() {
+    this.syncTheme()
     this.refresh()
   },
   refresh() {
@@ -69,7 +75,8 @@ Page({
       stats, accuracy, levels, days, speak,
       calendar: cal, badges, unlockedCount,
       mastered: storage.getMasteredCount(lang),
-      dailyGoal: storage.getSettings().dailyGoal || 20
+      dailyGoal: storage.getSettings().dailyGoal || 20,
+      feedbackEnabled: storage.getSettings().feedbackEnabled !== false
     }, () => this.drawChart())
   },
   drawChart() {
@@ -155,6 +162,35 @@ Page({
         }
       }
     })
+  },
+
+  toggleFeedback() {
+    const v = !this.data.feedbackEnabled
+    storage.setFeedbackEnabled(v)
+    this.setData({ feedbackEnabled: v })
+    wx.showToast({ title: v ? '反馈已开启' : '反馈已关闭', icon: 'none' })
+  },
+
+  setFontSize() {
+    const that = this
+    wx.showActionSheet({
+      itemList: ['标准', '大', '超大', '小'],
+      success(res) {
+        const scales = [1, 1.18, 1.35, 0.9]
+        storage.setFontScale(scales[res.tapIndex])
+        app.refreshTheme()
+        that.syncTheme()
+        wx.showToast({ title: '字号已调整', icon: 'success' })
+      }
+    })
+  },
+
+  toggleDarkMode() {
+    const v = !this.data.darkMode
+    storage.setDarkMode(v)
+    app.refreshTheme()
+    this.syncTheme()
+    wx.showToast({ title: v ? '已开启深色模式' : '已关闭深色模式', icon: 'none' })
   },
 
   exportProgress() {

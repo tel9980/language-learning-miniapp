@@ -1,0 +1,80 @@
+// 纯函数单元测试（Node 运行，不依赖微信环境）
+// 运行：node tests/run-tests.js
+// 覆盖：fsrs 调度 / karaoke 分词与高亮时间 / achievements 徽章与日历 / speech-score 相似度
+
+let pass = 0, fail = 0
+const failures = []
+
+function ok(cond, msg) {
+  if (cond) { pass++ }
+  else { fail++; failures.push(msg) }
+}
+function eq(a, b, msg) { ok(a === b, `${msg} (got ${JSON.stringify(a)}, expected ${JSON.stringify(b)})`) }
+
+// ---- fsrs ----
+const fsrs = require('../utils/fsrs')
+eq(fsrs.normalize(5), 2, 'fsrs.normalize(5)=2')
+eq(fsrs.normalize(3), 1, 'fsrs.normalize(3)=1')
+eq(fsrs.normalize(0), 0, 'fsrs.normalize(0)=0')
+let s = fsrs.schedule({}, 5)
+eq(s.intervalDays, 1, 'first success interval=1 day')
+eq(s.reps, 1, 'first success reps=1')
+eq(s.level, 1, 'first success level=1')
+s = fsrs.schedule({ reps: 1, level: 1, ef: 2.5 }, 5)
+eq(s.intervalDays, 6, 'second success interval=6 days')
+const lapse = fsrs.schedule({ reps: 3, level: 4, ef: 2.5 }, 0)
+eq(lapse.level, 0, 'lapse resets level to 0')
+eq(lapse.intervalDays, 0, 'lapse interval=0 (short)')
+eq(lapse.lapses, 1, 'lapse increments lapses')
+ok(fsrs.schedule({ ef: 9 }, 5).ef <= 2.5, 'ef clamped to <=2.5')
+ok(fsrs.dueAt(0) > Date.now(), 'dueAt(0) is in the future')
+ok(fsrs.dueAt(1) - Date.now() >= fsrs.DAY - 1000, 'dueAt(1) ~ 1 day')
+
+// ---- karaoke ----
+const karaoke = require('../utils/karaoke')
+eq(karaoke.tokenize('Hello   world  !').length, 3, 'tokenize splits on whitespace')
+eq(karaoke.tokenize('  ').length, 0, 'tokenize empty string')
+const timings = karaoke.wordTimings(['a', 'bbbb'], 2000)
+eq(timings.length, 2, 'wordTimings count')
+ok(timings[0].end <= timings[1].start, 'timings are sequential')
+ok(timings[1].end <= 2000 + 5 || timings[1].end > 0, 'timings produced')
+const view = karaoke.toView(['a', 'b'], 1)
+ok(view[1].active && !view[0].active, 'toView marks active word')
+
+// ---- achievements ----
+const ach = require('../utils/achievements')
+const badges = ach.compute({ speakTimes: 1, fluent: 0, streak: 7, mastered: 0, dialogues: 0, recordings: 0 })
+eq(badges.length, 8, '8 badges defined')
+const first = badges.find(b => b.id === 'first_speak')
+ok(first.unlocked, 'first_speak unlocked at 1 speak')
+const week = badges.find(b => b.id === 'streak_7')
+ok(week.unlocked, 'streak_7 unlocked at 7')
+const month = badges.find(b => b.id === 'streak_30')
+ok(!month.unlocked, 'streak_30 locked at 7')
+const cal = ach.calendar({}, {}, 7)
+eq(cal.length, 7, 'calendar returns n days')
+ok(!cal[cal.length - 1].active, 'empty calendar days inactive')
+
+// ---- speech-score ----
+const sc = require('../utils/speech-score')
+eq(sc.normalizeText('Hello, World!'), 'hello world', 'normalizeText strips punctuation/case')
+eq(sc.similarity('hello world', 'hello world'), 1, 'identical text similarity=1')
+eq(sc.similarity('hello', ''), 0, 'empty text similarity=0')
+ok(sc.similarity('hello world', 'hello word') > 0.7, 'near match high similarity')
+ok(sc.similarity('cat', 'dog') < 0.5, 'different text low similarity')
+
+// ---- sentences (data sanity, needs no wx) ----
+const sentences = require('../utils/sentences')
+ok(sentences.getSentences('en').length >= 20, 'English sentences >= 20')
+ok(sentences.getDialogues('en').length >= 5, 'English dialogues >= 5')
+ok(sentences.getAllItems('en').length > 30, 'all speaking items > 30')
+ok(sentences.getLevels().indexOf('B2') >= 0, 'has B2 level')
+ok(sentences.getSentences('en', 'A1').every(x => x.level === 'A1'), 'level filter works')
+
+console.log(`\n单元测试结果：${pass} 通过 / ${fail} 失败`)
+if (fail) {
+  failures.forEach(f => console.log('  ✗ ' + f))
+  process.exit(1)
+} else {
+  console.log('✅ ALL TESTS PASSED')
+}

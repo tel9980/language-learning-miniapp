@@ -41,6 +41,41 @@
 .play-example::after { border: none; }
 
 /* 录音 & 评分 */
+.entry-row { gap: 16rpx; margin-top: 16rpx; }
+.entry-row .record-entry { flex: 1; margin-top: 0; }
+
+/* 难度筛选 */
+.scene-picker { margin-top: 16rpx; }
+
+/* 工具行：AB复读/角色扮演 */
+.tool-row { display: flex; gap: 12rpx; justify-content: center; margin-top: 24rpx; flex-wrap: wrap; }
+.tool-btn { font-size: 24rpx; color: #5A6474; background: #F4F6FC; padding: 14rpx 22rpx; border-radius: 999rpx; }
+.tool-btn.on { background: #4A6CF7; color: #fff; }
+
+/* 角色扮演 */
+.role-prompt { background: #FFF8E8; border-radius: 16rpx; padding: 24rpx; text-align: left; margin-bottom: 28rpx; }
+.role-prompt-title { font-size: 22rpx; color: #E08A1E; margin-bottom: 12rpx; }
+.role-prompt-line { font-size: 30rpx; color: #1F2733; line-height: 1.5; }
+.role-prompt-line .role-tag { margin: 0 10rpx 0 0; }
+.play-other { font-size: 24rpx; color: #E08A1E; margin-top: 12rpx; }
+
+/* 逐词高亮 */
+.stage-word.karaoke { line-height: 1.7; }
+.k-token { color: #B7BFCC; transition: color .1s; }
+.k-token.active { color: #FF9F43; font-weight: 800; text-shadow: 0 0 20rpx rgba(255,159,67,.4); }
+
+/* 播放按钮行 */
+.play-btns-row { display: flex; gap: 20rpx; margin: 36rpx 0 0; }
+
+/* 新手引导 */
+.guide-mask { position: fixed; inset: 0; background: rgba(31,39,51,.72); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 48rpx; }
+.guide-box { background: #fff; border-radius: 28rpx; padding: 48rpx 40rpx; width: 100%; }
+.guide-title { font-size: 36rpx; font-weight: 800; margin-bottom: 28rpx; }
+.guide-text { font-size: 26rpx; color: #5A6474; line-height: 1.8; margin-bottom: 16rpx; }
+.guide-btn { margin-top: 32rpx; text-align: center; background: #4A6CF7; color: #fff; font-size: 30rpx; padding: 22rpx; border-radius: 999rpx; }
+
+.empty { text-align: center; padding: 100rpx 40rpx; }
+.empty-icon { font-size: 100rpx; margin-bottom: 24rpx; }
 .record-zone { margin-top: 32rpx; }
 .record-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 180rpx; border: 3rpx dashed #4A6CF7; border-radius: 24rpx; background: #F7F9FF; }
 .record-btn.recording { border-color: #FF5C5C; background: #FFF1F1; }
