@@ -32,17 +32,34 @@ function defaults() {
   }
 }
 
+// 进程内缓存：read/write 是全部业务数据的必经点，命中后省掉重复的同步 Storage 读。
+// key 用 nsKey 后的完整名（含档案id），切换档案天然隔离；write 时同步刷新，
+// 外部绕过本模块直写 Storage 的地方（全家包导入/删档案）须显式调用 invalidate()。
+const _cache = {}
+function clone(v) {
+  if (Array.isArray(v)) return v.slice()
+  if (v && typeof v === 'object') return Object.assign({}, v)
+  return v
+}
+function invalidate() { Object.keys(_cache).forEach(function (k) { delete _cache[k] }) }
+
 function read(key, fallback) {
+  const k = profile.nsKey(key)
+  if (k in _cache) return _cache[k] == null ? fallback : clone(_cache[k])
   try {
-    const v = wx.getStorageSync(profile.nsKey(key))
-    return v ? JSON.parse(v) : fallback
+    const v = wx.getStorageSync(k)
+    const val = v ? JSON.parse(v) : fallback
+    _cache[k] = val
+    return clone(val)
   } catch (e) {
     return fallback
   }
 }
 
 function write(key, value) {
-  try { wx.setStorageSync(profile.nsKey(key), JSON.stringify(value)) } catch (e) {}
+  const k = profile.nsKey(key)
+  _cache[k] = value
+  try { wx.setStorageSync(k, JSON.stringify(value)) } catch (e) {}
 }
 
 function rawHas(key) {
@@ -258,5 +275,5 @@ module.exports = {
   getCustomItems, addCustomItems, removeCustomItem,
   getProgress, getStats, getDaily, getDueWords, getNewWords, getToday,
   review, quizAnswer, getMasteredCount, INTERVALS,
-  exportData, importData, migrateProgress
+  exportData, importData, migrateProgress, invalidate
 }

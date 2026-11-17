@@ -20,7 +20,9 @@ Page({
     resultCount: 0,
     showMode: 'all', // all | fav
     historyList: [],
-    favIds: []
+    favIds: [],
+    visibleCount: 30,       // 增量渲染：先显示 30 条，下滑加载更多
+    hasMore: false
   },
 
   _applyLang(lang) {
@@ -38,7 +40,7 @@ Page({
     const lang = storage.getCurrentLang()
     this._applyLang(lang)
     this.refreshMeta()
-    this.doSearch()
+    this.doSearch(true)
   },
 
   onShow() {
@@ -49,7 +51,7 @@ Page({
       this.setData({ catIndex: 0 })
     }
     this.refreshMeta()
-    this.doSearch()
+    this.doSearch(true)
   },
 
   refreshMeta() {
@@ -60,23 +62,32 @@ Page({
   },
 
   onInput(e) {
-    this.setData({ keyword: e.detail.value }, this.doSearch)
+    this.setData({ keyword: e.detail.value }, () => this.doSearch(true))
+  },
+
+  // 按搜索键才记历史，而不是每敲一个字都写 Storage
+  onConfirm() {
+    const kw = (this.data.keyword || '').trim()
+    if (kw) {
+      favorites.pushHistory(this.data.lang, kw)
+      this.setData({ historyList: favorites.history(this.data.lang) })
+    }
   },
 
   clearKeyword() {
-    this.setData({ keyword: '' }, this.doSearch)
+    this.setData({ keyword: '' }, () => this.doSearch(true))
   },
 
   onCatChange(e) {
-    this.setData({ catIndex: Number(e.detail.value) }, this.doSearch)
+    this.setData({ catIndex: Number(e.detail.value) }, () => this.doSearch(true))
   },
 
   setMode(e) {
-    this.setData({ showMode: e.currentTarget.dataset.mode }, this.doSearch)
+    this.setData({ showMode: e.currentTarget.dataset.mode }, () => this.doSearch(true))
   },
 
   searchHistory(e) {
-    this.setData({ keyword: e.currentTarget.dataset.kw }, this.doSearch)
+    this.setData({ keyword: e.currentTarget.dataset.kw }, () => this.doSearch(true))
   },
 
   clearHistory() {
@@ -89,10 +100,11 @@ Page({
     const id = e.currentTarget.dataset.id
     favorites.toggle(this.data.lang, id)
     this.refreshMeta()
-    this.doSearch()
+    this.doSearch(true)
   },
 
-  doSearch() {
+  // reset=true 表示新查询（从头显示 30 条）；false 表示加载更多
+  doSearch(reset) {
     const kw = (this.data.keyword || '').trim().toLowerCase()
     const lang = this.data.lang
     const catInfo = this.data.catInfo[this.data.catIndex - 1]
@@ -109,12 +121,18 @@ Page({
         (w.meaning || '').toLowerCase().indexOf(kw) >= 0 ||
         (w.example || '').toLowerCase().indexOf(kw) >= 0
     })
-    // 有关键词时记入历史
-    if (kw) {
-      favorites.pushHistory(lang, this.data.keyword.trim())
-      this.setData({ historyList: favorites.history(lang) })
-    }
-    this.setData({ results: list, resultCount: list.length, expandedId: '', favIds: favorites.list(lang) })
+    const count = reset === false ? this.data.visibleCount : 30
+    const shown = list.slice(0, count)
+    this.setData({
+      results: shown, resultCount: list.length, expandedId: '',
+      favIds: favorites.list(lang),
+      visibleCount: count, hasMore: list.length > count
+    })
+  },
+
+  loadMore() {
+    if (!this.data.hasMore) return
+    this.setData({ visibleCount: this.data.visibleCount + 30 }, () => this.doSearch(false))
   },
 
   toggleDetail(e) {

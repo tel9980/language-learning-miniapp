@@ -27,6 +27,9 @@ Page({
     const prog = storage.getProgress()
     const words = getWords(lang)
     const allSpeakingItems = words.concat(sentences.getAllItems(lang))
+    const settings = storage.getSettings()
+    const daily = storage.getDaily()
+    const speakDaily = speaking.getDaily()
 
     // 总正确率
     const accuracy = stats.totalReviews > 0
@@ -48,7 +51,6 @@ Page({
     }))
 
     // 近 7 天
-    const daily = storage.getDaily()
     const days = []
     for (let i = 6; i >= 0; i--) {
       const d = new Date()
@@ -59,10 +61,9 @@ Page({
 
     // 口语汇总 + 打卡日历
     const speak = speaking.getSummary(lang, allSpeakingItems)
-    const cal = achievements.calendar(storage.getDaily(), speaking.getDaily(), 28)
+    const cal = achievements.calendar(daily, speakDaily, 28)
 
     // 近 14 天口语流利度趋势：每天 流利数/练习数
-    const speakDaily = speaking.getDaily()
     const fluency = []
     for (let i = 13; i >= 0; i--) {
       const d = new Date()
@@ -76,12 +77,15 @@ Page({
       })
     }
 
+    // 掌握数（只算一次，下面复用）
+    const mastered = storage.getMasteredCount(lang)
+
     // 成就徽章
     const badges = achievements.compute({
       speakTimes: speak.speakTimes,
       fluent: speak.fluent,
       streak: stats.streak || 0,
-      mastered: storage.getMasteredCount(lang),
+      mastered: mastered,
       dialogues: speak.dialogues,
       recordings: recordings.list().length
     })
@@ -90,9 +94,9 @@ Page({
     this.setData({
       stats, accuracy, levels, days, speak, fluency,
       calendar: cal, badges, unlockedCount,
-      mastered: storage.getMasteredCount(lang),
-      dailyGoal: storage.getSettings().dailyGoal || 20,
-      feedbackEnabled: storage.getSettings().feedbackEnabled !== false
+      mastered: mastered,
+      dailyGoal: settings.dailyGoal || 20,
+      feedbackEnabled: settings.feedbackEnabled !== false
     }, () => { this.drawChart(); this.drawFluencyChart() })
   },
   drawFluencyChart() {

@@ -1,5 +1,10 @@
 // 多档案：一家人共用一台设备时，各人有各人独立的进度/统计/录音。
 // 做法：所有业务数据的 Storage key 加 "@档案id" 命名空间；老数据自动迁移到默认档案。
+//
+// 性能：current()/list() 每次被调用原本都要同步读 Storage + JSON.parse，
+// 而 nsKey()（所有业务读写的必经之路）又依赖 current()。这里做进程内缓存，
+// 所有变更入口显式失效；外部直接写 KEY_LIST/KEY_CURRENT 的地方（全家包导入）
+// 必须调用 invalidate()。缓存只省同步读，不缓存业务数据本身。
 const KEY_LIST = 'lp_profiles_v1'
 const KEY_CURRENT = 'lp_profile_current_v1'
 const DEFAULT_ID = 'p_default'
@@ -10,6 +15,9 @@ const MODES = {
   elder:  { name: '长辈', fontScale: 1.35, darkMode: false }
 }
 
+let _listCache = null
+let _currentCache = null
+
 function rawRead(key, fallback) {
   try { const v = wx.getStorageSync(key); return v ? JSON.parse(v) : fallback } catch (e) { return fallback }
 }
@@ -17,23 +25,27 @@ function rawWrite(key, value) {
   try { wx.setStorageSync(key, JSON.stringify(value)) } catch (e) {}
 }
 
-// 档案列表：首次自动建默认档案
+// 档案列表：首次自动建默认档案（命中缓存时零 Storage 读）
 function list() {
+  if (_listCache) return _listCache
   let arr = rawRead(KEY_LIST, null)
   if (!Array.isArray(arr) || arr.length === 0) {
     arr = [{ id: DEFAULT_ID, name: '我', avatar: '😀', mode: 'normal', createdAt: Date.now() }]
     rawWrite(KEY_LIST, arr)
   }
+  _listCache = arr
   return arr
 }
 
 function current() {
+  if (_currentCache && list().some(function (p) { return p.id === _currentCache })) return _currentCache
   let id = ''
   try { id = wx.getStorageSync(KEY_CURRENT) } catch (e) {}
   if (!id || !list().some(function (p) { return p.id === id })) {
     id = DEFAULT_ID
     try { wx.setStorageSync(KEY_CURRENT, id) } catch (e) {}
   }
+  _currentCache = id
   return id
 }
 
@@ -45,12 +57,13 @@ function currentProfile() { return get(current()) }
 function switchTo(id) {
   if (!get(id)) return false
   try { wx.setStorageSync(KEY_CURRENT, id) } catch (e) {}
+  _currentCache = id
   applyMode(id)
   return true
 }
 
 function add(name, mode) {
-  const arr = list()
+  const arr = list().slice()
   const id = 'p_' + Date.now() + '_' + Math.floor(Math.random() * 1000)
   arr.push({
     id: id,
@@ -60,24 +73,27 @@ function add(name, mode) {
     createdAt: Date.now()
   })
   rawWrite(KEY_LIST, arr)
+  _listCache = arr
   return id
 }
 
 function rename(id, name) {
-  const arr = list()
+  const arr = list().slice()
   const p = arr.find(function (x) { return x.id === id })
   if (!p || !name) return false
   p.name = String(name).slice(0, 12)
   rawWrite(KEY_LIST, arr)
+  _listCache = arr
   return true
 }
 
 function setMode(id, mode) {
-  const arr = list()
+  const arr = list().slice()
   const p = arr.find(function (x) { return x.id === id })
   if (!p || !MODES[mode]) return false
   p.mode = mode
   rawWrite(KEY_LIST, arr)
+  _listCache = arr
   if (id === current()) applyMode(id)
   return true
 }
@@ -96,7 +112,7 @@ function applyMode(id) {
 
 // 删除档案：清理其命名空间下的数据与录音文件；默认档案/最后一个不可删
 function remove(id) {
-  const arr = list()
+  const arr = list().slice()
   if (id === DEFAULT_ID || arr.length <= 1) return { ok: false, reason: '默认档案不能删除' }
   const p = arr.find(function (x) { return x.id === id })
   if (!p) return { ok: false, reason: '档案不存在' }
@@ -112,10 +128,15 @@ function remove(id) {
     recs.forEach(function (r) { if (r.filePath) wx.removeSavedFile({ filePath: r.filePath, fail() {} }) })
   } catch (e) {}
   rawWrite(KEY_LIST, arr.filter(function (x) { return x.id !== id }))
+  _listCache = arr.filter(function (x) { return x.id !== id })
   if (current() === id) {
     try { wx.setStorageSync(KEY_CURRENT, DEFAULT_ID) } catch (e) {}
+    _currentCache = DEFAULT_ID
     applyMode(DEFAULT_ID)
   }
+  // 清掉被删档案可能残留的业务数据值缓存
+  try { require('./storage').invalidate() } catch (e) {}
+  try { require('./speaking').invalidate() } catch (e) {}
   return { ok: true }
 }
 
@@ -142,7 +163,10 @@ function migrateLegacy(baseKeys) {
 
 function modes() { return MODES }
 
+// 外部（全家包导入等）直接改了 KEY_LIST / KEY_CURRENT 后必须调用，避免缓存陈旧
+function invalidate() { _listCache = null; _currentCache = null }
+
 module.exports = {
   list, current, get, currentProfile, switchTo, add, rename, setMode, remove,
-  nsKey, migrateLegacy, modes, DEFAULT_ID
+  nsKey, migrateLegacy, modes, DEFAULT_ID, invalidate
 }

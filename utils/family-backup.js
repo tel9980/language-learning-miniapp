@@ -144,6 +144,12 @@ function importAll(payload, mode) {
     try { wx.setStorageSync(KEY_CURRENT, payload.current) } catch (e) {}
   }
 
+  // 本模块绕过 storage/speaking 直写了 Storage，必须让两者的进程内缓存失效，
+  // 同时清掉 profile 自身的 list/current 缓存，否则导入后页面可能读到旧数据。
+  try { profile.invalidate() } catch (e) {}
+  try { require('./storage').invalidate() } catch (e) {}
+  try { require('./speaking').invalidate() } catch (e) {}
+
   return { ok: true, count: count, mode: mode }
 }
 

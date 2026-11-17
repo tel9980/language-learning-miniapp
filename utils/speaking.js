@@ -7,17 +7,26 @@ const KEY_RECORDS  = 'lp_speak_records_v1'
 const KEY_FOCUS    = 'lp_speak_focus_v1'
 const KEY_DAILY    = 'lp_speak_daily_v1'   // { 'YYYY-MM-DD': { count, good } }
 
+// 进程内缓存（key 经 nsKey 含档案id，切换档案天然隔离）
+const _cache = {}
 function read(key, fallback) {
+  const k = profile.nsKey(key)
+  if (k in _cache) return _cache[k] == null ? fallback : _cache[k]
   try {
-    const v = wx.getStorageSync(profile.nsKey(key))
-    return v ? JSON.parse(v) : fallback
+    const v = wx.getStorageSync(k)
+    const val = v ? JSON.parse(v) : fallback
+    _cache[k] = val
+    return val
   } catch (e) {
     return fallback
   }
 }
 function write(key, value) {
-  try { wx.setStorageSync(profile.nsKey(key), JSON.stringify(value)) } catch (e) {}
+  const k = profile.nsKey(key)
+  _cache[k] = value
+  try { wx.setStorageSync(k, JSON.stringify(value)) } catch (e) {}
 }
+function invalidate() { Object.keys(_cache).forEach(function (k) { delete _cache[k] }) }
 function todayKey(d) {
   const t = d || new Date()
   const m = String(t.getMonth() + 1).padStart(2, '0')
@@ -116,5 +125,5 @@ function importData(data) {
 
 module.exports = {
   record, getRecords, getFocus, getDaily, getToday, getFocusItems, getFocusWords,
-  clearFocus, getSummary, exportData, importData
+  clearFocus, getSummary, exportData, importData, invalidate
 }

@@ -7,15 +7,24 @@ const STORAGE_KEY = 'lp_online_data_v1'
 // 留空 '' 表示不启用在线更新（默认，完全离线）。
 const DATA_URL = ''
 
+// 进程内缓存：getOverride 会被 getWords/getSentences 高频调用，避免每次读 Storage
+let _cacheLoaded = false
+let _cacheVal = null
+
 function configured() {
   return !!(typeof DATA_URL === 'string' && DATA_URL.indexOf('https://') === 0)
 }
 
 function getCache() {
-  try { return wx.getStorageSync(STORAGE_KEY) || null } catch (e) { return null }
+  if (_cacheLoaded) return _cacheVal
+  try { _cacheVal = wx.getStorageSync(STORAGE_KEY) || null } catch (e) { _cacheVal = null }
+  _cacheLoaded = true
+  return _cacheVal
 }
 
 function saveCache(payload) {
+  _cacheVal = payload
+  _cacheLoaded = true
   try { wx.setStorageSync(STORAGE_KEY, payload) } catch (e) {}
 }
 
@@ -59,6 +68,8 @@ function checkUpdate(cb) {
 
 // 清缓存，回到内置词库
 function clearCache() {
+  _cacheLoaded = true
+  _cacheVal = null
   try { wx.removeStorageSync(STORAGE_KEY) } catch (e) {}
 }
 

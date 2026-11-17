@@ -2,7 +2,7 @@
   <view class="search-bar card">
     <view class="search-icon">🔍</view>
     <input class="search-input" placeholder="搜索单词、释义或例句" confirm-type="search"
-           value="{{keyword}}" bindinput="onInput" />
+           value="{{keyword}}" bindinput="onInput" bindconfirm="onConfirm" />
     <view class="clear-btn" wx:if="{{keyword}}" bindtap="clearKeyword">✕</view>
   </view>
 
@@ -46,6 +46,8 @@
         <view class="detail-cn">{{item.exampleCn}}</view>
       </view>
     </view>
+
+    <view class="load-more" wx:if="{{hasMore}}" bindtap="loadMore">加载更多（已显示 {{results.length}}/{{resultCount}}）</view>
 
     <view class="empty" wx:if="{{resultCount === 0}}">
       <view class="empty-icon">🔎</view>

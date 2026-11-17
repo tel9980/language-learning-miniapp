@@ -155,6 +155,30 @@ let ttsCbCalled = false
 sc.tts('hello', 'en_US', function (r) { ttsCbCalled = true; ok(!r.ok, 'tts degrades when no plugin') })
 ok(ttsCbCalled, 'tts callback always called')
 
+// ---- 性能缓存正确性（读次数下降 + 失效无脏数据） ----
+const storage = require('../utils/storage')
+// 统计 getStorageSync 调用次数
+let _reads = 0
+const _origGet = global.wx.getStorageSync
+global.wx.getStorageSync = function (k) { _reads++; return _origGet(k) }
+storage.invalidate(); profile.invalidate()
+storage.init()
+_reads = 0
+storage.getSettings(); storage.getSettings(); storage.getSettings()
+ok(_reads <= 1, 'settings read 3x hits cache (<=1 storage read), got ' + _reads)
+_reads = 0
+storage.getStats(); storage.getStats()
+ok(_reads <= 1, 'stats repeated read cached, got ' + _reads)
+// write 后立刻能读到新值
+storage.setDailyGoal(42)
+eq(storage.getSettings().dailyGoal, 42, 'write refreshes cache')
+// 外部直写后 invalidate 能拿到新值
+const ns = profile.nsKey('lp_settings_v1')
+global.wx.setStorageSync(ns, JSON.stringify(Object.assign({}, storage.getSettings(), { dailyGoal: 7 })))
+storage.invalidate()
+eq(storage.getSettings().dailyGoal, 7, 'invalidate discovers external write')
+global.wx.getStorageSync = _origGet
+
 console.log(`\n单元测试结果：${pass} 通过 / ${fail} 失败`)
 if (fail) {
   failures.forEach(f => console.log('  ✗ ' + f))
