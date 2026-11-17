@@ -129,11 +129,19 @@ const DIALOGUES = {
 const LEVELS = ['A1', 'A2', 'B1', 'B2']
 
 function getSentences(lang, level) {
-  const list = SENTENCES[lang] || SENTENCES.en
+  let list = SENTENCES[lang] || SENTENCES.en
+  try {
+    const od = require('./online-data').getOverride()
+    if (od && od.sentences && od.sentences[lang] && od.sentences[lang].length) list = od.sentences[lang]
+  } catch (e) {}
   return level ? list.filter(function (s) { return s.level === level }) : list
 }
 function getDialogues(lang, level) {
-  const list = DIALOGUES[lang] || DIALOGUES.en
+  let list = DIALOGUES[lang] || DIALOGUES.en
+  try {
+    const od = require('./online-data').getOverride()
+    if (od && od.dialogues && od.dialogues[lang] && od.dialogues[lang].length) list = od.dialogues[lang]
+  } catch (e) {}
   return level ? list.filter(function (d) { return d.level === level }) : list
 }
 function getLevels() { return LEVELS.slice() }

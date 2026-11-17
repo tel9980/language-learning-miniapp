@@ -1,4 +1,5 @@
 const storage = require('./utils/storage')
+const onlineData = require('./utils/online-data')
 
 App({
   globalData: {
@@ -10,6 +11,8 @@ App({
     this.globalData.lang = storage.getCurrentLang()
     this.globalData.theme = storage.getTheme()
     this.applyTheme()
+    // 异步检查在线素材更新（未配置域名时自动 no-op，不影响启动速度与使用）
+    onlineData.checkUpdate()
   },
   applyTheme() {
     const t = this.globalData.theme || { fontScale: 1, darkMode: false }

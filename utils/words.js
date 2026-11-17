@@ -231,6 +231,11 @@ const WORDS = {
 }
 
 function getWords(lang) {
+  // 在线覆盖层：配置了在线词库且有缓存时优先用；否则用内置（默认行为不变）
+  try {
+    const od = require('./online-data').getOverride()
+    if (od && od.words && od.words[lang] && od.words[lang].length) return od.words[lang]
+  } catch (e) {}
   return WORDS[lang] || WORDS.en
 }
 

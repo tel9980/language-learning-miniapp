@@ -61,7 +61,11 @@
 │   ├── speech-score.js               同声传译识别 → 发音相似度评分（可选）
 │   ├── recordings.js                 录音持久化（本地文件，保留最近 30 条）
 │   ├── fsrs.js                       SM-2 风格动态间隔算法
-│   └── achievements.js               成就徽章 + 打卡日历
+│   ├── achievements.js               成就徽章 + 打卡日历
+│   └── online-data.js                在线词库拉取 + 缓存 + 静默降级（可选）
+├── deploy/
+│   ├── data.json                     导出的词库 JSON（上传到 OSS 用）
+│   └── export-data.js                重新导出脚本
 ├── tests/
 │   └── run-tests.js                  纯函数单元测试（node tests/run-tests.js）
 └── pages/
@@ -96,6 +100,16 @@ tabBar 五项：首页 / 口语 / 学习 / 测验 / 统计。
 ```bash
 node tests/run-tests.js
 ```
+
+## 在线词库更新（可选，需你自己的备案域名）
+
+默认完全离线、用内置词库。若你有**已备案的 https 域名**，可把词库放上去，以后加词改句**不用重新提交小程序版本**：
+
+1. 按 **[在线词库部署-OSS.md](在线词库部署-OSS.md)** 把 `deploy/data.json` 传到阿里云 OSS 并绑定备案域名。
+2. 把得到的 https 地址填进 `utils/online-data.js` 的 `DATA_URL`（留空即不启用）。
+3. 小程序后台把该域名加进 **request 合法域名**（测试号可先跳过）。
+
+拉不到 / 没配置时自动用内置词库，**完全无感**。以后更新：改素材 → 跑 `node deploy/export-data.js` → 覆盖上传 `data.json` 即可。
 
 ## 上线前
 
