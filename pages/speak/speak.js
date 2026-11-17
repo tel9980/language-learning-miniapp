@@ -7,6 +7,7 @@ const recordings = require('../../utils/recordings')
 const karaoke = require('../../utils/karaoke')
 const feedback = require('../../utils/feedback')
 const theme = require('../../utils/theme')
+const profile = require('../../utils/profile')
 const { getWords } = require('../../utils/words')
 
 // 跟读模式：word=单词 | sentence=句子 | dialogue=情景对话 | custom=自建素材
@@ -31,7 +32,9 @@ Page({
     // 角色扮演
     rolePlay: false, revealed: false, otherLine: null,
     // 新手引导
-    showGuide: false
+    showGuide: false,
+    // 儿童模式星星奖励
+    isKid: false, stars: 0, showStar: false
   },
 
   _audioPlayer: null,
@@ -51,6 +54,8 @@ Page({
 
   onShow() {
     this.syncTheme()
+    const p = profile.currentProfile() || {}
+    this.setData({ isKid: p.mode === 'kid', stars: storage.getStats().totalCorrect || 0 })
     this.setData({ sceneIndex: 0 })
     this.refreshScenes()
     this.buildQueueAndLoad()
@@ -161,7 +166,8 @@ Page({
     const tokens = karaoke.tokenize(text)
     const duration = Math.max(2200, tokens.length * 480)
     this._audioPlayer = audio.speak(text, slow, {
-      onFallback() { wx.showToast({ title: '切换备用发音源…', icon: 'none' }) },
+      lang: storage.getCurrentLang() === 'ja' ? 'ja_JP' : 'en_US',
+      onFallback(src) { wx.showToast({ title: src === 'wesisi-tts' ? '切换本地合成发音…' : '切换备用发音源…', icon: 'none' }) },
       onError() { wx.showToast({ title: '发音需联网，请检查网络', icon: 'none' }); that.stopHighlight() },
       onEnded() {
         that.stopHighlight()
@@ -308,11 +314,20 @@ Page({
 
     const msg = ['已加入重点复练 💪', '不错，继续！', '很流利，赞！'][q] || '已记录'
     wx.showToast({ title: msg, icon: 'none' })
-    this.setData({
+
+    // 儿童模式：答好给星星动画奖励
+    const addUpdate = {}
+    if (this.data.isKid && q >= 1) {
+      addUpdate.showStar = true
+      addUpdate.stars = (this.data.stars || 0) + 1
+      const that = this
+      setTimeout(function () { that.setData({ showStar: false }) }, 1200)
+    }
+    this.setData(Object.assign({
       justRated: true,
       todayCount: speaking.getToday().count,
       focusCount: speaking.getFocusItems(this.allItems(storage.getCurrentLang())).length
-    })
+    }, addUpdate))
     setTimeout(() => this.next(), 700)
   },
 

@@ -1,5 +1,6 @@
 const theme = require('../../utils/theme')
 const storage = require('../../utils/storage')
+const favorites = require('../../utils/favorites')
 const {
   getWords, getLangMeta, getExamCategories, getWordsByCategory
 } = require('../../utils/words')
@@ -16,7 +17,10 @@ Page({
     catInfo: [],
     results: [],
     expandedId: '',
-    resultCount: 0
+    resultCount: 0,
+    showMode: 'all', // all | fav
+    historyList: [],
+    favIds: []
   },
 
   _applyLang(lang) {
@@ -33,6 +37,7 @@ Page({
   onLoad() {
     const lang = storage.getCurrentLang()
     this._applyLang(lang)
+    this.refreshMeta()
     this.doSearch()
   },
 
@@ -42,8 +47,16 @@ Page({
     if (lang !== this.data.lang) {
       this._applyLang(lang)
       this.setData({ catIndex: 0 })
-      this.doSearch()
     }
+    this.refreshMeta()
+    this.doSearch()
+  },
+
+  refreshMeta() {
+    this.setData({
+      historyList: favorites.history(this.data.lang),
+      favIds: favorites.list(this.data.lang)
+    })
   },
 
   onInput(e) {
@@ -58,18 +71,50 @@ Page({
     this.setData({ catIndex: Number(e.detail.value) }, this.doSearch)
   },
 
+  setMode(e) {
+    this.setData({ showMode: e.currentTarget.dataset.mode }, this.doSearch)
+  },
+
+  searchHistory(e) {
+    this.setData({ keyword: e.currentTarget.dataset.kw }, this.doSearch)
+  },
+
+  clearHistory() {
+    favorites.clearHistory(this.data.lang)
+    this.refreshMeta()
+    wx.showToast({ title: '已清空历史', icon: 'none' })
+  },
+
+  toggleFav(e) {
+    const id = e.currentTarget.dataset.id
+    favorites.toggle(this.data.lang, id)
+    this.refreshMeta()
+    this.doSearch()
+  },
+
   doSearch() {
     const kw = (this.data.keyword || '').trim().toLowerCase()
+    const lang = this.data.lang
     const catInfo = this.data.catInfo[this.data.catIndex - 1]
     const cat = catInfo ? catInfo.name : ''
-    const words = getWordsByCategory(this.data.lang, cat)
+    let words = getWordsByCategory(lang, cat)
+    // 只看收藏
+    if (this.data.showMode === 'fav') {
+      const favs = favorites.list(lang)
+      words = words.filter(w => favs.indexOf(w.id) >= 0)
+    }
     const list = words.filter(function (w) {
       if (!kw) return true
       return (w.word || '').toLowerCase().indexOf(kw) >= 0 ||
         (w.meaning || '').toLowerCase().indexOf(kw) >= 0 ||
         (w.example || '').toLowerCase().indexOf(kw) >= 0
     })
-    this.setData({ results: list, resultCount: list.length, expandedId: '' })
+    // 有关键词时记入历史
+    if (kw) {
+      favorites.pushHistory(lang, this.data.keyword.trim())
+      this.setData({ historyList: favorites.history(lang) })
+    }
+    this.setData({ results: list, resultCount: list.length, expandedId: '', favIds: favorites.list(lang) })
   },
 
   toggleDetail(e) {

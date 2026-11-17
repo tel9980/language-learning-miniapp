@@ -38,6 +38,16 @@
     <view class="arrow">›</view>
   </view>
 
+  <view class="today-cta card" bindtap="goToday">
+    <view class="cta-icon">📋</view>
+    <view class="cta-body">
+      <view class="cta-title">今日待练</view>
+      <view class="cta-sub">复习 · 口语重点 · 错词，一处全看清</view>
+    </view>
+    <view class="cta-badge" wx:if="{{dueCount > 0}}">{{dueCount}} 项待办</view>
+    <view class="arrow">›</view>
+  </view>
+
   <view class="goal card">
     <view class="row between">
       <view class="title">今日复习目标</view>
@@ -114,7 +124,7 @@
     <view class="entry card" bindtap="goFamilyRecordings">
       <view class="entry-icon famrec">🎧</view>
       <view class="entry-body">
-        <view class="entry-title">全家录音墙</view>
+        <view class="entry-title">全家录音墙 <text class="red-dot" wx:if="{{unreadComments > 0}}">{{unreadComments}}</text></view>
         <view class="muted">听家人练习，互相点评</view>
       </view>
       <view class="arrow">›</view>

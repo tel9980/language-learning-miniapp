@@ -84,3 +84,15 @@
   padding: 100rpx 40rpx;
 }
 .empty-icon { font-size: 64rpx; margin-bottom: 20rpx; }
+
+/* 收藏 + 搜索历史 */
+.mode-row { display: flex; gap: 16rpx; margin: 20rpx 0; }
+.mode-btn { flex: 1; text-align: center; font-size: 27rpx; padding: 16rpx 0; border-radius: 14rpx; background: #fff; color: #8a94a6; }
+.mode-btn.active { background: #4A6CF7; color: #fff; font-weight: 600; }
+.fav-btn { font-size: 38rpx; padding: 4rpx 12rpx; }
+.fav-btn.on { color: #f5a623; }
+.history-row { background: #fff; border-radius: 20rpx; padding: 20rpx 24rpx; margin-bottom: 20rpx; }
+.history-head { display: flex; justify-content: space-between; align-items: center; font-size: 26rpx; }
+.clear-history { color: #4A6CF7; }
+.history-chips { display: flex; flex-wrap: wrap; gap: 14rpx; margin-top: 16rpx; }
+.history-chip { font-size: 25rpx; color: #4A6CF7; background: #eef2ff; padding: 10rpx 20rpx; border-radius: 999rpx; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

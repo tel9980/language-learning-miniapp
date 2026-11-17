@@ -6,7 +6,7 @@ Page({
   data: { list: [], commentCounts: {}, playingId: '' },
   _player: null,
 
-  onShow() { this.syncTheme(); this.refresh() },
+  onShow() { this.syncTheme(); this.refresh(); family.markCommentsSeen() },
   onHide() { this.stopPlay() },
   onUnload() { this.stopPlay() },
 

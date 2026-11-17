@@ -2,6 +2,7 @@ const theme = require('../../utils/theme')
 const storage = require('../../utils/storage')
 const speaking = require('../../utils/speaking')
 const profile = require('../../utils/profile')
+const family = require('../../utils/family')
 const { getLangMeta } = require('../../utils/words')
 
 const app = getApp()
@@ -12,7 +13,7 @@ Page({
     stats: {}, today: {}, mastered: 0, dueCount: 0,
     lang: 'en', langName: '英语', langFlag: '🇬🇧',
     dailyGoal: 20, goalPercent: 0, goalTip: '',
-    speakCount: 0, focusCount: 0,
+    speakCount: 0, focusCount: 0, unreadComments: 0,
     myName: '我', myAvatar: '😀', modeName: '标准'
   },
   onShow() {
@@ -35,7 +36,7 @@ Page({
     const speakCount = speaking.getToday().count
     const focusCount = speaking.getFocusWords(lang).length
     app.globalData.lang = lang
-    this.setData({ stats, today, dueCount, mastered, lang, langName: meta.name, langFlag: meta.flag, dailyGoal, goalPercent, goalTip, speakCount, focusCount, myName: p.name, myAvatar: p.avatar, modeName: modeNames[p.mode] || '标准' })
+    this.setData({ stats, today, dueCount, mastered, lang, langName: meta.name, langFlag: meta.flag, dailyGoal, goalPercent, goalTip, speakCount, focusCount, unreadComments: family.unreadComments(), myName: p.name, myAvatar: p.avatar, modeName: modeNames[p.mode] || '标准' })
   },
   switchLang() {
     const langs = ['en', 'ja']
@@ -46,6 +47,7 @@ Page({
     this.refresh()
   },
   goSpeak() { wx.navigateTo({ url: '/pages/speak/speak' }) },
+  goToday() { wx.navigateTo({ url: '/pages/today/today' }) },
   goLearn() { wx.navigateTo({ url: '/pages/learn/learn' }) },
   goQuiz()  { wx.navigateTo({ url: '/pages/quiz/quiz' }) },
   goStats() { wx.navigateTo({ url: '/pages/stats/stats' }) },

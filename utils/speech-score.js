@@ -91,4 +91,21 @@ function createRecognizer(opts) {
   }
 }
 
-module.exports = { isSupported, normalizeText, similarity, createRecognizer }
+// 同声传译 TTS 合成：文字 → 本地临时音频文件，作为有道外链全挂时的最终备用发音源
+// cb({ok, filename})；插件未添加/合成失败一律 ok:false，调用方静默降级
+function tts(text, lang, cb) {
+  const p = getPlugin()
+  if (!p || typeof p.textToSpeech !== 'function') { cb && cb({ ok: false }); return }
+  try {
+    p.textToSpeech({
+      lang: lang || 'en_US',
+      ttsContent: String(text || ''),
+      success(res) { cb && cb({ ok: true, filename: res && res.filename }) },
+      fail() { cb && cb({ ok: false }) }
+    })
+  } catch (e) {
+    cb && cb({ ok: false })
+  }
+}
+
+module.exports = { isSupported, normalizeText, similarity, createRecognizer, tts }

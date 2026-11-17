@@ -2,6 +2,7 @@
 const profile = require('./profile')
 
 const KEY_COMMENTS = 'lp_family_comments_v1'
+const KEY_SEEN = 'lp_family_comments_seen_v1' // 每个档案上次查看录音墙的时间
 
 function rawRead(key, fallback) {
   try { const v = wx.getStorageSync(key); return v ? JSON.parse(v) : fallback } catch (e) { return fallback }
@@ -79,4 +80,31 @@ function removeComment(recordingId, commentId) {
   rawWrite(KEY_COMMENTS, all)
 }
 
-module.exports = { leaderboard, familyRecordings, getComments, addComment, removeComment }
+// 未读点评数：当前档案之外的家人，在"我"的录音下留下的、晚于上次查看时间的点评
+function unreadComments() {
+  const all = rawRead(KEY_COMMENTS, {})
+  const seen = rawRead(KEY_SEEN, {})
+  const myId = profile.current()
+  const lastSeen = seen[myId] || 0
+  const myRecordingIds = {}
+  let mine = []
+  try { mine = JSON.parse(wx.getStorageSync(profile.nsKey('lp_recordings_v1', myId)) || '[]') } catch (e) {}
+  mine.forEach(function (r) { myRecordingIds[r.id] = true })
+  let n = 0
+  Object.keys(all).forEach(function (recId) {
+    if (!myRecordingIds[recId]) return
+    ;(all[recId] || []).forEach(function (c) {
+      if (c.profileId !== myId && c.at > lastSeen) n++
+    })
+  })
+  return n
+}
+
+// 标记当前档案已查看录音墙
+function markCommentsSeen() {
+  const seen = rawRead(KEY_SEEN, {})
+  seen[profile.current()] = Date.now()
+  rawWrite(KEY_SEEN, seen)
+}
+
+module.exports = { leaderboard, familyRecordings, getComments, addComment, removeComment, unreadComments, markCommentsSeen }

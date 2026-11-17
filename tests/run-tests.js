@@ -99,6 +99,41 @@ family.removeComment('r_test', family.getComments('r_test')[0].id)
 eq(family.getComments('r_test').length, 0, 'comment removed')
 ok(Array.isArray(family.leaderboard()), 'leaderboard returns array')
 
+// ---- favorites（生词收藏 + 搜索历史） ----
+const favorites = require('../utils/favorites')
+eq(favorites.list('en').length, 0, 'favorites initially empty')
+ok(favorites.toggle('en', 'en_001'), 'toggle adds favorite')
+ok(favorites.isFav('en', 'en_001'), 'isFav true after add')
+ok(!favorites.toggle('en', 'en_001'), 'toggle removes favorite')
+favorites.pushHistory('en', ' hello ')
+favorites.pushHistory('en', 'world')
+favorites.pushHistory('en', 'hello')
+eq(favorites.history('en')[0], 'hello', 'latest search first')
+eq(favorites.history('en').length, 2, 'history deduped')
+favorites.clearHistory('en')
+eq(favorites.history('en').length, 0, 'history cleared')
+
+// ---- family-backup（全家包导出/导入） ----
+const familyBackup = require('../utils/family-backup')
+const pack = familyBackup.exportAll()
+eq(pack.format, 'yuban-family-backup', 'family pack format')
+ok(Array.isArray(pack.profiles) && pack.profiles.length >= 1, 'pack has profiles')
+ok(!!pack.data && !!pack.global, 'pack has data + global')
+const badImport = familyBackup.importAll({ format: 'wrong' }, 'overwrite')
+ok(!badImport.ok, 'reject foreign backup')
+const goodImport = familyBackup.importAll(pack, 'merge')
+ok(goodImport.ok && goodImport.count >= 1, 'import own pack ok')
+
+// ---- 扩容后的素材 ----
+ok(sentences.getSentences('en').length >= 100, 'English sentences >= 100')
+const allIds = sentences.getSentences('en').map(function (x) { return x.id })
+eq(new Set(allIds).size, allIds.length, 'sentence ids unique')
+
+// ---- speech-score tts（无插件时静默降级） ----
+let ttsCbCalled = false
+sc.tts('hello', 'en_US', function (r) { ttsCbCalled = true; ok(!r.ok, 'tts degrades when no plugin') })
+ok(ttsCbCalled, 'tts callback always called')
+
 console.log(`\n单元测试结果：${pass} 通过 / ${fail} 失败`)
 if (fail) {
   failures.forEach(f => console.log('  ✗ ' + f))

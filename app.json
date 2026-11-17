@@ -13,7 +13,8 @@
     "pages/family/family",
     "pages/family-recordings/family-recordings",
     "pages/share/share",
-    "pages/reminder/reminder"
+    "pages/reminder/reminder",
+    "pages/today/today"
   ],
   "window": {
     "navigationBarBackgroundColor": "#4A6CF7",

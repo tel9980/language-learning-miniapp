@@ -1,9 +1,13 @@
 // 音频工具：统一 TTS 地址生成 + 播放管理 + 发音源降级兜底
-// 发音源：主=有道 dictvoice；备=有道 type 切换（同为外链但不同参数，主源挂时有机会救回）
-// 若接入微信同声传译插件，可由页面把 pluginTTS 作为更高优先级备用源注入（见 speech-score.js）
+// 降级链：有道主源 → 有道 type 切换 → 微信同声传译本地合成（需插件，静默降级）
 
 function ttsUrl(text, slow) {
   return 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=' + (slow ? 1 : 2)
+}
+
+// 检测同声传译 TTS 是否可用
+function pluginTtsAvailable() {
+  try { return require('./speech-score').isSupported() } catch (e) { return false }
 }
 
 // 创建并管理一个 InnerAudioContext；返回控制器 {play, stop, destroy}
@@ -28,20 +32,33 @@ function createPlayer(opts) {
   return { play, stop, destroy }
 }
 
-// 带降级的发音播放：先主源，onError 时自动切备用源（换 type 参数）
+// 带降级的发音播放：有道主源 → 有道备源 → 同声传译本地合成
+// handlers.lang 可传 'en_US'/'ja_JP' 供同声传译合成用；onFallback(source) 告知降级到哪一级
 // 返回控制器，含 stop/destroy，供页面在切词/离开时清理
 function speak(text, slow, handlers) {
   handlers = handlers || {}
   const mainUrl = ttsUrl(text, slow)
   const backupUrl = ttsUrl(text, !slow)
   let triedBackup = false
+  let triedPlugin = false
   const player = createPlayer({
     onEnded() { if (handlers.onEnded) handlers.onEnded() },
     onError() {
       if (!triedBackup) {
         triedBackup = true
-        if (handlers.onFallback) handlers.onFallback()
+        if (handlers.onFallback) handlers.onFallback('youdao-backup')
         player.play(backupUrl)
+      } else if (!triedPlugin && pluginTtsAvailable()) {
+        triedPlugin = true
+        if (handlers.onFallback) handlers.onFallback('wesisi-tts')
+        try {
+          require('./speech-score').tts(text, handlers.lang, function (r) {
+            if (r && r.ok && r.filename) player.play(r.filename)
+            else if (handlers.onError) handlers.onError()
+          })
+        } catch (e) {
+          if (handlers.onError) handlers.onError()
+        }
       } else if (handlers.onError) {
         handlers.onError()
       }

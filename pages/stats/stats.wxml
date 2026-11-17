@@ -39,6 +39,13 @@
     </view>
   </view>
 
+  <view class="card chart-card">
+    <view class="section-title">近 14 天口语流利度 <text class="muted">（流利数 ÷ 练习数）</text></view>
+    <view class="chart-wrap">
+      <canvas type="2d" id="fluencyChart" class="chart"></canvas>
+    </view>
+  </view>
+
   <view class="card calendar-card">
     <view class="section-title">打卡日历 <text class="muted">（近 4 周）</text></view>
     <view class="cal-grid">
@@ -89,6 +96,11 @@
     <view class="data-btns">
       <view class="data-btn export" bindtap="exportProgress">导出进度</view>
       <view class="data-btn import" bindtap="importProgress">导入进度</view>
+    </view>
+    <view class="muted" style="margin-top:20rpx">一家人换设备？用全家包一次搬走所有人的进度</view>
+    <view class="data-btns">
+      <view class="data-btn export" bindtap="exportFamily">导出全家包</view>
+      <view class="data-btn import" bindtap="importFamily">导入全家包</view>
     </view>
   </view>
 

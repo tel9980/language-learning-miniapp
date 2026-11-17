@@ -9,6 +9,9 @@
     </view>
   </view>
 
+  <!-- 儿童模式星星奖励动画 -->
+  <view class="star-pop" wx:if="{{showStar}}">⭐ +1</view>
+
   <view class="header card">
     <view class="row between">
       <view>
@@ -17,6 +20,7 @@
       </view>
       <view class="today-badge">今日 {{todayCount}} 次</view>
     </view>
+    <view class="star-bar" wx:if="{{isKid}}">⭐ 已得 {{stars}} 颗星</view>
 
     <!-- 跟读类型切换 -->
     <view class="track-tabs">

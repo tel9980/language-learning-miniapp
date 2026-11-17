@@ -105,3 +105,8 @@
 .stage-actions button { flex: 1; }
 .empty { text-align: center; padding: 100rpx 40rpx; }
 .empty-icon { font-size: 100rpx; margin-bottom: 24rpx; }
+
+/* 儿童模式星星奖励 */
+.star-bar { margin-top: 16rpx; font-size: 28rpx; color: #e8890c; background: #fff8e6; padding: 12rpx 20rpx; border-radius: 12rpx; }
+.star-pop { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 80rpx; color: #f5a623; z-index: 999; animation: starpop 1.2s ease-out forwards; pointer-events: none; text-shadow: 0 4rpx 16rpx rgba(245,166,35,0.4); }
+@keyframes starpop { 0% { opacity: 0; transform: translate(-50%, -30%) scale(0.5); } 30% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); } 100% { opacity: 0; transform: translate(-50%, -120%) scale(1); } }

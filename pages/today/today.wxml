@@ -1,0 +1,37 @@
+<view class="container {{themeClass}}">
+  <view class="hero">
+    <view class="hero-title">📋 今日待练</view>
+    <view class="hero-sub">{{langName}} · 共 {{total}} 项，练完今天就轻松啦</view>
+  </view>
+
+  <view wx:if="{{allDone}}" class="card empty-card">
+    <view class="empty-emoji">🎉</view>
+    <view class="empty-title">今天全部完成！</view>
+    <view class="muted">没有到期的复习、口语重点或错词，去自由练习吧</view>
+    <view class="quick-btns">
+      <view class="quick-btn" bindtap="goLearn">复习单词</view>
+      <view class="quick-btn" bindtap="goSpeak">练口语</view>
+      <view class="quick-btn" bindtap="goWrong">错词本</view>
+    </view>
+  </view>
+
+  <block wx:else>
+    <view class="stat-row">
+      <view class="stat-box due"><view class="stat-num">{{dueCount}}</view><view class="stat-label">待复习</view></view>
+      <view class="stat-box focus"><view class="stat-num">{{focusCount}}</view><view class="stat-label">口语重点</view></view>
+      <view class="stat-box wrong"><view class="stat-num">{{wrongCount}}</view><view class="stat-label">错词</view></view>
+    </view>
+
+    <view class="card list-card">
+      <view class="section-title">待练清单</view>
+      <view class="item" wx:for="{{items}}" wx:key="id" data-target="{{item.target}}" bindtap="goItem">
+        <view class="item-badge {{item.type}}">{{item.typeName}}</view>
+        <view class="item-main">
+          <view class="item-label">{{item.label}}</view>
+          <view class="item-sub">{{item.sub}}</view>
+        </view>
+        <view class="item-arrow">›</view>
+      </view>
+    </view>
+  </block>
+</view>

@@ -12,11 +12,15 @@
 .cta-title { font-size: 34rpx; font-weight: 700; }
 .cta-sub { font-size: 24rpx; color: #8A94A6; margin-top: 8rpx; }
 .cta-badge { background: #FF8A3D; color: #fff; font-size: 20rpx; padding: 8rpx 14rpx; border-radius: 999rpx; margin-right: 8rpx; white-space: nowrap; }
+.today-cta { display: flex; align-items: center; margin-top: 16rpx; padding: 28rpx 32rpx; background: linear-gradient(135deg, #FFFFFF 0%, #EEF2FF 100%); border: 2rpx solid #DBE3FF; }
+.today-cta .cta-icon { background: #DDE6FF; }
+.today-cta .cta-badge { background: #4A6CF7; }
 .goal { margin-top: 24rpx; }
 .progress-track { height: 14rpx; background: #EEF1FB; border-radius: 999rpx; margin-top: 20rpx; overflow: hidden; }
 .progress-fill { height: 100%; background: #4A6CF7; border-radius: 999rpx; transition: width 0.3s; }
 .goal-tip { margin-top: 14rpx; }
 .entry-list { margin-top: 24rpx; }
+.red-dot { display: inline-block; background: #E5484D; color: #fff; font-size: 20rpx; line-height: 32rpx; min-width: 32rpx; text-align: center; border-radius: 999rpx; padding: 0 8rpx; margin-left: 10rpx; vertical-align: middle; }
 .entry { display: flex; align-items: center; margin-bottom: 20rpx; }
 .entry-icon { width: 88rpx; height: 88rpx; border-radius: 22rpx; display: flex; align-items: center; justify-content: center; font-size: 44rpx; margin-right: 24rpx; }
 .entry-icon.learn { background: #EEF2FF; }
