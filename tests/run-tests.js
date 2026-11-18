@@ -155,6 +155,16 @@ let ttsCbCalled = false
 sc.tts('hello', 'en_US', function (r) { ttsCbCalled = true; ok(!r.ok, 'tts degrades when no plugin') })
 ok(ttsCbCalled, 'tts callback always called')
 
+// ---- audio 发音源降级链 ----
+const au = require('../utils/audio')
+eq(au.ttsUrl('hello', false), 'https://dict.youdao.com/dictvoice?audio=hello&type=2', 'ttsUrl normal')
+eq(au.ttsUrl('hello', true), 'https://dict.youdao.com/dictvoice?audio=hello&type=1', 'ttsUrl slow')
+ok(au.baiduUrl('hello world', false, 'en_US').indexOf('lan=en') > 0, 'baidu lan=en')
+ok(au.baiduUrl('hello world', false, 'en_US').indexOf('spd=3') > 0, 'baidu normal speed')
+ok(au.baiduUrl('hello world', true, 'en_US').indexOf('spd=2') > 0, 'baidu slow speed')
+ok(au.baiduUrl('hello world', false, 'en_US').indexOf('text=hello%20world') > 0, 'baidu encodes text')
+ok(au.baiduUrl('x', false, 'ja_JP').indexOf('lan=jap') > 0, 'baidu ja maps to jap')
+
 // ---- speech-score 智聆评测（无插件环境下应全部安全降级） ----
 eq(sc.countWords('hello'), 1, 'countWords single word')
 eq(sc.countWords('How are you doing today'), 5, 'countWords counts words')

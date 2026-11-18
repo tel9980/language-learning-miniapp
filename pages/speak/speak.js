@@ -194,8 +194,15 @@ Page({
     const duration = Math.max(2200, tokens.length * 480)
     this._audioPlayer = audio.speak(text, slow, {
       lang: storage.getCurrentLang() === 'ja' ? 'ja_JP' : 'en_US',
-      onFallback(src) { wx.showToast({ title: src === 'wesisi-tts' ? '切换本地合成发音…' : '切换备用发音源…', icon: 'none' }) },
-      onError() { wx.showToast({ title: '发音需联网，请检查网络', icon: 'none' }); that.stopHighlight() },
+      onFallback(src) {
+        const tip = src === 'wesisi-tts' ? '切换本地合成发音…'
+          : (src === 'baidu' ? '换用备用发音…' : '切换发音源…')
+        wx.showToast({ title: tip, icon: 'none' })
+      },
+      onError() {
+        wx.showToast({ title: '这句暂时读不出来，点一下再试', icon: 'none' })
+        that.stopHighlight()
+      },
       onEnded() {
         that.stopHighlight()
         if (that._abPlaying && that.data.abLoop) {
