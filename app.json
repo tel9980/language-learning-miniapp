@@ -39,7 +39,7 @@
   },
   "plugins": {
     "ihearing-eval": {
-      "version": "0.0.2",
+      "version": "0.0.6",
       "provider": "wx63d6102e26f0a3f8"
     }
   },
