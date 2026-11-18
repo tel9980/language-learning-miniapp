@@ -37,6 +37,12 @@
       { "pagePath": "pages/stats/stats", "text": "统计" }
     ]
   },
+  "plugins": {
+    "ihearing-eval": {
+      "version": "0.0.2",
+      "provider": "wx63d6102e26f0a3f8"
+    }
+  },
   "style": "v2",
   "sitemapLocation": "sitemap.json"
 }

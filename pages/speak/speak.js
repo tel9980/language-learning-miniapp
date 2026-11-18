@@ -25,6 +25,7 @@ Page({
     focusCount: 0, justRated: false, todayCount: 0,
     // 客观评分
     scoreSupported: false, scoring: false, score: null, recognized: '',
+    scoreDetail: null, wrongWords: [],
     // 对话展示
     showLine: 0,
     // 逐词高亮（K歌字幕）
@@ -42,20 +43,23 @@ Page({
   _audioPlayer: null,
   _recManager: null,
   _recognizer: null,
+  _evaluator: null,
   _recFilePath: null,
   _lastScore: null,
   _lastRecognized: '',
+  _lastWrong: [],
   _highlighter: null,
   _abPlaying: false,
 
   onLoad() {
-    this.setData({ scoreSupported: speechScore.isSupported() })
+    this.setData({ scoreSupported: speechScore.isSupported(storage.getCurrentLang()) })
     const s = storage.getSettings()
     if (!s.guideSeen) this.setData({ showGuide: true })
   },
 
   onShow() {
     this.syncTheme()
+    this.setData({ scoreSupported: speechScore.isSupported(storage.getCurrentLang()) })
     const p = profile.currentProfile() || {}
     this.setData({ isKid: p.mode === 'kid', stars: storage.getStats().totalCorrect || 0 })
     const intent = nav.takeIntent('pages/speak/speak')
@@ -173,7 +177,7 @@ Page({
     }
     this.setData({
       current: w, hasRecording: false, justRated: false,
-      score: null, recognized: '', playingMine: false,
+      score: null, recognized: '', playingMine: false, scoreDetail: null, wrongWords: [],
       showLine: 0, revealed: false, otherLine,
       karaokeOn: false, karaokeTokens: karaoke.toView(tokens, -1), abCount: 0
     }, () => {
@@ -263,24 +267,82 @@ Page({
     this.setData({ playingMine: true })
   },
 
-  // ---------- 录音（并行启动客观识别） ----------
+  // ---------- 录音 ----------
+  // 优先走智聆评测插件：它自己录音，并把「发音分 + 逐词错误 + 录音文件」一次给全。
+  // 注意 wx.getRecorderManager() 是全局单例，插件内部也用它，两边同时开会互相覆盖回调，
+  // 所以走插件时不再自己开录音器。
+  _evalAvailable(cur) {
+    return !!cur && speechScore.canEvaluate(storage.getCurrentLang())
+  },
+
+  // 存一条录音到「全家录音墙」，插件路径与自带录音器路径共用
+  _saveRecording(filePath) {
+    if (!filePath) return
+    const cur = this.data.current
+    recordings.save(filePath, {
+      itemId: cur ? cur.id : '',
+      label: cur ? cur.word : '',
+      cn: cur ? cur.meaning : '',
+      kind: this.data.track,
+      score: this._lastScore,
+      recognized: this._lastRecognized
+    })
+  },
+
   toggleRecord() {
     if (this.data.recording) { this.stopRecord(); return }
     const that = this
+    this.stopAudio()
+    feedback.tap()
+    this._lastScore = null
+    this._lastRecognized = ''
+    const cur = this.data.current
+    const lang = storage.getCurrentLang()
+
+    // 路径 A：智聆评测
+    if (this._evalAvailable(cur)) {
+      const ev = speechScore.createEvaluator({
+        text: cur.word,
+        lang: lang,
+        onResult(res) {
+          that._evaluator = null
+          that._lastScore = res.score
+          that._lastWrong = res.wrongWords || []
+          if (res.filePath) {
+            that._recFilePath = res.filePath
+            that._saveRecording(res.filePath)
+          }
+          that.setData({
+            recording: false,
+            scoring: false,
+            hasRecording: !!res.filePath,
+            score: res.score,
+            scoreDetail: { accuracy: res.accuracy, fluency: res.fluency, completion: res.completion },
+            wrongWords: (res.wrongWords || []).slice(0, 6)
+          })
+          if (res.filePath) wx.showToast({ title: '录好了，点「听我的」对比', icon: 'none' })
+        },
+        onError() {
+          that._evaluator = null
+          that.setData({ recording: false, scoring: false })
+          wx.showToast({ title: '评测失败，可以先自评', icon: 'none' })
+        }
+      })
+      if (ev.supported) {
+        this._evaluator = ev
+        this.setData({ recording: true, hasRecording: false, scoring: true, score: null, scoreDetail: null, wrongWords: [] })
+        ev.start()
+        return
+      }
+    }
+
+    // 路径 B：自带录音器（若同声传译可用，并行做文字识别算相似度）
     if (!this._recManager) {
       this._recManager = wx.getRecorderManager()
       this._recManager.onStop(res => {
         that._recFilePath = res.tempFilePath
         that.setData({ hasRecording: true, recording: false })
-        const cur = that.data.current
-        recordings.save(res.tempFilePath, {
-          itemId: cur ? cur.id : '',
-          label: cur ? cur.word : '',
-          cn: cur ? cur.meaning : '',
-          kind: that.data.track,
-          score: that._lastScore,
-          recognized: that._lastRecognized
-        })
+        that._saveRecording(res.tempFilePath)
         wx.showToast({ title: '录好了，点「听我的」对比', icon: 'none' })
       })
       this._recManager.onError(() => {
@@ -288,15 +350,10 @@ Page({
         wx.showToast({ title: '录音失败，请检查麦克风权限', icon: 'none' })
       })
     }
-    this.stopAudio()
-    feedback.tap()
-    this._lastScore = null
-    this._lastRecognized = ''
-    const cur = this.data.current
-    if (this.data.scoreSupported && cur) {
+    if (cur && speechScore.isSupported(lang)) {
       this._recognizer = speechScore.createRecognizer({
         targetText: cur.word,
-        lang: storage.getCurrentLang() === 'ja' ? 'ja_JP' : 'en_US',
+        lang: lang === 'ja' ? 'ja_JP' : 'en_US',
         onResult(res) {
           that._lastScore = res.score
           that._lastRecognized = res.recognized
@@ -318,6 +375,8 @@ Page({
   },
 
   stopRecord() {
+    // 智聆路径：录音归插件管，stop 之后由它的 onStop 回调收尾
+    if (this._evaluator) { this._evaluator.stop(); return }
     if (this._recManager && this.data.recording) {
       try { this._recManager.stop() } catch (e) {}
       this.setData({ recording: false })
@@ -396,6 +455,7 @@ Page({
   // ---------- 清理 ----------
   stopAll() {
     this.stopAudio()
+    if (this._evaluator) { try { this._evaluator.stop() } catch (e) {} this._evaluator = null }
     if (this._recManager && this.data.recording) { try { this._recManager.stop() } catch (e) {} }
     if (this._recognizer) { try { this._recognizer.stop() } catch (e) {} this._recognizer = null }
     if (this.data.recording) this.setData({ recording: false })

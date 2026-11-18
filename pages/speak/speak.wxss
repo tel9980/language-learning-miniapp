@@ -115,3 +115,22 @@
 .star-bar { margin-top: 16rpx; font-size: 28rpx; color: #e8890c; background: #fff8e6; padding: 12rpx 20rpx; border-radius: 12rpx; }
 .star-pop { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 80rpx; color: #f5a623; z-index: 999; animation: starpop 1.2s ease-out forwards; pointer-events: none; text-shadow: 0 4rpx 16rpx rgba(245,166,35,0.4); }
 @keyframes starpop { 0% { opacity: 0; transform: translate(-50%, -30%) scale(0.5); } 30% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); } 100% { opacity: 0; transform: translate(-50%, -120%) scale(1); } }
+
+/* 发音评测明细 */
+.score-detail {
+  display: flex;
+  gap: 14rpx;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #8a8f99;
+}
+.wrong-words {
+  margin-top: 12rpx;
+  font-size: 25rpx;
+  line-height: 1.7;
+  color: #d9822b;
+}
+.wrong-words .wrong-title { color: #8a8f99; }
+.wrong-words .wrong-word { margin-right: 12rpx; }

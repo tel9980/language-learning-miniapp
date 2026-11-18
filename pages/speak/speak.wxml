@@ -126,7 +126,16 @@
         <block wx:if="{{scoring}}"><view class="score-wait">🔍 正在识别发音…</view></block>
         <block wx:elif="{{score !== null}}">
           <view class="score-num {{score>=80?'high':(score>=60?'mid':'low')}}">{{score}}<text class="score-unit">分</text></view>
+          <view class="score-detail" wx:if="{{scoreDetail}}">
+            <text>准确 {{scoreDetail.accuracy}}</text>
+            <text wx:if="{{scoreDetail.fluency}}">流畅 {{scoreDetail.fluency}}</text>
+            <text wx:if="{{scoreDetail.completion}}">完整 {{scoreDetail.completion}}</text>
+          </view>
           <view class="score-recognized" wx:if="{{recognized}}">识别到：{{recognized}}</view>
+          <view class="wrong-words" wx:if="{{wrongWords.length}}">
+            <text class="wrong-title">需要练的词：</text>
+            <text class="wrong-word" wx:for="{{wrongWords}}" wx:key="word">{{item.word}}（{{item.tagText}}）</text>
+          </view>
           <view class="muted">客观参考分，结合自评一起看</view>
         </block>
         <block wx:else><view class="muted">录音后将给出客观发音参考分</view></block>

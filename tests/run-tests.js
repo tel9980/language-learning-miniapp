@@ -155,6 +155,32 @@ let ttsCbCalled = false
 sc.tts('hello', 'en_US', function (r) { ttsCbCalled = true; ok(!r.ok, 'tts degrades when no plugin') })
 ok(ttsCbCalled, 'tts callback always called')
 
+// ---- speech-score 智聆评测（无插件环境下应全部安全降级） ----
+eq(sc.countWords('hello'), 1, 'countWords single word')
+eq(sc.countWords('How are you doing today'), 5, 'countWords counts words')
+eq(sc.countWords(''), 0, 'countWords empty = 0')
+eq(sc.canEvaluate('en'), false, 'no eval plugin in test env')
+eq(sc.canEvaluate('ja'), false, 'ja never uses eval plugin')
+eq(sc.supportsLang('en'), true, 'en supported by eval plugin')
+eq(sc.supportsLang('ja'), false, 'ja unsupported by eval plugin')
+eq(sc.isSupported(), false, 'isSupported false without any plugin')
+eq(sc.isSupported('en'), false, 'isSupported(lang) false without plugin')
+ok(!sc.createEvaluator({ text: 'hello', lang: 'en' }).supported, 'evaluator unsupported without plugin')
+eq(sc.scoreOf({ pron_accuracy: 82 }, 'word'), 82, 'word score = accuracy')
+eq(sc.scoreOf({ pron_accuracy: 80, pron_completion: 100, pron_fluency: 50 }, 'sentence'), 81,
+  'sentence score = acc*0.7 + completion*0.2 + fluency*0.1')
+eq(sc.scoreOf({}, 'word'), 0, 'missing fields score 0')
+eq(sc.scoreOf({ pron_accuracy: 500 }, 'word'), 100, 'score clamped to 100')
+const ww = sc.wrongWordsOf({ words: [
+  { word: 'hello', tag: 0, pron_accuracy: 90 },
+  { word: 'world', tag: 3, pron_accuracy: 40 },
+  { word: 'extra', tag: 1, pron_accuracy: 60 }
+] })
+eq(ww.length, 2, 'only mismatched words returned')
+eq(ww[0].tagText, '读错', 'tag 3 = 读错')
+eq(ww[1].tagText, '多读', 'tag 1 = 多读')
+eq(sc.wrongWordsOf(null).length, 0, 'null result = no wrong words')
+
 // ---- pager（大列表增量渲染） ----
 const pager = require('../utils/pager')
 const pg = pager.create(30)
