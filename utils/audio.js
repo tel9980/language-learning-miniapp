@@ -62,7 +62,8 @@ function createPlayer(opts) {
 // 源顺序按「词 / 句」分流，避免整句一上来就撞有道的 500：
 //   单词（<=2 词）→ 有道 → 有道备源 → 百度
 //   整句（>2 词） → 百度 → 有道 → 有道备源
-//   日语          → 有道 → 有道备源（百度 lan=jap 会 403，不试）
+//   日语单词      → 有道 → 有道备源（百度 lan=jap 会 403，不试）
+//   日语整句      → 同声传译插件（有道对日语句子同样 500，装了插件就直接上）
 // 最后一级若同声传译插件可用，再用它的本地合成兜底。
 //
 // handlers.lang 可传 'en_US'/'ja_JP'；onFallback(source) 告知降级到哪一级
@@ -70,17 +71,28 @@ function createPlayer(opts) {
 function speak(text, slow, handlers) {
   handlers = handlers || {}
   const lang = handlers.lang || 'en_US'
-  const words = String(text || '').trim().split(/\s+/).filter(Boolean).length
+  const raw = String(text || '').trim()
+  // 按文本判断语种：用户把语言切到日语、但素材还是英文时，不能因此把百度排掉
+  const jaText = isJapaneseText(raw)
+  // 日文没有空格，按空白分词永远是 1 个"词"，会把整句误判成单词。
+  // 日文改按字符长度近似：<= 6 个字符算单词，否则算整句。
+  const words = jaText
+    ? (raw.length > 6 ? 99 : 1)
+    : raw.split(/\s+/).filter(Boolean).length
   const yd = { id: 'youdao', url: ttsUrl(text, slow) }
   const ydBackup = { id: 'youdao-backup', url: ttsUrl(text, !slow) }
   const bd = { id: 'baidu', url: baiduUrl(text, slow, lang) }
 
-  // 按文本判断语种：用户把语言切到日语、但素材还是英文时，不能因此把百度排掉
-  const jaText = isJapaneseText(text)
   let sources
-  if (jaText) sources = [yd, ydBackup]
-  else if (words > 2) sources = [bd, yd, ydBackup]
-  else sources = [yd, ydBackup, bd]
+  if (jaText) {
+    // 日语：有道词典音对单词还行，但整句一样会 500。
+    // 装了同声传译插件就让它直接上，省掉两次必然失败的请求。
+    sources = (words > 2 && pluginTtsAvailable()) ? [] : [yd, ydBackup]
+  } else if (words > 2) {
+    sources = [bd, yd, ydBackup]
+  } else {
+    sources = [yd, ydBackup, bd]
+  }
 
   let i = 0
   let triedPlugin = false
