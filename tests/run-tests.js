@@ -164,6 +164,11 @@ ok(au.baiduUrl('hello world', false, 'en_US').indexOf('spd=3') > 0, 'baidu norma
 ok(au.baiduUrl('hello world', true, 'en_US').indexOf('spd=2') > 0, 'baidu slow speed')
 ok(au.baiduUrl('hello world', false, 'en_US').indexOf('text=hello%20world') > 0, 'baidu encodes text')
 ok(au.baiduUrl('x', false, 'ja_JP').indexOf('lan=jap') > 0, 'baidu ja maps to jap')
+eq(au.isJapaneseText('おはようございます'), true, 'kana detected as japanese')
+eq(au.isJapaneseText('Good morning'), false, 'english not japanese')
+eq(au.isJapaneseText(''), false, 'empty not japanese')
+eq(sc.canEvaluateText('Good morning'), false, 'english text still needs plugin (absent here)')
+eq(sc.canEvaluateText('おはよう'), false, 'japanese text never evaluable')
 
 // ---- speech-score 智聆评测（无插件环境下应全部安全降级） ----
 eq(sc.countWords('hello'), 1, 'countWords single word')

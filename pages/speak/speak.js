@@ -279,7 +279,9 @@ Page({
   // 注意 wx.getRecorderManager() 是全局单例，插件内部也用它，两边同时开会互相覆盖回调，
   // 所以走插件时不再自己开录音器。
   _evalAvailable(cur) {
-    return !!cur && speechScore.canEvaluate(storage.getCurrentLang())
+    if (!cur) return false
+    // 按文本判断，不看用户设置的语言：切到日语但素材是英文时照样能评测
+    return speechScore.canEvaluateText(cur.word)
   },
 
   // 存一条录音到「全家录音墙」，插件路径与自带录音器路径共用

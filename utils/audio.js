@@ -21,6 +21,12 @@ function baiduUrl(text, slow, lang) {
     '&spd=' + (slow ? 2 : 3) + '&source=web'
 }
 
+// 文本里有没有日文假名（用来判断该走哪条发音链，而不是看用户设置的语言）
+const KANA_RE = /[\u3040-\u309f\u30a0-\u30ff]/
+function isJapaneseText(text) {
+  return KANA_RE.test(String(text || ''))
+}
+
 // 同声传译 TTS 是否可用（注意：智聆插件没有 textToSpeech，不能算）
 function pluginTtsAvailable() {
   try {
@@ -69,8 +75,10 @@ function speak(text, slow, handlers) {
   const ydBackup = { id: 'youdao-backup', url: ttsUrl(text, !slow) }
   const bd = { id: 'baidu', url: baiduUrl(text, slow, lang) }
 
+  // 按文本判断语种：用户把语言切到日语、但素材还是英文时，不能因此把百度排掉
+  const jaText = isJapaneseText(text)
   let sources
-  if (lang === 'ja_JP') sources = [yd, ydBackup]
+  if (jaText) sources = [yd, ydBackup]
   else if (words > 2) sources = [bd, yd, ydBackup]
   else sources = [yd, ydBackup, bd]
 
@@ -120,4 +128,4 @@ function speak(text, slow, handlers) {
   }
 }
 
-module.exports = { ttsUrl, baiduUrl, createPlayer, speak }
+module.exports = { ttsUrl, baiduUrl, isJapaneseText, createPlayer, speak }

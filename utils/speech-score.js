@@ -37,6 +37,13 @@ function supportsLang(lang) {
   return lang !== 'ja'
 }
 
+// 按文本判断能不能评测：素材是英文、用户却把语言切到日语时，仍然应该能评测
+const KANA_RE = /[\u3040-\u309f\u30a0-\u30ff]/
+function canEvaluateText(text) {
+  if (KANA_RE.test(String(text || ''))) return false
+  return getEvalPlugin() != null
+}
+
 function canEvaluate(lang) {
   if (!supportsLang(lang)) return false
   return getEvalPlugin() != null
@@ -268,6 +275,7 @@ module.exports = {
   MAX_CONTENT_WORDS,
   isSupported,
   canEvaluate,
+  canEvaluateText,
   supportsLang,
   countWords,
   normalizeText,
