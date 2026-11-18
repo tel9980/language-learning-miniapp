@@ -20,6 +20,7 @@ Page({
     sceneIndex: 0, scenes: [], sceneNames: [],
     levelIndex: 0, levelNames: ['全部', 'A1', 'A2', 'B1', 'B2'],
     queue: [], index: 0, current: null,
+    showDots: true, progressText: '0 / 0', progressPercent: 0,
     recording: false, hasRecording: false, playingMine: false,
     focusCount: 0, justRated: false, todayCount: 0,
     // 客观评分
@@ -126,7 +127,9 @@ Page({
     const fresh = pool.filter(w => !records[w.id])
     const done = pool.filter(w => records[w.id])
     const queue = fresh.concat(done)
-    this.setData({ queue, index: 0, showLine: 0, mode: 'train', abCount: 0 }, () => this.loadCurrent())
+    this.setData(Object.assign({
+      queue, index: 0, showLine: 0, mode: 'train', abCount: 0
+    }, this._progress(0, queue.length)), () => this.loadCurrent())
   },
 
   switchTrack(e) {
@@ -141,6 +144,17 @@ Page({
     const idx = Number(e.detail.value)
     this.stopAll()
     this.setData({ sceneIndex: idx, revealed: false }, () => this.buildQueueAndLoad())
+  },
+
+  // 进度显示：条目少时用圆点，条目多（几十上百）时改用进度条，
+  // 避免为每个条目都渲染一个 view 节点（220 词 = 220 个节点，明显拖慢渲染）
+  _progress(index, total) {
+    const n = total || 0
+    return {
+      showDots: n > 0 && n <= 20,
+      progressText: n ? (Math.min(index + 1, n) + ' / ' + n) : '0 / 0',
+      progressPercent: n ? Math.round((index + 1) / n * 100) : 0
+    }
   },
 
   loadCurrent() {
@@ -162,6 +176,9 @@ Page({
       score: null, recognized: '', playingMine: false,
       showLine: 0, revealed: false, otherLine,
       karaokeOn: false, karaokeTokens: karaoke.toView(tokens, -1), abCount: 0
+    }, () => {
+      // 进度随当前索引更新
+      this.setData(this._progress(this.data.index, this.data.queue.length))
     })
   },
 
@@ -366,7 +383,7 @@ Page({
       return
     }
     this.stopAll()
-    this.setData({ mode: 'focus', queue: list, index: 0 }, () => this.loadCurrent())
+    this.setData(Object.assign({ mode: 'focus', queue: list, index: 0 }, this._progress(0, list.length)), () => this.loadCurrent())
   },
   backToTrain() {
     this.stopAll()

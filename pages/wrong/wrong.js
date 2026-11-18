@@ -2,6 +2,7 @@ const theme = require('../../utils/theme')
 const audio = require('../../utils/audio')
 const storage = require('../../utils/storage')
 const { getWords, getLangMeta } = require('../../utils/words')
+const pager = require('../../utils/pager')
 
 const INTERVALS = storage.INTERVALS
 
@@ -19,8 +20,13 @@ Page({
     showAnswer: false,
     current: null,
     doneCount: 0,
+    hasMore: false,
     _audio: null
   },
+
+  // 完整错词表留在实例上，setData 只传当前片段
+  _all: null,
+  _pager: pager.create(30),
 
   onLoad() {
     const lang = storage.getCurrentLang()
@@ -53,7 +59,17 @@ Page({
       }
     })
     items.sort(function (a, b) { return b.lapses - a.lapses })
-    this.setData({ items: items, total: items.length, expandedId: '' })
+    this._all = items
+    this._pager.reset(items.length)
+    this.setData({
+      items: this._pager.slice(items), total: items.length,
+      hasMore: this._pager.hasMore, expandedId: ''
+    })
+  },
+
+  loadMore() {
+    if (!this._pager.more()) return
+    this.setData({ items: this._pager.slice(this._all || []), hasMore: this._pager.hasMore })
   },
 
   toggleDetail(e) {

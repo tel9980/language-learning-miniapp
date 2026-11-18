@@ -30,6 +30,8 @@
           <view class="detail-cn">{{item.exampleCn}}</view>
         </view>
       </view>
+
+      <view class="load-more" wx:if="{{hasMore}}" bindtap="loadMore">加载更多（已显示 {{items.length}}/{{total}}）</view>
     </view>
 
     <view class="empty" wx:if="{{total === 0}}">

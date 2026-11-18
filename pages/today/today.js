@@ -5,6 +5,7 @@ const storage = require('../../utils/storage')
 const speaking = require('../../utils/speaking')
 const sentences = require('../../utils/sentences')
 const { getWords, getLangMeta } = require('../../utils/words')
+const pager = require('../../utils/pager')
 
 Page({
   behaviors: [theme],
@@ -12,8 +13,12 @@ Page({
     lang: 'en', langName: '英语',
     items: [], total: 0,
     dueCount: 0, focusCount: 0, wrongCount: 0,
-    allDone: false
+    allDone: false, hasMore: false
   },
+
+  // 完整清单留在实例上，setData 只传当前该渲染的片段（大清单不卡）
+  _all: null,
+  _pager: pager.create(30),
 
   onLoad() {
     const lang = storage.getCurrentLang()
@@ -60,10 +65,20 @@ Page({
       }
     })
 
+    this._all = items
+    this._pager.reset(items.length)
     this.setData({
-      items: items, total: items.length,
+      items: this._pager.slice(items), total: items.length, hasMore: this._pager.hasMore,
       dueCount: dueCount, focusCount: focusItems.length, wrongCount: wrongCount,
       allDone: items.length === 0
+    })
+  },
+
+  loadMore() {
+    if (!this._pager.more()) return
+    this.setData({
+      items: this._pager.slice(this._all || []),
+      hasMore: this._pager.hasMore
     })
   },
 

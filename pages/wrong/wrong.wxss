@@ -76,3 +76,4 @@
 .done-title { font-size: 40rpx; font-weight: 600; color: #1f2533; margin-top: 24rpx; }
 .done-sub { font-size: 28rpx; color: #8A94A6; margin-top: 12rpx; }
 .done-view .primary-btn { margin-top: 48rpx; }
+.load-more { text-align: center; color: #4A6CF7; font-size: 26rpx; padding: 26rpx 0; }

@@ -31,3 +31,4 @@
 .muted { color: #8a94a6; font-size: 26rpx; line-height: 1.6; }
 .quick-btns { display: flex; gap: 16rpx; margin-top: 40rpx; }
 .quick-btn { flex: 1; background: #eef2ff; color: #4A6CF7; font-size: 26rpx; padding: 20rpx 0; border-radius: 16rpx; }
+.load-more { text-align: center; color: #4A6CF7; font-size: 26rpx; padding: 26rpx 0 10rpx; }

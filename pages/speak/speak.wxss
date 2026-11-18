@@ -21,6 +21,11 @@
 .stage { text-align: center; }
 .progress-dots { display: flex; justify-content: center; flex-wrap: wrap; gap: 10rpx; margin-bottom: 40rpx; }
 .dot { width: 14rpx; height: 14rpx; border-radius: 50%; background: #E4E8F2; }
+.progress-bar-row { display: flex; align-items: center; gap: 18rpx; margin-bottom: 40rpx; }
+.progress-bar { flex: 1; height: 12rpx; border-radius: 999rpx; background: #E4E8F2; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 999rpx; background: linear-gradient(90deg, #6E8BFF, #4A6CF7); transition: width .25s ease; }
+.progress-text { font-size: 24rpx; color: #8A94A6; min-width: 90rpx; text-align: right; }
+
 .dot.on { background: #4A6CF7; width: 36rpx; border-radius: 999rpx; }
 .dot.done { background: #A9BCFF; }
 .role-tag { display: inline-block; font-size: 22rpx; color: #E08A1E; background: #FFF7EC; padding: 6rpx 18rpx; border-radius: 999rpx; margin-bottom: 16rpx; }

@@ -155,6 +155,27 @@ let ttsCbCalled = false
 sc.tts('hello', 'en_US', function (r) { ttsCbCalled = true; ok(!r.ok, 'tts degrades when no plugin') })
 ok(ttsCbCalled, 'tts callback always called')
 
+// ---- pager（大列表增量渲染） ----
+const pager = require('../utils/pager')
+const pg = pager.create(30)
+eq(pg.size, 30, 'pager page size')
+const big = Array.from({ length: 220 }, (_, i) => ({ id: 'x' + i }))
+pg.reset(big.length)
+ok(pg.hasMore, 'hasMore true for 220 items')
+eq(pg.slice(big).length, 30, 'first page renders 30')
+eq(pg.slice(big)[0].id, 'x0', 'first page starts at head')
+ok(pg.more(), 'more() advances')
+eq(pg.slice(big).length, 60, 'second page renders 60')
+while (pg.more()) {}
+ok(!pg.hasMore, 'exhausted has no more')
+eq(pg.slice(big).length, 220, 'renders all after exhaustion')
+ok(!pg.more(), 'more() returns false when exhausted')
+const small = pager.create(30)
+small.reset(5)
+ok(!small.hasMore, 'small list has no more')
+eq(small.slice([1, 2, 3, 4, 5]).length, 5, 'small list renders fully')
+eq(pager.create(0).size, 30, 'invalid page size falls back to default')
+
 // ---- 性能缓存正确性（读次数下降 + 失效无脏数据） ----
 const storage = require('../utils/storage')
 // 统计 getStorageSync 调用次数

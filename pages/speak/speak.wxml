@@ -62,8 +62,12 @@
   </view>
 
   <view class="card stage" wx:if="{{current}}">
-    <view class="progress-dots">
+    <view class="progress-dots" wx:if="{{showDots}}">
       <view wx:for="{{queue}}" wx:key="id" wx:for-index="idx" class="dot {{index===idx?'on':(idx<index?'done':'')}}"></view>
+    </view>
+    <view class="progress-bar-row" wx:else>
+      <view class="progress-bar"><view class="progress-bar-fill" style="width:{{progressPercent}}%"></view></view>
+      <view class="progress-text">{{progressText}}</view>
     </view>
 
     <!-- 角色扮演：显示对方台词 -->
