@@ -200,6 +200,21 @@ storage.invalidate()
 eq(storage.getSettings().dailyGoal, 7, 'invalidate discovers external write')
 global.wx.getStorageSync = _origGet
 
+// ---- 写入失败不能静默（否则用户以为存上了） ----
+let modalCount = 0
+const _origSet2 = global.wx.setStorageSync
+const _origErr = console.error
+global.wx.showModal = () => { modalCount++ }
+console.error = () => {}   // 这条用例故意制造写入失败，压掉预期内的报错日志
+global.wx.setStorageSync = () => { throw new Error('quota exceeded') }
+storage.invalidate()
+storage.setDailyGoal(11)
+storage.setDailyGoal(12)
+ok(modalCount === 1, 'write failure warns exactly once, got ' + modalCount)
+global.wx.setStorageSync = _origSet2
+console.error = _origErr
+delete global.wx.showModal
+
 console.log(`\n单元测试结果：${pass} 通过 / ${fail} 失败`)
 if (fail) {
   failures.forEach(f => console.log('  ✗ ' + f))

@@ -56,10 +56,29 @@ function read(key, fallback) {
   }
 }
 
+// 写入失败（存储空间满 / 序列化异常）不能静默吞掉：否则用户以为进度存上了，
+// 下次打开却回退。这里只提示一次，避免每写一次弹一次。
+let _writeWarned = false
 function write(key, value) {
   const k = profile.nsKey(key)
   _cache[k] = value
-  try { wx.setStorageSync(k, JSON.stringify(value)) } catch (e) {}
+  try {
+    wx.setStorageSync(k, JSON.stringify(value))
+  } catch (e) {
+    if (typeof console !== 'undefined' && console.error) console.error('[storage] 写入失败', k, e)
+    if (!_writeWarned) {
+      _writeWarned = true
+      try {
+        if (typeof wx.showModal === 'function') {
+          wx.showModal({
+            title: '保存失败',
+            content: '本地存储写入失败（可能是空间已满）。这次的学习记录可能没保存上，建议先到「统计 → 导出进度」备份，再清理一些旧录音。',
+            showCancel: false
+          })
+        }
+      } catch (e2) {}
+    }
+  }
 }
 
 function rawHas(key) {

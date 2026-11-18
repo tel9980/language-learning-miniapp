@@ -27,5 +27,17 @@ App({
   refreshTheme() {
     this.globalData.theme = storage.getTheme()
     this.applyTheme()
+  },
+  // ---- 兜底：小程序没有错误边界，页面里抛异常会直接白屏且无提示 ----
+  onError(err) {
+    if (typeof console !== 'undefined' && console.error) console.error('[app] 未捕获错误', err)
+  },
+  onUnhandledRejection(res) {
+    if (typeof console !== 'undefined' && console.error) console.error('[app] 未处理的 Promise 拒绝', res && res.reason)
+  },
+  // 页面路径不存在（例如手改分享路径、旧版链接）时回首页，而不是停在错误页
+  onPageNotFound(res) {
+    if (typeof console !== 'undefined' && console.warn) console.warn('[app] 页面不存在', res && res.path)
+    wx.reLaunch({ url: '/pages/index/index' })
   }
 })
