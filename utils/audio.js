@@ -84,8 +84,10 @@ function speak(text, slow, handlers) {
   handlers = handlers || {}
   const lang = handlers.lang || 'en_US'
   const raw = String(text || '').trim()
-  // 按文本判断语种：用户把语言切到日语、但素材还是英文时，不能因此把百度排掉
-  const jaText = isJapaneseText(raw)
+  // 按文本判断语种：用户把语言切到日语、但素材还是英文时，不能因此把百度排掉。
+  // 用 needJapaneseVoice 而不是 isJapaneseText，纯汉字日语词（「家」「部屋」）才算日语，
+  // 否则它会走英文分支、白撞一次百度 lan=jap 的 403。
+  const jaText = needJapaneseVoice(raw)
   // 日文没有空格，按空白分词永远是 1 个"词"，会把整句误判成单词。
   // 日文改按字符长度近似：<= 6 个字符算单词，否则算整句。
   const words = jaText
