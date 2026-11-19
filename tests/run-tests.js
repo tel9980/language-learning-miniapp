@@ -659,12 +659,13 @@ global.wx.getFileSystemManager = function () {
   }
 }
 playedSrc = null
-au.speak('すみません、駅はどこですか。', false, { id: 'js015' })
-eq(playedSrc, 'wxfile://usr/pkg-audio/packageJa_ja_js015.mp3', '代码包音频先复制到用户目录再播（真机才不会 access denied）')
-ok(!!_pkgFs[playedSrc], '副本文件确实写了出来')
+const ctlBundled = au.speak('すみません、駅はどこですか。', false, { id: 'js015' })
+eq(playedSrc, 'https://yb.qy663.de5.net/audio/js015.mp3', '随包音频先流播 CDN（真机读代码包里的文件不可靠）')
+eq(ctlBundled.bundled, true, '控制器能看出这是随包音频（失败时还有两级退路）')
+ctlBundled.stop()
 playedSrc = null
 au.speak('すみません、駅はどこですか。', false, { id: 'js015' })
-eq(playedSrc, 'wxfile://usr/pkg-audio/packageJa_ja_js015.mp3', '第二次直接播副本，不再读包')
+eq(playedSrc, 'https://yb.qy663.de5.net/audio/js015.mp3', '再听一次仍走 CDN，不依赖包内文件与本地副本')
 playedSrc = null
 au.speak('hello', false, {})
 ok(/^https:\/\//.test(playedSrc || ''), 'speak still goes online for items without bundled audio')
@@ -672,7 +673,7 @@ ok(/^https:\/\//.test(playedSrc || ''), 'speak still goes online for items witho
 // 否则「情景对话」整段都只能走在线链（真机上就是听不出声）。
 playedSrc = null
 au.speak('Hi, I do not think we have met.', false, { id: 'dl_d003_1' })
-eq(playedSrc, 'wxfile://usr/pkg-audio/packageEn_en_d003_1.mp3', '对话台词也走离线音频（队列 id 带 dl_ 前缀）')
+eq(playedSrc, 'https://yb.qy663.de5.net/audio-en/d003_1.mp3', '对话台词命中随包音频（队列 id 带 dl_ 前缀，CDN 同样用原始 id）')
 
 // pkg-audio：路径扁平化 / 复制后再复制不重复写 / 读不到包内文件时返回空串
 const pkgAudio = require('../utils/pkg-audio')
@@ -1260,10 +1261,11 @@ async function runExtraTests() {
   eq(laJa.isReady('ja'), false, '重新加载的模块：日语分包初始未就绪')
   playedSrc = null
   const ctl = auJa.speak('すみません、駅はどこですか。', false, { id: 'st_js015' })
-  eq(ctl.pending, true, '日语分包未就绪时先挂起，不去撞必然失败的在线源')
-  eq(playedSrc, null, '挂起期间不播放任何音频')
+  eq(playedSrc, 'https://yb.qy663.de5.net/audio/js015.mp3', '第一级：流播 CDN（前缀 id 也认）')
+  // CDN 也播不出来时（没网/文件丢了）→ 读分包里的文件、复制到用户目录再播
+  global.__lastCtx._onErr({ errMsg: 'operateAudio:fail' })
   await new Promise(function (r) { setTimeout(r, 30) })
-  eq(playedSrc, 'wxfile://usr/pkg-audio/packageJa_ja_js015.mp3', '分包就绪后自动播本地副本（前缀 id 也命中）')
+  eq(playedSrc, 'wxfile://usr/pkg-audio/packageJa_ja_js015.mp3', '第二级：CDN 失败 → 分包副本（真离线）')
   ctl.stop()
 
   // 分包真加载失败时：同一批 mp3 在 CDN 上也有一份，改成流播，别让用户听到静默。
@@ -1278,9 +1280,12 @@ async function runExtraTests() {
   eq(laCdn.isReady('ja'), false, '分包加载失败后仍未就绪')
   playedSrc = null
   const ctl2 = auCdn.speak('すみません、駅はどこですか。', false, { id: 'st_js015' })
-  eq(ctl2.pending, true, '日语整句先挂起等分包')
+  eq(playedSrc, 'https://yb.qy663.de5.net/audio/js015.mp3', '分包加载失败第一级仍是 CDN')
+  global.__lastCtx._onErr({ errMsg: 'operateAudio:fail' })
   await new Promise(function (r) { setTimeout(r, 40) })
-  eq(playedSrc, 'https://yb.qy663.de5.net/audio/js015.mp3', '分包加载失败 → 流播 CDN 上的同一批音频')
+  eq(laCdn.isReady('ja'), false, '分包确实没起来')
+  ok(/^https:\/\/(dict\.youdao|fanyi\.baidu)/.test(playedSrc || '') || playedSrc === 'https://yb.qy663.de5.net/audio/js015.mp3',
+    '第二级也拿不到时退回在线链（不会静默停住）')
   ctl2.stop()
   global.wx.loadSubpackage = savedLoad
 }

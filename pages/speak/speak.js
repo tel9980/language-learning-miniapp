@@ -65,7 +65,8 @@ Page({
   onShow() {
     this.syncTheme()
     // 换到日语时确保离线音频分包已加载（主包里没有日语音频）
-    localAudio.ensureLoaded(storage.getCurrentLang())
+    // 离线音频现在优先流播 CDN（见 utils/audio.js），不再预载分包——
+    // 预载要拉 1–3MB，而真机上读分包文件还可能失败，不如按需。
     this.setData({ scoreSupported: speechScore.isSupported(storage.getCurrentLang()) })
     const p = profile.currentProfile() || {}
     this.setData({ isKid: p.mode === 'kid', stars: storage.getStats().totalCorrect || 0 })

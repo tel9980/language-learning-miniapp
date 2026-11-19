@@ -108,7 +108,7 @@ function createPlayer(opts) {
 
 // 直接流播一个远程 mp3（不经过 downloadFile：真机上 InnerAudioContext 播网络音频
 // 不受 downloadFile 合法域名限制）。分包加载失败时用它播 CDN 上的同一批离线音频。
-function playRemote(url, slow, handlers) {
+function playRemote(url, slow, handlers, onFail) {
   let lp = null
   function start() {
     lp = createPlayer({
@@ -118,7 +118,8 @@ function playRemote(url, slow, handlers) {
       onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
       onError(err) {
         console.error('[audio] CDN 离线音频播放失败', url, err && (err.errMsg || err))
-        if (handlers.onError) handlers.onError(err)
+        if (onFail) onFail(err)
+        else if (handlers.onError) handlers.onError(err)
       }
     })
     lp.play(url)
@@ -160,75 +161,66 @@ function speak(text, slow, handlers) {
   const ydBackup = { id: 'youdao-backup', url: ttsUrl(text, !slow, jaText ? 'ja_JP' : lang) }
   const bd = { id: 'baidu', url: baiduUrl(text, slow, lang) }
 
-  // 随包音频优先：日语素材的 mp3 打在代码包里（见 utils/local-audio.js），
-  // 播到就是 0 请求、0 配额、断网可用。真出问题（文件缺失/解码失败）再退回网络链。
-  const localPath = handlers.id ? localAudio.pathFor(handlers.id) : ''
-  // 离线音频都在分包里（日语 packageJa / 英语 packageEn），分包没加载完时 pathFor 返回空串。
-  // 不能直接退在线链：日语整句没有可用在线源，退过去就是「读不出来」。
-  // 正确的做法是等分包加载完再播本地文件；分包失败则流播 CDN 上的同一批文件。
+  // 随包音频（日语/英语的句子、台词、日语单词）：见 utils/local-audio.js。
+  // 顺序 = ①流播 CDN 上的同一批 mp3（InnerAudioContext 播 URL 不受域名白名单限制）
+  //       → ②分包里的文件复制到用户目录再播（真离线路径）
+  //       → ③在线 TTS 链。
+  // 为什么不再优先读包：真机实测 FileSystemManager 读分包内的文件会直接失败
+  // （日志「[pkg-audio] 读不到代码包内的音频 /packageJa/ja/js001.mp3」），
+  // 原来的顺序导致每条都掉进在线链——日语整句没有在线源，等于没声音。
   const region = handlers.id ? localAudio.langOf(handlers.id) : ''
-  if (handlers.id && !localPath && region && !handlers._waitedRegion && !localAudio.isReady(region)) {
-    // 音频在分包里且还没加载完：挂起等待，别直接退在线链。
-    // 日语整句根本没有可用在线源，英语整句虽有百度，但等分包通常比它快。
-    if (handlers.onLoading) handlers.onLoading(true)
-    let cancelled = false
-    let inner = null
-    localAudio.ensureLoaded(region).then(function () {
-      if (cancelled) { if (handlers.onLoading) handlers.onLoading(false); return }
-      const again = Object.assign({}, handlers, { _waitedRegion: true })
-      if (handlers.onLoading) handlers.onLoading(false)
-      if (!localAudio.pathFor(handlers.id)) {
-        // 分包没起来（个别真机会加载失败/超时）：同一批音频在 CDN 上也有一份，直接流播。
-        const remote = localAudio.remoteFor(handlers.id)
-        if (remote) {
-          console.warn('[audio] 离线分包未就绪，改用 CDN 音频', region, handlers.id, remote)
-          inner = playRemote(remote, slow, handlers)
-          return
+  if (handlers.id && region) {
+    const remoteUrl = localAudio.remoteFor(handlers.id)
+    let stage = 'remote'
+    let cur = null
+    let net = null
+    let destroyed = false
+
+    function toPackage(err) {
+      if (destroyed) return
+      stage = 'pkg'
+      if (handlers.onLoading) handlers.onLoading(true)
+      localAudio.ensureLoaded(region).then(function () {
+        if (handlers.onLoading) handlers.onLoading(false)
+        if (destroyed) return
+        const p = localAudio.pathFor(handlers.id)
+        const playable = p ? pkgAudio.ensure(p) : ''
+        if (!playable) {
+          console.warn('[audio] 离线音频不可用，改用在线链', handlers.id)
+          return toNetwork(err)
         }
-      }
-      inner = speak(text, slow, again)
-    })
-    return {
-      pending: true,
-      stop() { cancelled = true; if (inner && inner.stop) inner.stop() },
-      destroy() { cancelled = true; if (inner && inner.destroy) inner.destroy() },
-      retry() { if (inner && inner.retry) inner.retry() }
-    }
-  }
-  if (localPath) {
-    // 代码包内的 mp3 真机播不了（operateAudio:fail:access denied），
-    // 必须先复制到用户目录再播；复制失败就直接走在线链，别让用户点了个寂寞。
-    const playable = pkgAudio.ensure(localPath)
-    if (!playable) {
-      console.warn('[audio] 离线音频不可用，改用在线链', localPath)
-      return runNetwork()
-    }
-    let lp = null
-    let fellBack = false
-    function playLocal() {
-      lp = createPlayer({
-        rate: slow ? 0.75 : 1,
-        onPlay() { if (handlers.onPlay) handlers.onPlay() },
-        onEnded: handlers.onEnded,
-        onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
-        onError(err) {
-          if (fellBack) return
-          fellBack = true
-          console.error('[audio] 本地音频播放失败，改用在线链', playable, err && (err.errMsg || err))
-          if (lp) lp.destroy()
-          const p = runNetwork()
-          keep.push(p)
-        }
+        cur = createPlayer({
+          rate: slow ? 0.75 : 1,
+          onPlay() { if (handlers.onPlay) handlers.onPlay() },
+          onEnded: handlers.onEnded,
+          onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
+          onError(e) {
+            console.error('[audio] 本地音频播放失败，改用在线链', playable, e && (e.errMsg || e))
+            toNetwork(e)
+          }
+        })
+        cur.play(playable)
       })
-      lp.play(playable)
     }
-    const keep = []
-    playLocal()
+
+    function toNetwork(err) {
+      if (destroyed) return
+      stage = 'network'
+      net = runNetwork()
+    }
+
+    if (remoteUrl) cur = playRemote(remoteUrl, slow, handlers, toPackage)
+    else toPackage()
+
     return {
-      local: true,
-      stop() { if (lp) lp.stop() },
-      destroy() { if (lp) lp.destroy(); keep.forEach(function (p) { try { p.destroy() } catch (e) {} }) },
-      retry() { if (fellBack) keep.forEach(function (p) { try { p.retry() } catch (e) {} }); else playLocal() }
+      bundled: true,
+      stop() { destroyed = true; if (cur && cur.stop) cur.stop(); if (net && net.stop) net.stop() },
+      destroy() { destroyed = true; if (cur && cur.destroy) cur.destroy(); if (net && net.destroy) net.destroy() },
+      retry() {
+        if (handlers.onLoading) handlers.onLoading(false)
+        if (stage === 'network' && net && net.retry) return net.retry()
+        if (cur && cur.retry) return cur.retry()
+      }
     }
   }
 
