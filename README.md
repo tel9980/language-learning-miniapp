@@ -162,6 +162,7 @@ python3 tools/gen-ja-audio.py --items /tmp/ja_items.json --out assets/audio/ja
 │   ├── speaking.js                   口语记录 + 重点清单 + 每日打卡（带缓存）
 │   ├── audio.js                      TTS 地址 + 播放器 + 发音源降级(有道→百度→同传) + 本地音频优先
 │   ├── local-audio.js                日语离线音频清单（自动生成，id → /assets/audio/ja/*.mp3）
+│   ├── custom-items.js               自建素材归一化（{text,cn} → 练习页的 {word,meaning}）
 │   ├── favorites.js                  生词收藏夹 + 搜索历史（按档案隔离）
 │   ├── nav.js                        统一跳转（tabBar走switchTab + 跨tab意图传参）
 │   ├── karaoke.js                    逐词高亮（K歌字幕）+ 词级时间估算 + 真实时长重排

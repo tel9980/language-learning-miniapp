@@ -259,6 +259,34 @@ storage.invalidate()
 eq(storage.getSettings().dailyGoal, 7, 'invalidate discovers external write')
 global.wx.getStorageSync = _origGet
 
+// ---- 自建素材：存储形状 { text, cn } → 练习页形状 { word, meaning } ----
+// 少了这一步，口语页读到 current.word 是 undefined：舞台空白、点发音会把字面量
+// "undefined" 送去有道合成（实测 ttsUrl(undefined) = ...audio=undefined）。
+const customItems = require('../utils/custom-items')
+const cu1 = customItems.toPracticeItem({ id: 'cu_1', text: 'Hello there.', cn: '你好', scene: '我的素材' })
+eq(cu1.word, 'Hello there.', 'custom item text maps to word')
+eq(cu1.meaning, '你好', 'custom item cn maps to meaning')
+eq(cu1.isCustom, true, 'custom item is marked isCustom')
+eq(cu1.phonetic, '', 'custom item has empty phonetic')
+eq(customItems.toPracticeItem({ id: 'cu_2', text: '   ' }), null, 'blank custom item dropped')
+eq(customItems.toPracticeItem(null), null, 'null custom item dropped')
+eq(customItems.toPracticeItems([{ text: 'a' }, { text: '' }, null]).length, 1, 'toPracticeItems filters junk')
+// 端到端：存进去再取出来，练习页必需字段齐全
+storage.addCustomItems([{ text: 'Could you send me the report?', cn: '你能把报告发我吗', scene: '商务邮件', lang: 'en' }])
+const savedCustom = customItems.toPracticeItems(storage.getCustomItems('en'))
+eq(savedCustom.length, 1, 'saved custom item normalizes to a practice item')
+eq(savedCustom[0].word, 'Could you send me the report?', 'practice item carries the sentence text')
+ok(!!savedCustom[0].id, 'practice item keeps the id (used as progress/record key)')
+// 单条删除：以前 removeCustomItem 没有 UI 入口，导入错一条就再也去不掉
+const _cuId = savedCustom[0].id
+storage.addCustomItems([{ text: 'second one', cn: '第二条', lang: 'en' }])
+storage.removeCustomItem(_cuId)
+const _cuLeft = storage.getCustomItems('en')
+eq(_cuLeft.length, 1, 'removeCustomItem deletes exactly one item')
+eq(_cuLeft[0].text, 'second one', 'removeCustomItem keeps the other items')
+storage.removeCustomItem(_cuLeft[0].id)
+eq(storage.getCustomItems('en').length, 0, 'removeCustomItem can empty the list')
+
 // ---- 写入失败不能静默（否则用户以为存上了） ----
 let modalCount = 0
 const _origSet2 = global.wx.setStorageSync

@@ -16,7 +16,7 @@
 
   <view class="card preview-card" wx:if="{{preview.length}}">
     <view class="field-label">预览（前 {{preview.length}} 条）</view>
-    <view class="preview-item" wx:for="{{preview}}" wx:key="index">
+    <view class="preview-item" wx:for="{{preview}}" wx:key="text">
       <view class="preview-text">{{item.text}}</view>
       <view class="preview-cn" wx:if="{{item.cn}}">{{item.cn}}</view>
     </view>
@@ -25,5 +25,17 @@
   <view class="btn-row">
     <button class="btn-ghost" bindtap="clear">清空</button>
     <button class="btn-primary" bindtap="save">保存到我的素材</button>
+  </view>
+
+  <view class="card mine-card" wx:if="{{mine.length}}">
+    <view class="field-label">我的素材 · 共 {{mine.length}} 条</view>
+    <view class="mine-item" wx:for="{{mine}}" wx:key="id">
+      <view class="mine-main">
+        <view class="mine-text">{{item.text}}</view>
+        <view class="mine-cn" wx:if="{{item.cn}}">{{item.cn}}</view>
+        <view class="mine-scene" wx:if="{{item.scene}}">{{item.scene}}</view>
+      </view>
+      <view class="mine-del" data-id="{{item.id}}" bindtap="removeOne">删除</view>
+    </view>
   </view>
 </view>

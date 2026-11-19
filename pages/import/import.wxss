@@ -12,3 +12,19 @@
 .preview-cn { font-size: 24rpx; color: #8A94A6; margin-top: 6rpx; }
 .btn-row { display: flex; gap: 20rpx; margin-top: 32rpx; }
 .btn-row button { flex: 1; }
+
+/* 已保存的自建素材列表（可单条删除） */
+.mine-card { margin-top: 24rpx; }
+.mine-item { display: flex; align-items: flex-start; gap: 16rpx; padding: 18rpx 0; border-bottom: 1rpx solid #F0F2F8; }
+.mine-item:last-child { border-bottom: none; }
+.mine-main { flex: 1; min-width: 0; }
+.mine-text { font-size: 28rpx; color: #1F2733; line-height: 1.5; word-break: break-word; }
+.mine-cn { font-size: 24rpx; color: #8A94A6; margin-top: 6rpx; }
+.mine-scene { font-size: 22rpx; color: #A9B2C2; margin-top: 6rpx; }
+.mine-del { flex: none; font-size: 24rpx; color: #E24A4A; padding: 4rpx 16rpx; border: 1rpx solid #F3C9C9; border-radius: 999rpx; }
+/* 深色模式 */
+.theme-dark .mine-text { color: #E8ECF5; }
+.theme-dark .mine-cn { color: #9AA6BC; }
+.theme-dark .mine-scene { color: #6E7A91; }
+.theme-dark .mine-del { color: #FF8A8A; border-color: #6B3A3A; }
+.theme-dark .mine-item { border-bottom-color: #2A3242; }

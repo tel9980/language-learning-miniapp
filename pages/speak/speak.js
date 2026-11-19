@@ -10,6 +10,7 @@ const theme = require('../../utils/theme')
 const profile = require('../../utils/profile')
 const nav = require('../../utils/nav')
 const { getWords } = require('../../utils/words')
+const custom = require('../../utils/custom-items')
 
 // 跟读模式：word=单词 | sentence=句子 | dialogue=情景对话 | custom=自建素材
 Page({
@@ -129,8 +130,9 @@ Page({
 
   // 汇总某语种下全部可跟读条目（词 + 句 + 对话台词 + 自建）
   allItems(lang) {
-    const custom = storage.getCustomItems(lang).map(x => Object.assign({}, x, { kind: 'sentence' }))
-    return getWords(lang).concat(sentences.getAllItems(lang)).concat(custom)
+    // 自建素材存的是 { text, cn }，练习页统一按 { word, meaning } 取值，必须归一化
+    const mine = custom.toPracticeItems(storage.getCustomItems(lang))
+    return getWords(lang).concat(sentences.getAllItems(lang)).concat(mine)
   },
 
   buildQueueAndLoad() {
@@ -142,12 +144,14 @@ Page({
     } else if (this.data.track === 'sentence') {
       pool = sentences.getSentences(lang, level === '全部' ? null : level).map(s => sentences.toItem(s, 'st'))
     } else if (this.data.track === 'custom') {
-      pool = storage.getCustomItems(lang).map(x => Object.assign({}, x, { kind: 'sentence' }))
+      pool = custom.toPracticeItems(storage.getCustomItems(lang))
     } else {
       const list = level === '全部' ? sentences.getDialogues(lang) : sentences.getDialogues(lang, level)
       const dlg = list[this.data.sceneIndex]
       pool = dlg ? dlg.lines.map(l => sentences.toItem(Object.assign({ scene: dlg.scene, level: dlg.level }, l), 'dl')) : []
     }
+    // 没有 word 的条目练不了（舞台空白、发音念不出来），一律不进队列
+    pool = pool.filter(w => w && w.word)
     const records = speaking.getRecords()
     const fresh = pool.filter(w => !records[w.id])
     const done = pool.filter(w => records[w.id])
@@ -217,6 +221,8 @@ Page({
 
   // ---------- 音频播放（带降级兜底 + 逐词高亮 + AB复读） ----------
   playText(text, slow, id) {
+    // 兜底：空文本不要去合成（历史上自建素材缺 word 字段时会把字面量 "undefined" 送去有道）
+    if (!text || !String(text).trim()) return
     this.stopAudio()
     const that = this
     const tokens = karaoke.tokenize(text)
