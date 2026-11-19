@@ -20,5 +20,6 @@ Thumbs.db
 # 由 deploy/cf/build-worker.js 生成（内联了 data.json，不必进仓库）
 deploy/cf/worker.js
 
-# 发布时由 packageJa/ja/*.mp3 复制过来（CDN 兜底，体积大，不进仓库）
+# 发布时由 packageJa/ja/*.mp3、packageEn/en/*.mp3 复制过来（CDN 兜底，体积大，不进仓库）
 deploy/cf/audio/
+deploy/cf/audio-en/

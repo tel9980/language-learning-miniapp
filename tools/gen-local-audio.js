@@ -8,7 +8,7 @@
 //
 // 布局：
 //   日语 → packageJa/ja/<id>.mp3   放在分包里（约 1.8MB，主包放不下）
-//   英语 → assets/audio/en/<id>.mp3 放主包（约 1MB，学英语最常用，不想等分包）
+//   英语 → packageEn/en/<id>.mp3  同样放分包（约 950KB，放主包会撑爆主包体积、拖慢冷启动）
 const fs = require('fs')
 const path = require('path')
 const s = require('../utils/sentences')
@@ -19,7 +19,7 @@ const REGION = {
   // 日语在主包放不下、只能在分包里；分包在个别真机上会加载失败，所以同一批 mp3
   // 还会随 Pages 部署到 CDN，加载失败时直接流播（见 utils/local-audio.js 的 remoteFor）
   ja: { base: '/packageJa/ja/', name: 'jaAudio', dir: 'packageJa/ja', remote: 'https://yb.qy663.de5.net/audio/' },
-  en: { base: '/assets/audio/en/', name: '', dir: 'assets/audio/en' }
+  en: { base: '/packageEn/en/', name: 'enAudio', dir: 'packageEn/en', remote: 'https://yb.qy663.de5.net/audio-en/' }
 }
 
 // 每个语种要合成的素材 id（英语不含单词：单词在线发音一直稳，880 个文件放不下）
@@ -62,7 +62,7 @@ lines.push('// 为什么不走在线合成：日语整句找不到可靠的免�
 lines.push('// （且必须带 le=jap），百度 lan=jap 返回 403，同声传译 textToSpeech 只列中英文。')
 lines.push('// 英语虽然有在线源，但学英语最常练，随包发能在断网时照常听。')
 lines.push('//')
-lines.push('// 分包：日语音频 1.8MB 放不进 2MB 的主包，放在 packageJa 分包里，')
+lines.push('// 分包：日语 1.8MB、英语 0.95MB 都放不进 2MB 的主包，分别放在 packageJa / packageEn 分包里，')
 lines.push('// 启动时 wx.loadSubpackage 预载；没加载完时 pathFor 返回空串，调用方退回在线合成。')
 lines.push('')
 lines.push('const REGION = {')

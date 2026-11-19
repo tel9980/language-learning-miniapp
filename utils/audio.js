@@ -163,23 +163,25 @@ function speak(text, slow, handlers) {
   // 随包音频优先：日语素材的 mp3 打在代码包里（见 utils/local-audio.js），
   // 播到就是 0 请求、0 配额、断网可用。真出问题（文件缺失/解码失败）再退回网络链。
   const localPath = handlers.id ? localAudio.pathFor(handlers.id) : ''
-  // 日语音频在分包里，分包没加载完时 pathFor 返回空串。日语整句又没有可用的在线源
-  // （有道只支持词、百度 403、同声传译只支持中英文），所以这里不能直接退在线链，
-  // 而是等分包加载完再播本地文件——否则用户看到的就是「日语句子读不出来」。
-  if (handlers.id && !localPath && !handlers._waitedJa &&
-      localAudio.langOf(handlers.id) === 'ja' && !localAudio.isReady('ja')) {
+  // 离线音频都在分包里（日语 packageJa / 英语 packageEn），分包没加载完时 pathFor 返回空串。
+  // 不能直接退在线链：日语整句没有可用在线源，退过去就是「读不出来」。
+  // 正确的做法是等分包加载完再播本地文件；分包失败则流播 CDN 上的同一批文件。
+  const region = handlers.id ? localAudio.langOf(handlers.id) : ''
+  if (handlers.id && !localPath && region && !handlers._waitedRegion && !localAudio.isReady(region)) {
+    // 音频在分包里且还没加载完：挂起等待，别直接退在线链。
+    // 日语整句根本没有可用在线源，英语整句虽有百度，但等分包通常比它快。
     if (handlers.onLoading) handlers.onLoading(true)
     let cancelled = false
     let inner = null
-    localAudio.ensureLoaded('ja').then(function () {
+    localAudio.ensureLoaded(region).then(function () {
       if (cancelled) { if (handlers.onLoading) handlers.onLoading(false); return }
-      const again = Object.assign({}, handlers, { _waitedJa: true })
+      const again = Object.assign({}, handlers, { _waitedRegion: true })
       if (handlers.onLoading) handlers.onLoading(false)
       if (!localAudio.pathFor(handlers.id)) {
         // 分包没起来（个别真机会加载失败/超时）：同一批音频在 CDN 上也有一份，直接流播。
         const remote = localAudio.remoteFor(handlers.id)
         if (remote) {
-          console.warn('[audio] 日语分包未就绪，改用 CDN 音频', handlers.id, remote)
+          console.warn('[audio] 离线分包未就绪，改用 CDN 音频', region, handlers.id, remote)
           inner = playRemote(remote, slow, handlers)
           return
         }

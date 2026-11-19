@@ -11,7 +11,6 @@
 // 绝不阻断练习。
 
 // ---------- 智聆口语评测 ----------
-const EVAL_PLUGIN = 'ihearing-eval'   // 提供方 appid wx63d6102e26f0a3f8，见 app.json 的 plugins
 const MAX_CONTENT_WORDS = 15 // 插件限制：content 不超过 15 个词
 const DEFAULT_SCORE_COEFF = 1.5 // [1.0, 4.0]，1.0 最宽松；对学习者偏宽松一点更友好
 
@@ -22,7 +21,9 @@ function getEvalPlugin() {
   if (evalPlugin) return evalPlugin
   if (evalState === 'unavailable') return null
   try {
-    evalPlugin = requirePlugin(EVAL_PLUGIN) // 未添加插件时这里会抛错
+    // 插件名必须写成字面量：小程序后台的「代码质量」扫描靠静态匹配 requirePlugin('xxx')
+    // 来判断插件有没有被使用，写成变量会被判成「引用了无使用的插件」。
+    evalPlugin = requirePlugin('ihearing-eval') // 未添加插件时这里会抛错
     evalState = evalPlugin ? 'ready' : 'unavailable'
     return evalPlugin
   } catch (e) {
@@ -269,7 +270,6 @@ function tts(text, lang, cb) {
 }
 
 module.exports = {
-  EVAL_PLUGIN,
   MAX_CONTENT_WORDS,
   isSupported,
   canEvaluate,

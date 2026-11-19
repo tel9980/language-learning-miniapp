@@ -9,9 +9,9 @@ App({
   onLaunch() {
     storage.init()
     this.globalData.lang = storage.getCurrentLang()
-    // 日语离线音频在 packageJa 分包里（1.8MB，主包放不下），启动就预载，
-    // 用户第一次点发音时已经就位；加载失败也不影响启动（会退回在线合成）
-    try { require('./utils/local-audio').ensureLoaded(this.globalData.lang) } catch (e) {}
+    // 离线音频（日语 1.8MB / 英语 0.95MB）都放在分包里，**启动时不预载**：
+    // 冷启动是用户最敏感的那一段，为了可能马上听不到的一句去拉 1–2MB 不划算。
+    // 真正的预载点在口语/学习页 onShow（用户要去练了）以及 speak() 的按需挂起。
     this.globalData.theme = storage.getTheme()
     this.applyTheme()
     // 异步检查在线素材更新（未配置域名时自动 no-op，不影响启动速度与使用）

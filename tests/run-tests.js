@@ -567,7 +567,10 @@ eq(localAudio.isReady('ja'), false, 'Japanese audio region starts as not-ready')
 localAudio.ensureLoaded('ja')   // 测试环境没有 wx.loadSubpackage → 同步标为可用
 eq(localAudio.isReady('ja'), true, 'ensureLoaded marks the region ready when loadSubpackage is unavailable')
 eq(localAudio.pathFor('js015'), '/packageJa/ja/js015.mp3', 'Japanese audio lives in the subpackage')
-eq(localAudio.pathFor('s001'), '/assets/audio/en/s001.mp3', 'English audio lives in the main package')
+eq(localAudio.isReady('en'), false, 'English audio region also starts as not-ready')
+localAudio.ensureLoaded('en')
+eq(localAudio.isReady('en'), true, 'ensureLoaded marks the english region ready too')
+eq(localAudio.pathFor('s001'), '/packageEn/en/s001.mp3', 'English audio lives in its own subpackage')
 eq(localAudio.langOf('js015'), 'ja', 'langOf maps a Japanese id to its region')
 eq(localAudio.langOf('s001'), 'en', 'langOf maps an English id to its region')
 eq(localAudio.langOf('nope'), '', 'langOf returns empty for unknown ids')
@@ -576,8 +579,8 @@ eq(localAudio.pathFor('nope'), '', 'unknown id has no audio')
 // 跟读队列里的 id 带前缀（句子 st_ / 对话台词 dl_），而 mp3 文件名用原始 id。
 // 两种都得认，否则对话台词永远命中不了离线音频、只能走在线链。
 eq(localAudio.idCandidates('dl_d003_1').join(','), 'dl_d003_1,d003_1', 'id candidates strip the queue prefix')
-eq(localAudio.pathFor('st_s001'), '/assets/audio/en/s001.mp3', 'prefixed sentence id finds the same mp3')
-eq(localAudio.pathFor('dl_d003_1'), '/assets/audio/en/d003_1.mp3', 'prefixed dialogue line id finds the same mp3')
+eq(localAudio.pathFor('st_s001'), '/packageEn/en/s001.mp3', 'prefixed sentence id finds the same mp3')
+eq(localAudio.pathFor('dl_d003_1'), '/packageEn/en/d003_1.mp3', 'prefixed dialogue line id finds the same mp3')
 eq(localAudio.langOf('dl_d003_1'), 'en', 'langOf understands prefixed ids')
 
 const audioIds = []
@@ -611,7 +614,7 @@ ok(audioKb < 1900, 'Japanese audio stays under 1.9MB (actual ' + audioKb.toFixed
 ok(localAudio.countOf('ja') === audioIds.length,
   'local-audio index covers exactly the current Japanese items (' + localAudio.countOf('ja') + ' vs ' + audioIds.length + ')')
 
-// 英语：只预生成句子与对话台词（单词在线发音一直稳，880 个文件塞不进主包）
+// 英语：只预生成句子与对话台词（单词在线发音一直稳，880 个文件塞不进任何一个分包）
 const enAudioIds = []
 sentences.getSentences('en').forEach(function (x) { enAudioIds.push(x.id) })
 sentences.getDialogues('en').forEach(function (d) { d.lines.forEach(function (l) { enAudioIds.push(l.id) }) })
@@ -619,7 +622,7 @@ const enMissing = enAudioIds.filter(function (id) { return !localAudio.has(id) }
 eq(enMissing.length, 0, 'every English sentence has bundled audio (missing: ' + enMissing.slice(0, 5).join(',') + ')')
 eq(badMp3(enAudioIds).length, 0, 'English audio files are real mp3')
 const enKb = kbOf(enAudioIds)
-ok(enKb < 1200, 'English audio stays under 1.2MB (actual ' + enKb.toFixed(0) + 'KB, 主包上限 2MB)')
+ok(enKb < 1200, 'English audio stays under 1.2MB (actual ' + enKb.toFixed(0) + 'KB, 分包上限 2MB)')
 
 // 代码包内的 mp3 真机播不了 —— 实录报错：
 //   [InnerAudio] operateAudio fail: errMsg="operateAudio:fail:access denied, appId=wx..."
@@ -669,13 +672,13 @@ ok(/^https:\/\//.test(playedSrc || ''), 'speak still goes online for items witho
 // 否则「情景对话」整段都只能走在线链（真机上就是听不出声）。
 playedSrc = null
 au.speak('Hi, I do not think we have met.', false, { id: 'dl_d003_1' })
-eq(playedSrc, 'wxfile://usr/pkg-audio/assets_audio_en_d003_1.mp3', '对话台词也走离线音频（队列 id 带 dl_ 前缀）')
+eq(playedSrc, 'wxfile://usr/pkg-audio/packageEn_en_d003_1.mp3', '对话台词也走离线音频（队列 id 带 dl_ 前缀）')
 
 // pkg-audio：路径扁平化 / 复制后再复制不重复写 / 读不到包内文件时返回空串
 const pkgAudio = require('../utils/pkg-audio')
 eq(pkgAudio.nameOf('/packageJa/ja/js015.mp3'), 'packageJa_ja_js015.mp3', '包内路径压成扁平文件名')
 eq(pkgAudio.ensure('/packageJa/ja/js015.mp3'), 'wxfile://usr/pkg-audio/packageJa_ja_js015.mp3', 'ensure 返回可播路径')
-eq(pkgAudio.ensure('/assets/audio/en/nope.mp3'), 'wxfile://usr/pkg-audio/assets_audio_en_nope.mp3', '任意包内路径都能复制')
+eq(pkgAudio.ensure('/packageEn/en/nope.mp3'), 'wxfile://usr/pkg-audio/packageEn_en_nope.mp3', '任意包内路径都能复制')
 const _fsNoMp3 = global.wx.getFileSystemManager
 global.wx.getFileSystemManager = function () {
   return { readFileSync() { throw new Error('denied') }, statSync() { throw new Error('none') }, mkdirSync() {}, writeFileSync() {}, readdirSync() { return [] }, unlinkSync() {} }
@@ -1265,7 +1268,7 @@ async function runExtraTests() {
 
   // 分包真加载失败时：同一批 mp3 在 CDN 上也有一份，改成流播，别让用户听到静默。
   eq(laJa.remoteFor('st_js015'), 'https://yb.qy663.de5.net/audio/js015.mp3', '日语素材有 CDN 兜底地址（前缀 id 也认）')
-  eq(laJa.remoteFor('s001'), '', '英语在主包里，不需要 CDN 兜底')
+  eq(laJa.remoteFor('s001'), 'https://yb.qy663.de5.net/audio-en/s001.mp3', '英语同样有 CDN 兜底地址（与分包同源发布）')
   delete require.cache[require.resolve('../utils/audio')]
   delete require.cache[require.resolve('../utils/local-audio')]
   const savedLoad = global.wx.loadSubpackage

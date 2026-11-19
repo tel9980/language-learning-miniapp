@@ -1,7 +1,9 @@
 // ---- 运行时接口（下面这段被 tools/gen-local-audio.js 原样拼进 utils/local-audio.js）----
 
-// 分包是否已经加载完：日语要等 wx.loadSubpackage 成功，英语在主包里恒为 true
-const _ready = { ja: false, en: true }
+// 分包是否已经加载完：有 name 的语种在分包里（日语 packageJa / 英语 packageEn），
+// 要等 wx.loadSubpackage 成功才能播；没有 name 的语种在主包里，恒为可用。
+const _ready = {}
+Object.keys(REGION).forEach(function (k) { _ready[k] = !REGION[k].name })
 let _pending = null
 
 // 跟读队列里的素材 id 是「前缀_原始id」（句子 st_s001、对话台词 dl_d003_1），

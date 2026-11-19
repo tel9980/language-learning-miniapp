@@ -68,15 +68,18 @@
 
 | 位置 | 内容 | 体积 |
 | --- | --- | --- |
-| 主包 | 代码 + 英语朗读 148 条（120 句 + 28 行台词） | 约 **1407KB / 2048KB** |
+| 主包 | 只有代码（wxml/wxss/js/json） | 约 **474KB / 2048KB** |
 | 分包 `packageJa` | 日语朗读 353 条（100 句 + 33 行台词 + 110 词 + 110 条例句） | 约 **1872KB / 2048KB** |
+| 分包 `packageEn` | 英语朗读 148 条（120 句 + 28 行台词） | 约 **949KB / 2048KB** |
 
-日语音频 1.8MB 塞不进 2MB 主包，所以放在分包 `packageJa` 里（分包必须至少有一个页面，
-于是顺手做了「离线发音包」页，可从「统计 → 使用设置 → 离线发音包」进入，能试听、能看到加载状态）。
+音频一律不进主包：日语 1.8MB、英语 0.95MB，任何一个都能把主包撑到「代码质量」扫描不过线，
+更实际的是拖慢冷启动（用户第一次打开要先下完这些）。所以日语放 `packageJa`、英语放 `packageEn`，
+**启动时不预载**，进到口语/学习页或第一次点发音时才 `wx.loadSubpackage`。分包必须至少有一个页面，
+于是各自带了一个「离线发音包」页（统计 → 使用设置 → 离线发音包，当前语种进对应分包），能试听、能看到加载状态。
 `app.js` 启动时就用 `wx.loadSubpackage({ name: 'jaAudio' })` 预载；分包没加载好之前
 `localAudio.pathFor()` 返回空串，播放会退回在线链，不会给出一个必然失败的路径。
 
-英语朗读放在主包里而不是分包：学英语是这个 App 的主场景，随包发布等于零下载延迟，
+英语朗读原本放主包（学英语是主场景，随包＝零下载延迟），后来还是移进分包：
 断网也不会突然没声音；剩下的 727KB 余量足够再放一门外语的句子。
 
 素材改动后重新生成（需要 `pip install --break-system-packages edge-tts imageio-ffmpeg`）：
@@ -86,7 +89,7 @@ node tools/dump-items.js ja /tmp/ja_items.json
 python3 tools/gen-audio.py --lang ja --items /tmp/ja_items.json --out packageJa/ja
 
 node tools/dump-items.js en /tmp/en_items.json --no-words   # 英语不预生成单词，见下
-python3 tools/gen-audio.py --lang en --items /tmp/en_items.json --out assets/audio/en
+python3 tools/gen-audio.py --lang en --items /tmp/en_items.json --out packageEn/en
 
 node tools/gen-local-audio.js    # 扫磁盘重新生成 utils/local-audio.js 清单
 node tools/validate.js           # 主包/分包体积、页面四件套、JSON/JS 语法
@@ -179,7 +182,7 @@ node tools/validate.js           # 主包/分包体积、页面四件套、JSON/
 ```
 语言学习小程序/
 ├── packageJa/                        日语离线音频分包（353 条 mp3 约 1.9MB + 「离线发音包」页）
-├── assets/audio/en/                  英语朗读 148 条 mp3（约 0.95MB，主包内，断网可听）
+├── packageEn/                        英语离线音频分包（148 条 mp3 约 0.95MB + 「离线发音包」页）
 ├── tools/                            素材工具（导出素材 / 批量合成音频 / 再生清单 / 全量校验，不打包）
 ├── app.js / app.json / app.wxss      全局逻辑、配置、样式
 ├── project.config.json               开发者工具项目配置
@@ -196,7 +199,7 @@ node tools/validate.js           # 主包/分包体积、页面四件套、JSON/
 │   ├── pkg-audio.js                  代码包音频→用户目录副本（真机不允许直接播包内 mp3，按需复制）
 │   ├── file-budget.js                本地文件配额账本：录音/发音缓存共用 10MB 的分配规则
 │   ├── quiz.js                       测验组题：优先到期词、干扰项去重、标记是否学过
-│   ├── local-audio.js                离线音频清单（自动生成，id → 主包或分包的 mp3 路径 + 分包预载）
+│   ├── local-audio.js                离线音频清单（自动生成，id → 分包 mp3 路径 + CDN 兜底地址 + 分包预载）
 │   ├── custom-items.js               自建素材归一化（{text,cn} → 练习页的 {word,meaning}）
 │   ├── favorites.js                  生词收藏夹 + 搜索历史（按档案隔离）
 │   ├── nav.js                        统一跳转（tabBar走switchTab + 跨tab意图传参）
@@ -286,7 +289,9 @@ node tests/run-tests.js
 
 1. **测验里的句子题**：单词测验已经接上复习计划了（见「功能说明」里的测验一行），但句子还不行——句子和对话台词没有 FSRS 记录、也没有到期时间。直接把句子塞进 10 题测验，会变成「不影响复习计划的题」——做完对「明天该练什么」毫无影响，只是看着丰富。**正确顺序是先给句子加一套调度（数据模型改动 + 老数据迁移测试），再扩题型**，不要反过来。
 2. **统计页 canvas 脏检查**：统计页每次 `onShow` 都重画两张图（约 53 处 `ctx.` 调用）。加「数据指纹没变就跳过重绘」能省一次重绘，但统计页不是热路径（切 tab 时一次几十毫秒），而脏检查写错的后果是「数据变了没重画」——比省下的那点时间更糟。
-3. **日语分包余量**：`packageJa` 现在 1777KB / 2048KB，只剩约 271KB（约合 45 条句子音频）。再加日语素材前，得先把码率从 16kbps 降到 12kbps（约省 25%）或再拆一个分包，别在没有余量的情况直接扩素材。
+3. **分包余量**：`packageJa` 现在约 1872KB / 2048KB（只剩约 176KB，约 30 条句子音频），`packageEn` 约 949KB（还有约 1MB）。再加日语素材前，得先把码率从 16kbps 降到 12kbps（约省 25%）或再拆一个分包。
+
+4. **主包已瘦身到 474KB**：英语音频进分包后，主包只剩代码，冷启动只需要下 ~470KB。「代码质量」扫描的四项（主包 <1.5M、组件按需注入、音频资源 <200K、无未使用插件）都已处理：`app.json` 加了 `"lazyCodeLoading": "requiredComponents"`，`requirePlugin('ihearing-eval')` 改成字面量（扫描器只认字面量）。
 4. **语言码收敛**：`getLangMeta()` 已有 `voice`（`en_US`/`ja_JP`，给音频链用）和 `tts`（`en-US`，给同声传译插件用），但还有 3 处页面仍手写 `lang === 'ja' ? 'ja_JP' : 'en_US'`。纯写法问题，不影响功能，下次动这几个页面时顺手换掉即可。
 
 ## 上线前

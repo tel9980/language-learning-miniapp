@@ -30,20 +30,28 @@
     "backgroundColor": "#FFFFFF",
     "borderStyle": "black",
     "list": [
-      { "pagePath": "pages/index/index", "text": "首页" },
-      { "pagePath": "pages/speak/speak", "text": "口语" },
-      { "pagePath": "pages/learn/learn", "text": "学习" },
-      { "pagePath": "pages/quiz/quiz", "text": "测验" },
-      { "pagePath": "pages/stats/stats", "text": "统计" }
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/speak/speak",
+        "text": "口语"
+      },
+      {
+        "pagePath": "pages/learn/learn",
+        "text": "学习"
+      },
+      {
+        "pagePath": "pages/quiz/quiz",
+        "text": "测验"
+      },
+      {
+        "pagePath": "pages/stats/stats",
+        "text": "统计"
+      }
     ]
   },
-  "subpackages": [
-    {
-      "root": "packageJa",
-      "name": "jaAudio",
-      "pages": ["pages/offline/offline"]
-    }
-  ],
   "plugins": {
     "ihearing-eval": {
       "version": "0.0.6",
@@ -55,5 +63,22 @@
     }
   },
   "style": "v2",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents",
+  "subpackages": [
+    {
+      "root": "packageJa",
+      "name": "jaAudio",
+      "pages": [
+        "pages/offline/offline"
+      ]
+    },
+    {
+      "root": "packageEn",
+      "name": "enAudio",
+      "pages": [
+        "pages/offline/offline"
+      ]
+    }
+  ]
 }

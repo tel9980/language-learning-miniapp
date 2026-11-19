@@ -8,7 +8,7 @@
 // （且必须带 le=jap），百度 lan=jap 返回 403，同声传译 textToSpeech 只列中英文。
 // 英语虽然有在线源，但学英语最常练，随包发能在断网时照常听。
 //
-// 分包：日语音频 1.8MB 放不进 2MB 的主包，放在 packageJa 分包里，
+// 分包：日语 1.8MB、英语 0.95MB 都放不进 2MB 的主包，分别放在 packageJa / packageEn 分包里，
 // 启动时 wx.loadSubpackage 预载；没加载完时 pathFor 返回空串，调用方退回在线合成。
 
 const REGION = {
@@ -375,9 +375,9 @@ const REGION = {
     }
   },
   en: {
-    base: '/assets/audio/en/',
-    remote: '',
-    name: '',  // 分包名；空串表示在主包里，随时可用
+    base: '/packageEn/en/',
+    remote: 'https://yb.qy663.de5.net/audio-en/',
+    name: 'enAudio',  // 分包名；空串表示在主包里，随时可用
     count: 148,
     bytes: 967208,
     ids: {
@@ -535,8 +535,10 @@ const REGION = {
 
 // ---- 运行时接口（下面这段被 tools/gen-local-audio.js 原样拼进 utils/local-audio.js）----
 
-// 分包是否已经加载完：日语要等 wx.loadSubpackage 成功，英语在主包里恒为 true
-const _ready = { ja: false, en: true }
+// 分包是否已经加载完：有 name 的语种在分包里（日语 packageJa / 英语 packageEn），
+// 要等 wx.loadSubpackage 成功才能播；没有 name 的语种在主包里，恒为可用。
+const _ready = {}
+Object.keys(REGION).forEach(function (k) { _ready[k] = !REGION[k].name })
 let _pending = null
 
 // 跟读队列里的素材 id 是「前缀_原始id」（句子 st_s001、对话台词 dl_d003_1），
