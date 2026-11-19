@@ -7,9 +7,21 @@
 // 实测库里 280 条整句文本约 235 条会被它拒绝，主源和备源（只切 type）会一起挂，
 // 表现就是「点了没声音」。百度翻译的 gettts 免费、无需 key、整句稳定。
 
-// 有道发音地址（词典音，单词首选，音质最正）
-function ttsUrl(text, slow) {
-  return 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=' + (slow ? 1 : 2)
+// 有道词典音地址（单词首选，音质最正）
+// 实测：不加 le 参数时，任何日语文本都返回同一个 1920 字节的占位文件（hash 恒定，
+// 听不出任何读音）；加上 le=jap 才会返回真正的日语合成音频（18-30KB，逐词不同）。
+// 所以日语必须显式带上 le=jap，否则"有声音但没声音"。
+// 判定「要不要按日语合成」：有假名或有汉字 ⇒ 按日语读（「家」「部屋」这类纯汉字词
+// 不加 le 只会拿到 1920 字节的静音占位文件）。纯拉丁字母的文本一律按 lang 走，
+// 否则界面切到日语后练英文词（"hello"）会被读成日式口音。
+const KANJI_RE = /[\u4e00-\u9fff]/
+function needJapaneseVoice(text) {
+  return isJapaneseText(text) || KANJI_RE.test(text || '')
+}
+function ttsUrl(text, slow, lang) {
+  const ja = needJapaneseVoice(text)
+  return 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) +
+    '&type=' + (slow ? 1 : 2) + (ja ? '&le=jap' : '')
 }
 
 // 百度翻译发音地址（整句兜底）
@@ -79,8 +91,8 @@ function speak(text, slow, handlers) {
   const words = jaText
     ? (raw.length > 6 ? 99 : 1)
     : raw.split(/\s+/).filter(Boolean).length
-  const yd = { id: 'youdao', url: ttsUrl(text, slow) }
-  const ydBackup = { id: 'youdao-backup', url: ttsUrl(text, !slow) }
+  const yd = { id: 'youdao', url: ttsUrl(text, slow, jaText ? 'ja_JP' : lang) }
+  const ydBackup = { id: 'youdao-backup', url: ttsUrl(text, !slow, jaText ? 'ja_JP' : lang) }
   const bd = { id: 'baidu', url: baiduUrl(text, slow, lang) }
 
   let sources

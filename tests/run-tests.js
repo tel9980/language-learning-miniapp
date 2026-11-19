@@ -256,6 +256,52 @@ global.wx.setStorageSync = _origSet2
 console.error = _origErr
 delete global.wx.showModal
 
+// ---- words：词库规模与数据完整性 ----
+// 扩充词库时最容易犯的错是 id 撞车、词形重复、字段漏填，这里全部锁死。
+const words = require('../utils/words')
+const EN_WORDS = words.WORDS.en
+const JA_WORDS = words.WORDS.ja
+eq(EN_WORDS.length, 440, 'english word count = 440')
+eq(JA_WORDS.length, 50, 'japanese word count = 50')
+const allWords = EN_WORDS.concat(JA_WORDS)
+const idSet = {}
+let dupId = 0
+allWords.forEach(w => { if (idSet[w.id]) dupId++; idSet[w.id] = 1 })
+eq(dupId, 0, 'no duplicate word ids')
+const FIELDS = ['word', 'phonetic', 'meaning', 'example', 'exampleCn', 'category']
+let emptyField = 0
+allWords.forEach(w => { FIELDS.forEach(f => { if (!w[f] || !String(w[f]).trim()) emptyField++ }) })
+eq(emptyField, 0, 'every word has all 6 fields non-empty')
+function dupWordsIn(list) {
+  const seen = {}
+  let dup = 0
+  list.forEach(w => { if (seen[w.word]) dup++; seen[w.word] = 1 })
+  return dup
+}
+eq(dupWordsIn(EN_WORDS), 0, 'no duplicate english word forms')
+eq(dupWordsIn(JA_WORDS), 0, 'no duplicate japanese word forms')
+// 新增分类必须能在筛选里选到，否则只能藏在「全部」里
+const enCats = words.getExamCategories('en').map(c => c.name)
+;['四级', '六级', '考研', '雅思托福', '日常', '情绪', '工作', '科技', '旅行', '健康', '饮食', '社交'].forEach(c => {
+  ok(enCats.indexOf(c) >= 0, `category "${c}" is selectable`)
+})
+const jaCats = words.getExamCategories('ja').map(c => c.name)
+;['问候', '日常', '食物', '数字', '时间', '动词'].forEach(c => {
+  ok(jaCats.indexOf(c) >= 0, `japanese category "${c}" is selectable`)
+})
+eq(words.getWordsByCategory('en', '日常').length, 30, 'filter by 日常 returns 30')
+eq(words.getWords('en').length, 440, 'getWords ignores unknown lang fallback')
+
+// ---- audio：日语必须带 le=jap，否则有道只返回 1920 字节静音占位文件 ----
+const audio = require('../utils/audio')
+ok(audio.ttsUrl('ありがとう', false, 'ja_JP').indexOf('le=jap') > 0, 'kana text asks for japanese voice')
+ok(audio.ttsUrl('家', false, 'ja_JP').indexOf('le=jap') > 0, 'kanji-only japanese word asks for japanese voice')
+ok(audio.ttsUrl('hello', false, 'en_US').indexOf('le=') < 0, 'english word never asks for japanese voice')
+ok(audio.ttsUrl('hello', false, 'ja_JP').indexOf('le=') < 0, 'UI language alone must not turn english into japanese voice')
+ok(audio.ttsUrl('How are you', true, 'en_US').indexOf('type=1') > 0, 'slow mode uses type=1')
+ok(audio.baiduUrl('How are you doing today', false, 'en_US').indexOf('lan=en') > 0, 'baidu url carries lan=en')
+ok(audio.baiduUrl('ありがとう', false, 'ja_JP').indexOf('lan=jap') > 0, 'baidu url carries lan=jap')
+
 // ---- recordings：wx.saveFile 会把临时文件「移走」，必须拿到 permanent 路径 ----
 // 锁死 speak.js 回放修复的前提：save() 返回的 entry.filePath 不能等于传进去的临时路径。
 const recordings = require('../utils/recordings')
