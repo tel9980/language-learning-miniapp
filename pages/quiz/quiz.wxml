@@ -6,6 +6,7 @@
         <view class="muted">{{index+1}} / {{total}}</view>
       </view>
       <view class="progress-track"><view class="progress-fill" style="width:{{progress}}%"></view></view>
+      <view class="muted quiz-hint">优先考今天该复习的词，凑不够才用新词</view>
       <view class="score-row">
         <view class="score-chip correct">✅ 正确 {{correctCount}}</view>
         <view class="score-chip wrong">❌ 错误 {{wrongCount}}</view>
@@ -52,6 +53,7 @@
     <view class="result-accuracy">{{accuracy}}%</view>
     <view class="result-sub">正确率</view>
     <view class="result-detail">答对 {{correctCount}} 题 · 共 {{total}} 题</view>
+    <view class="result-detail" wx:if="{{learnedCount>0}}">{{learnedCount}} 题考的是学过的词，已按答题结果调整下次复习时间{{wrongCount>0?'，答错的会进错词本':''}}</view>
     <button class="btn-primary result-btn" bindtap="restart">再来一组</button>
     <button class="btn-ghost result-btn" bindtap="goStats">查看统计</button>
   </view>

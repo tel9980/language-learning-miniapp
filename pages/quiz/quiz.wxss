@@ -35,4 +35,5 @@
 .result-accuracy { font-size: 96rpx; font-weight: 800; color: #4A6CF7; margin-top: 24rpx; }
 .result-sub { font-size: 24rpx; color: #8A94A6; }
 .result-detail { font-size: 26rpx; margin-top: 24rpx; }
+.quiz-hint { margin-top: 8rpx; }
 .result-btn { width: 100%; margin-top: 32rpx; }

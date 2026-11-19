@@ -940,4 +940,40 @@ async function runExtraTests() {
   })
   eq(missing.length, 0, '所有 wxml 绑定的处理函数都存在' + (missing.length ? '：' + missing.join(' / ') : ''))
   ok(pages.length >= 16, '扫到了全部页面（含分包页，共 ' + pages.length + ' 个）')
+
+  // F. 测验组题：优先「今天到期的词」，新词垫底；题目要带 id 与 learned 标记
+  //    （历史问题：buildQuiz() 从全库随机抽 10 个，学过的和没见过的混在一起，
+  //      答完既不写复习计划、也不进错词本）
+  const quizUtil = require('../utils/quiz')
+  const NOW = 1700000000000
+  const pool = [
+    { id: 'a', word: 'alpha', meaning: 'n. 甲', example: 'Alpha.', exampleCn: '甲。' },
+    { id: 'b', word: 'beta', meaning: 'n. 乙', example: 'Beta.', exampleCn: '乙。' },
+    { id: 'c', word: 'car', meaning: 'n. 车', example: 'Car.', exampleCn: '车。' },
+    { id: 'd', word: 'dog', meaning: 'n. 狗', example: 'Dog.', exampleCn: '狗。' }
+  ]
+  const progMap = { a: { dueAt: NOW - 1000 }, b: { dueAt: NOW + 86400000 } }
+  const noShuffle = function () { return 0.99 }   // 不洗牌 + 必出拼写题
+  const picked = quizUtil.pickWords(pool, progMap, NOW, 10, noShuffle)
+  eq(picked.length, 4, '到期词不够时用其余词补满')
+  eq(picked[0].id, 'a', '今天到期的词排最前')
+  eq(picked[1].id, 'b', '学过但没到期的排第二')
+  ok(picked.slice(2).every(function (w) { return w.id === 'c' || w.id === 'd' }), '没学过的新词垫底')
+  eq(quizUtil.pickWords(pool, progMap, NOW, 2, noShuffle).length, 2, 'n 能截断题量')
+  eq(quizUtil.pickWords(pool, {}, NOW, 3, noShuffle).length, 3, '一个词都没学过时也能出题')
+
+  const items = quizUtil.buildItems(picked, pool, progMap, noShuffle)
+  eq(items.length, 4, '每个词出一道题')
+  ok(items.every(function (i) { return i.id && i.answer && i.example }), '题目带 id / 答案 / 例句')
+  eq(items[0].learned, true, '学过的词标记 learned（答完要写复习计划）')
+  eq(items[2].learned, false, '新词不标记 learned（不替「学新词」记账）')
+
+  const choices = quizUtil.buildItems(picked, pool, progMap, function () { return 0 })
+  ok(choices.every(function (i) { return i.type === 'choice' }), '取随机数偏小时出选择题')
+  ok(choices.every(function (i) { return i.options.length === 4 }), '选择题固定 4 个选项')
+  ok(choices.every(function (i) { return i.options.indexOf(i.answer) >= 0 }), '选项里必有正确答案')
+  ok(choices.every(function (i) { return new Set(i.options).size === 4 }), '选项不重复')
+  const dupPool = pool.concat([{ id: 'e', word: 'auto', meaning: 'n. 车', example: 'Auto.', exampleCn: '汽车。' }])
+  const dupItems = quizUtil.buildItems([pool[2]], dupPool, progMap, function () { return 0 })
+  eq(dupItems[0].options.filter(function (o) { return o === 'n. 车' }).length, 1, '释义相同的词不当干扰项')
 }

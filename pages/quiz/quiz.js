@@ -1,15 +1,7 @@
 const theme = require('../../utils/theme')
 const storage = require('../../utils/storage')
 const { getWords } = require('../../utils/words')
-
-function shuffle(arr) {
-  const a = arr.slice()
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
+const quiz = require('../../utils/quiz')
 
 Page({
   behaviors: [theme],
@@ -17,7 +9,7 @@ Page({
     queue: [], index: 0, total: 10, current: null,
     selected: '', spellInput: '', revealed: false, isRight: false,
     correctCount: 0, wrongCount: 0, finished: false, accuracy: 0,
-    progress: 0, indexLetters: ['A', 'B', 'C', 'D']
+    progress: 0, indexLetters: ['A', 'B', 'C', 'D'], learnedCount: 0
   },
   onShow() {
     this.syncTheme()
@@ -30,26 +22,19 @@ Page({
   onUnload() { storage.flushAll() },
   buildQuiz() {
     const lang = storage.getCurrentLang()
-    const words = shuffle(getWords(lang)).slice(0, 10)
     const all = getWords(lang)
-    const queue = words.map(w => {
-      if (Math.random() < 0.6) {
-        // 选择题：4 个释义选项
-        const distractors = shuffle(all.filter(x => x.id !== w.id)).slice(0, 3).map(x => x.meaning)
-        return {
-          type: 'choice', question: w.word, answer: w.meaning,
-          options: shuffle([w.meaning].concat(distractors)), example: w.example + ' ' + w.exampleCn
-        }
-      }
-      // 拼写题
-      return {
-        type: 'spell', question: w.meaning, answer: w.word, example: w.example + ' ' + w.exampleCn
-      }
-    })
+    const prog = storage.getProgress()
+    // 优先考「今天到期的词」，其次学过没到期的，最后才是没学过的新词
+    // （组题规则在 utils/quiz.js，有单元测试兜着）
+    const picked = quiz.pickWords(all, prog, Date.now(), 10)
+    const queue = quiz.buildItems(picked, all, prog)
+    // 结果页要用：这组题里有多少是「学过的词」（答完会写回复习计划）
+    const learnedCount = queue.filter(q => q.learned).length
     this.setData({
       queue, total: queue.length, index: 0, current: queue[0] || null,
       selected: '', spellInput: '', revealed: false, isRight: false,
-      correctCount: 0, wrongCount: 0, finished: false, accuracy: 0, progress: 0
+      correctCount: 0, wrongCount: 0, finished: false, accuracy: 0, progress: 0,
+      learnedCount
     })
   },
   choose(e) {
@@ -70,7 +55,12 @@ Page({
     this.record(right)
   },
   record(right) {
-    storage.quizAnswer(right)
+    // 学过的词：写回复习计划（改到期时间、记错词本 lapses、累计统计），
+    // 以前只调 quizAnswer() 加了个总计数器 —— 答错 10 个词，错词本一条都不会多。
+    // 没学过的词只记总统计，不替「学新词」把它标成已学，否则今日待练会少一块。
+    const cur = this.data.current
+    if (cur && cur.learned && cur.id) storage.review(cur.id, right ? 2 : 0)
+    else storage.quizAnswer(right)
     this.setData({
       revealed: true, isRight: right,
       correctCount: this.data.correctCount + (right ? 1 : 0),
