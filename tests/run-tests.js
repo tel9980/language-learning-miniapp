@@ -302,9 +302,41 @@ ok(audio.ttsUrl('How are you', true, 'en_US').indexOf('type=1') > 0, 'slow mode 
 ok(audio.baiduUrl('How are you doing today', false, 'en_US').indexOf('lan=en') > 0, 'baidu url carries lan=en')
 ok(audio.baiduUrl('ありがとう', false, 'ja_JP').indexOf('lan=jap') > 0, 'baidu url carries lan=jap')
 
+// ---- storage.getNewWords：可按分类取新词 ----
+// 不传分类时按词库数组顺序取，考试词永远排在最前（日常/旅行那 220 个词排不上号），
+// 所以学习页必须能把分类传下来。这里锁死「传分类只返回该分类」的契约。
+const storageMod = require('../utils/storage')
+const freshAll = storageMod.getNewWords('en', 5)
+ok(freshAll.length > 0 && freshAll.length <= 5, 'unfiltered new words respects the limit')
+const freshDaily = storageMod.getNewWords('en', 5, '日常')
+ok(freshDaily.length > 0 && freshDaily.length <= 5, 'filtered new words respects the limit')
+ok(freshDaily.every(w => w.category === '日常'), 'filtered new words are all in that category')
+eq(storageMod.getNewWords('en', 5, '不存在的分类').length, 0, 'unknown category returns empty')
+
 // ---- recordings：wx.saveFile 会把临时文件「移走」，必须拿到 permanent 路径 ----
 // 锁死 speak.js 回放修复的前提：save() 返回的 entry.filePath 不能等于传进去的临时路径。
 const recordings = require('../utils/recordings')
+let __removed = []
+let __attempts = 0
+global.wx.removeSavedFile = function (o) { __removed.push(o.filePath); if (o.success) o.success({}) }
+global.wx.getFileInfo = function (o) { o.success({ size: 1024 }) }
+
+// 双重淘汰（条数 + 体积）是纯函数，先单独测
+const fakeList = function (n, size) {
+  const out = []
+  for (let i = 0; i < n; i++) out.push({ id: 'r' + i, filePath: 'wxfile://' + i, size: size })
+  return out
+}
+let tr = recordings.trim(fakeList(35, 1000))
+eq(tr.keep.length, recordings.MAX_KEEP, 'trim keeps at most MAX_KEEP entries')
+eq(tr.dropped.length, 5, 'trim drops the oldest beyond MAX_KEEP')
+tr = recordings.trim(fakeList(40, 300 * 1024))
+ok(tr.keep.reduce((sum, e) => sum + e.size, 0) <= recordings.MAX_BYTES, 'trim respects the byte budget')
+ok(tr.dropped.length > 5, 'trim drops extra entries when over the byte budget')
+tr = recordings.trim(fakeList(3, 100 * 1024 * 1024))
+eq(tr.keep.length, 1, 'trim never empties the list')
+
+// 1) 正常保存：拿到永久路径 + 体积
 global.wx.saveFile = function (o) {
   global.__saveFrom = o.tempFilePath
   o.success({ savedFilePath: 'wxfile://store_0' })
@@ -314,12 +346,28 @@ recordings.save('wxfile://tmp_abc.mp3', { label: 'hi' }).then((entry) => {
   ok(!!entry, 'save resolves an entry')
   ok(entry.filePath !== 'wxfile://tmp_abc.mp3', 'entry.filePath is permanent, not the stale temp path')
   eq(entry.filePath, 'wxfile://store_0', 'entry.filePath is the savedFilePath')
+  eq(entry.size, 1024, 'entry records the file size for the byte budget')
 
-  // 落盘失败返回 null，页面据此提示重录，而不是拿失效路径去播
+  // 2) 空间满：先删最旧一条腾地方，再自动重试一次
+  __removed = []
+  __attempts = 0
+  global.wx.saveFile = function (o) {
+    __attempts++
+    if (__attempts === 1) o.fail({ errMsg: 'saveFile:fail:exceed max size' })
+    else o.success({ savedFilePath: 'wxfile://store_1' })
+  }
+  return recordings.save('wxfile://tmp_retry.mp3', {})
+}).then((entry) => {
+  eq(__attempts, 2, 'save retries once after freeing space')
+  ok(__removed.length >= 1, 'save deletes the oldest recording to free space')
+  eq(entry && entry.filePath, 'wxfile://store_1', 'retry saves successfully')
+
+  // 3) 没东西可删时，如实返回 null（页面据此提示重录）
+  recordings.clear()
   global.wx.saveFile = function (o) { o.fail({ errMsg: 'saveFile:fail' }) }
   return recordings.save('wxfile://tmp_def.mp3', {})
 }).then((entry) => {
-  eq(entry, null, 'save resolves null when saveFile fails')
+  eq(entry, null, 'save resolves null when saveFile fails and nothing can be freed')
 
   console.log(`\n单元测试结果：${pass} 通过 / ${fail} 失败`)
   if (fail) {

@@ -5,6 +5,13 @@
     <view class="mode-tab {{mode==='new'?'active':''}}" bindtap="setMode" data-mode="new">学新词</view>
   </view>
 
+  <!-- 学新词时可选分类：不选按词库顺序，考试词会一直排在最前面 -->
+  <view class="cat-row" wx:if="{{mode==='new'}}">
+    <picker bindchange="onCatChange" value="{{catIndex}}" range="{{catNames}}">
+      <view class="cat-picker">{{catNames[catIndex]}} ▾</view>
+    </picker>
+  </view>
+
   <!-- 卡片 -->
   <view class="card-wrap" wx:if="{{current}}">
     <view class="flashcard {{flipped?'flipped':''}}" bindtap="flip">
@@ -41,13 +48,15 @@
   <view class="empty card" wx:else>
     <view class="empty-icon">{{mode==='due'?'🎉':'📚'}}</view>
     <view class="title" wx:if="{{mode==='due'}}">暂无待复习单词</view>
+    <view class="title" wx:elif="{{catEmpty}}">这个分类的新词学完了</view>
     <view class="title" wx:else>新词都学完了</view>
     <view class="muted" wx:if="{{mode==='due'}}">去「学新词」添加新内容吧</view>
+    <view class="muted" wx:elif="{{catEmpty}}">换个分类看看，或切到「待复习」巩固已学的</view>
     <view class="muted" wx:else>全部 {{totalWords}} 个词都已学过，坚持复习巩固记忆</view>
     <button class="btn-primary empty-btn" bindtap="setMode" data-mode="{{mode==='due'?'new':'due'}}">
       {{mode==='due'?'去学新词':'查看复习'}}
     </button>
   </view>
 
-  <view class="progress-line" wx:if="{{current}}">{{index+1}} / {{queue.length}} · {{langName}}</view>
+  <view class="progress-line" wx:if="{{current}}">{{index+1}} / {{queueLen}} · {{langName}}{{catValue?' · '+catValue:''}}</view>
 </view>

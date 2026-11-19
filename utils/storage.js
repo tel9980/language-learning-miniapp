@@ -112,6 +112,7 @@ function getCurrentLang() { return getSettings().lang || 'en' }
 function setDailyGoal(n) { const s = getSettings(); s.dailyGoal = n; write(KEY_SETTINGS, s) }
 function setFeedbackEnabled(v) { const s = getSettings(); s.feedbackEnabled = !!v; write(KEY_SETTINGS, s) }
 function setGuideSeen(v) { const s = getSettings(); s.guideSeen = !!v; write(KEY_SETTINGS, s) }
+function setLearnCat(cat) { const s = getSettings(); s.learnCat = cat || ''; write(KEY_SETTINGS, s) }
 
 // 无障碍主题
 function getTheme() { return read(KEY_THEME, defaults().theme) }
@@ -160,11 +161,13 @@ function getDueWords(lang) {
   })
 }
 
-// 取新词：未学过的
-function getNewWords(lang, limit) {
+// 取新词：未学过的。传 category 时只取该分类（不传 = 全部）
+// 不传分类时严格按词库数组顺序取，考试词会永远排在最前面；
+// 想学「日常」「旅行」这类场景词，必须由页面传分类下来。
+function getNewWords(lang, limit, category) {
   const prog = getProgress()
   const words = getWords(lang)
-  const fresh = words.filter(w => !prog[w.id])
+  const fresh = words.filter(w => !prog[w.id] && (!category || w.category === category))
   return limit ? fresh.slice(0, limit) : fresh
 }
 
@@ -290,7 +293,7 @@ function importData(data) {
 
 module.exports = {
   init, todayKey, getSettings, setLang, getCurrentLang, setDailyGoal,
-  setFeedbackEnabled, setGuideSeen, getTheme, setFontScale, setDarkMode,
+  setFeedbackEnabled, setGuideSeen, setLearnCat, getTheme, setFontScale, setDarkMode,
   getCustomItems, addCustomItems, removeCustomItem,
   getProgress, getStats, getDaily, getDueWords, getNewWords, getToday,
   review, quizAnswer, getMasteredCount, INTERVALS,

@@ -1,14 +1,15 @@
 const theme = require('../../utils/theme')
 const nav = require('../../utils/nav')
 const storage = require('../../utils/storage')
-const { getWords, getLangMeta } = require('../../utils/words')
+const { getWords, getLangMeta, getExamCategories } = require('../../utils/words')
 const audio = require('../../utils/audio')
 
 Page({
   behaviors: [theme],
   data: {
     mode: 'due', dueCount: 0, current: null, flipped: false,
-    queue: [], index: 0, langName: '英语', tts: 'en-US', totalWords: 0
+    queueLen: 0, index: 0, langName: '英语', tts: 'en-US', totalWords: 0,
+    catNames: ['全部分类'], catIndex: 0, catValue: '', catEmpty: false
   },
   onShow() {
     this.syncTheme()
@@ -22,20 +23,46 @@ Page({
     const lang = storage.getCurrentLang()
     const meta = getLangMeta(lang)
     const dueWords = storage.getDueWords(lang)
+    // 分类下拉：全部 + 当前语种的词库分类（新词可以按类学，不用从头排到尾）
+    const cats = getExamCategories(lang)
+    const catNames = ['全部分类'].concat(cats.map(c => c.name + '(' + c.count + ')'))
+    this._catValues = [''].concat(cats.map(c => c.name))
+    const saved = storage.getSettings().learnCat || ''
+    let catIndex = this._catValues.indexOf(saved)
+    if (catIndex < 0) catIndex = 0
     this.setData({
       langName: meta.name, tts: meta.tts,
       totalWords: getWords(lang).length,
       dueCount: dueWords.length,
-      queue: [], index: 0, current: null, flipped: false
+      catNames: catNames, catIndex: catIndex, catValue: this._catValues[catIndex],
+      queueLen: 0, index: 0, current: null, flipped: false
     })
     this.buildQueue()
   },
+  onCatChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const value = (this._catValues || [''])[idx] || ''
+    storage.setLearnCat(value)
+    this.setData({ catIndex: idx, catValue: value }, () => this.buildQueue())
+  },
   buildQueue() {
     const lang = storage.getCurrentLang()
-    const words = this.data.mode === 'due'
-      ? storage.getDueWords(lang)
-      : storage.getNewWords(lang, 5)
-    this.setData({ queue: words, index: 0, current: words[0] || null, flipped: false })
+    let list
+    if (this.data.mode === 'due') {
+      list = storage.getDueWords(lang)
+    } else {
+      list = storage.getNewWords(lang, 5, this.data.catValue || '')
+    }
+    // 队列只在页面内部流转，不进 data：400 词的队列约 60KB，
+    // 每次都塞进 setData 会让切页明显发卡，页面其实只需要「当前」和「共几条」。
+    this._queue = list
+    this.setData({
+      queueLen: list.length,
+      index: 0,
+      current: list[0] || null,
+      flipped: false,
+      catEmpty: this.data.mode === 'new' && !list.length
+    })
   },
   setMode(e) {
     this.setData({ mode: e.currentTarget.dataset.mode }, () => this.buildQueue())
@@ -58,12 +85,17 @@ Page({
     const w = this.data.current
     if (!w) return
     storage.review(w.id, q)
+    const queue = this._queue || []
     const nextIndex = this.data.index + 1
-    if (nextIndex < this.data.queue.length) {
-      this.setData({ index: nextIndex, current: this.data.queue[nextIndex], flipped: false })
+    if (nextIndex < queue.length) {
+      this.setData({ index: nextIndex, current: queue[nextIndex], flipped: false })
     } else {
       wx.showToast({ title: '本轮完成！', icon: 'success' })
       setTimeout(() => this.load(), 600)
     }
+  },
+  onUnload() {
+    if (this._player && this._player.destroy) this._player.destroy()
+    this._player = null
   }
 })

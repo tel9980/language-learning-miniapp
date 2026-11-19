@@ -39,3 +39,13 @@
 .empty .title { margin-bottom: 12rpx; }
 .empty-btn { margin-top: 40rpx; width: 60%; }
 .progress-line { text-align: center; font-size: 24rpx; color: #8A94A6; margin-top: 28rpx; }
+
+/* 学新词时的分类下拉 */
+.cat-row { display: flex; justify-content: center; margin: -8rpx 0 24rpx; }
+.cat-picker {
+  background: #EDF1FF;
+  color: #4A6CF7;
+  font-size: 26rpx;
+  padding: 10rpx 28rpx;
+  border-radius: 999rpx;
+}

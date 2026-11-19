@@ -59,6 +59,8 @@ page {
 .theme-dark .example-en,
 .theme-dark .rec-label { color: #8FA8FF; }
 .theme-dark .scene-picker,
+.theme-dark .cat-picker,
+.theme-dark .filter-picker,
 .theme-dark .play-btn,
 .theme-dark .tool-btn,
 .theme-dark .focus-bar.returning,
