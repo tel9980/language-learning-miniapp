@@ -1,6 +1,12 @@
 // 录音持久化：把录音临时文件保存到本地永久文件，存元数据到 Storage。
 // 注意：音频文件用 wx.saveFile 落盘（不进 Storage，避免 base64 撑爆 10MB）。
-// 只保留最近 N 条，超出删除最旧文件，防止占满小程序 200MB 本地空间。
+// 只保留最近 N 条，超出删除最旧文件。
+//
+// 容量口径（微信平台限制，与手机剩余空间无关）：
+//   · 本地文件目录（wx.saveFile / wx.env.USER_DATA_PATH）每个小程序每个用户 10MB
+//   · Storage（wx.setStorageSync）每个小程序每个用户 10MB
+// 录音参数是 16kHz 单声道 mp3，60 秒约 200KB；30 条上限 ≈ 6MB 封顶，
+// 先撞到的是 MAX_KEEP 而不是 10MB。
 
 const KEY = 'lp_recordings_v1'
 const MAX_KEEP = 30
