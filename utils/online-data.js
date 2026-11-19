@@ -16,6 +16,12 @@ const DATA_URLS = [
 ]
 
 
+// 检查频率：每 6 小时最多联网一次。
+// 每次启动都拉一遍整包（约 134KB）只为比较一个版本号，纯浪费——线上是
+// Cache-Control: max-age=0, must-revalidate，等于每次都真的传输。
+// 词库一年改几次，滞后 6 小时完全无所谓；想立刻更新可以去「统计」页点「立即检查」。
+const CHECK_INTERVAL = 6 * 60 * 60 * 1000
+
 // 进程内缓存：getOverride 会被 getWords/getSentences 高频调用，避免每次读 Storage
 let _cacheLoaded = false
 let _cacheVal = null
@@ -51,9 +57,16 @@ function getOverride() {
 
 // 启动时异步检查更新；cb(result) 可选，result={ok,updated,reason,source}
 // 按 DATA_URLS 顺序逐个尝试：主源失败（网络/坏数据）自动换备源，全挂就静默降级。
-function checkUpdate(cb) {
+// opts.force = true 绕过节流（页面上的「立即检查」用这个）。
+function checkUpdate(cb, opts) {
   const list = sources()
   if (!list.length) { if (cb) cb({ ok: false, reason: 'not-configured' }); return }
+  const force = !!(opts && opts.force)
+  const cached = getCache()
+  if (!force && cached && cached.checkedAt && Date.now() - cached.checkedAt < CHECK_INTERVAL) {
+    if (cb) cb({ ok: true, updated: false, reason: 'throttled', source: cached.source || '' })
+    return
+  }
   let i = 0
 
   function done(r) { if (cb) cb(r) }
@@ -71,9 +84,11 @@ function checkUpdate(cb) {
           const d = res.data
           if (!d.words && !d.sentences && !d.dialogues) throw new Error('empty-data')
           const old = getCache()
-          const payload = { data: d, fetchedAt: Date.now(), source: url }
-          // 版本号相同则跳过写入，避免无谓覆盖
+          const now = Date.now()
+          const payload = { data: d, fetchedAt: now, checkedAt: now, source: url }
+          // 版本号相同则不覆盖数据，只更新「上次检查时间」，节流才有意义
           if (old && old.data && d.version && old.data.version === d.version) {
+            saveCache({ data: old.data, fetchedAt: old.fetchedAt, checkedAt: now, source: url })
             done({ ok: true, updated: false, reason: 'same-version', source: url })
             return
           }
@@ -99,6 +114,7 @@ module.exports = {
   DATA_URLS,
   sources,
   configured,
+  CHECK_INTERVAL,
   getOverride,
   checkUpdate,
   getCache

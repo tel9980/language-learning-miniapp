@@ -6,6 +6,7 @@ const achievements = require('../../utils/achievements')
 const theme = require('../../utils/theme')
 const familyBackup = require('../../utils/family-backup')
 const ttsCache = require('../../utils/tts-cache')
+const onlineData = require('../../utils/online-data')
 const { getWords } = require('../../utils/words')
 
 const app = getApp()
@@ -293,6 +294,27 @@ Page({
   // 离线发音包在 packageJa 分包里（日语音频 1.8MB，主包放不下）
   openOfflineAudio() {
     wx.navigateTo({ url: '/packageJa/pages/offline/offline' })
+  },
+
+  // 平时启动后 6 小时内不再联网查词库（省掉每次启动白拉 134KB），想马上更新点这里
+  checkOnline() {
+    if (!onlineData.configured()) {
+      wx.showToast({ title: '这一版没配在线词库', icon: 'none' })
+      return
+    }
+    wx.showLoading({ title: '检查中…', mask: true })
+    onlineData.checkUpdate(function (r) {
+      wx.hideLoading()
+      if (!r.ok) {
+        wx.showToast({ title: r.reason === 'network' ? '连不上服务器，稍后再试' : '词库数据有问题', icon: 'none' })
+        return
+      }
+      if (r.updated) {
+        wx.showModal({ title: '词库已更新', content: '拉到新版本了，新素材会在下次打开页面时生效。', showCancel: false })
+        return
+      }
+      wx.showToast({ title: '已经是最新版本', icon: 'success' })
+    }, { force: true })
   },
 
   clearTtsCache() {

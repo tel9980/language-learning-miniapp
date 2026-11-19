@@ -1041,7 +1041,7 @@ async function runExtraTests() {
   eq(od.configured(), false, '清空后视为未配置')
   eq(od.sources().length, 0, '清空后没有可用的源')
   let o1 = null
-  od.checkUpdate(function (r) { o1 = r })
+  od.checkUpdate(function (r) { o1 = r }, { force: true })
   eq(o1 && o1.reason, 'not-configured', '未配置时回调 not-configured')
   eq(reqLog.length, 0, '未配置时一个请求都不发')
 
@@ -1054,7 +1054,7 @@ async function runExtraTests() {
   reqLog = []
   replies = [{ kind: 'ok', data: { version: 'v1', words: { en: [{ id: 'x' }] } } }]
   let o2 = null
-  od.checkUpdate(function (r) { o2 = r })
+  od.checkUpdate(function (r) { o2 = r }, { force: true })
   eq(o2 && o2.updated, true, '主源正常时更新成功')
   eq(o2.source, 'https://primary.example.com/data.json', '报告来源是主源')
   eq(reqLog.length, 1, '主源成功就不再请求备源')
@@ -1063,7 +1063,7 @@ async function runExtraTests() {
   reqLog = []
   replies = [{ kind: 'fail' }, { kind: 'ok', data: { version: 'v2', words: { en: [{ id: 'y' }] } } }]
   let o3 = null
-  od.checkUpdate(function (r) { o3 = r })
+  od.checkUpdate(function (r) { o3 = r }, { force: true })
   eq(o3 && o3.updated, true, '主源网络失败后备源顶上')
   eq(o3.source, 'https://backup.example.com/data.json', '报告来源是备源')
   eq(reqLog.length, 2, '两个源各请求一次')
@@ -1071,13 +1071,13 @@ async function runExtraTests() {
   reqLog = []
   replies = [{ kind: 'http', code: 500 }, { kind: 'ok', data: { version: 'v3', words: { en: [{}] } } }]
   let o4 = null
-  od.checkUpdate(function (r) { o4 = r })
+  od.checkUpdate(function (r) { o4 = r }, { force: true })
   eq(o4 && o4.updated, true, '主源返回 500 也换备源')
 
   reqLog = []
   replies = [{ kind: 'fail' }, { kind: 'fail' }]
   let o5 = null
-  od.checkUpdate(function (r) { o5 = r })
+  od.checkUpdate(function (r) { o5 = r }, { force: true })
   eq(o5 && o5.ok, false, '两个源都挂时报告失败')
   eq(o5.reason, 'network', '失败原因是 network')
   eq(od.getOverride() && od.getOverride().version, 'v3', '全挂时仍保留上次拉到的数据')
@@ -1085,7 +1085,7 @@ async function runExtraTests() {
   reqLog = []
   replies = [{ kind: 'ok', data: { version: 'v3', words: { en: [{}] } } }]
   let o6 = null
-  od.checkUpdate(function (r) { o6 = r })
+  od.checkUpdate(function (r) { o6 = r }, { force: true })
   eq(o6 && o6.updated, false, '版本号相同不重复写入')
   eq(o6.reason, 'same-version', '同版本标记 same-version')
 
@@ -1095,7 +1095,7 @@ async function runExtraTests() {
   reqLog = []
   replies = [{ kind: 'ok', data: { version: 'v9', words: { en: [onlineWord], ja: [] } } }]
   let o7 = null
-  od.checkUpdate(function (r) { o7 = r })
+  od.checkUpdate(function (r) { o7 = r }, { force: true })
   eq(o7 && o7.updated, true, '在线版本更新成功')
   eq(words.getWords('en').length, 1, '内置 440 词被在线词库覆盖')
   eq(words.getWords('en')[0].word, 'zebra-online', '取到的就是在线的词')
@@ -1105,9 +1105,55 @@ async function runExtraTests() {
   // 还原：空数组不构成覆盖（getWords 只在非空时才用覆盖层）
   replies = [{ kind: 'ok', data: { version: 'v10', words: { en: [], ja: [] } } }]
   let o8 = null
-  od.checkUpdate(function (r) { o8 = r })
+  od.checkUpdate(function (r) { o8 = r }, { force: true })
   eq(o8 && o8.updated, true, '空覆盖层版本也能更新')
   eq(words.getWords('en').length, 440, '空覆盖层回落到内置词库')
+
+  // 6 小时节流：别每次启动都为「比一个版本号」白拉 134KB
+  const realNow = Date.now
+  let fakeNow = realNow()
+  Date.now = function () { return fakeNow }
+  try {
+    // 把缓存恢复成「刚检查过」的状态
+    reqLog = []
+    replies = [{ kind: 'ok', data: { version: 't1', words: { en: [{ id: 'z1' }] } } }]
+    let t1 = null
+    od.checkUpdate(function (r) { t1 = r }, { force: true })
+    eq(t1 && t1.updated, true, '节流测试：第一次强制检查能联网')
+    const afterFirst = reqLog.length
+
+    reqLog = []
+    let t2 = null
+    od.checkUpdate(function (r) { t2 = r })   // 不带 force
+    eq(t2 && t2.reason, 'throttled', '刚检查过再调就节流，不发请求')
+    eq(reqLog.length, 0, '节流时一个请求都不发')
+    eq(t2 && t2.ok, true, '节流不是失败（静默当作已最新）')
+
+    // 过了 6 小时就该重新联网
+    reqLog = []
+    fakeNow += od.CHECK_INTERVAL + 1000
+    replies = [{ kind: 'ok', data: { version: 't2', words: { en: [{ id: 'z2' }] } } }]
+    let t3 = null
+    od.checkUpdate(function (r) { t3 = r })
+    eq(t3 && t3.updated, true, '超过 6 小时会重新检查并更新')
+    eq(reqLog.length, 1, '过点后只请求一次')
+
+    // 同版本时也要刷新「上次检查时间」，否则每次启动都会重新拉
+    reqLog = []
+    fakeNow += od.CHECK_INTERVAL + 1000
+    replies = [{ kind: 'ok', data: { version: 't2', words: { en: [{ id: 'z2' }] } } }]
+    let t4 = null
+    od.checkUpdate(function (r) { t4 = r })
+    eq(t4 && t4.reason, 'same-version', '同版本号标记 same-version')
+    reqLog = []
+    let t5 = null
+    od.checkUpdate(function (r) { t5 = r })
+    eq(t5 && t5.reason, 'throttled', '同版本检查后也会重置 6 小时计时')
+    eq(reqLog.length, 0, '重置后不再发请求')
+    ok(afterFirst >= 1, '节流前确实发生过网络请求')
+  } finally {
+    Date.now = realNow
+  }
 
   // 线上发布包本身的自洽性：版本号是内容指纹（同一份内容重跑导出必须一样）
   const crypto = require('crypto')

@@ -266,6 +266,9 @@ node tests/run-tests.js
 - 更新素材：改 `utils/words.js` / `utils/sentences.js` → **`bash deploy/cf/deploy.sh`**
   （一条命令：重导出 → 发布 → 自己拉一次线上做校验）。
 - 版本号是**内容指纹**：词库没改就不变版本，用户不会白拉一份同样的 134KB。
+- **每 6 小时最多联网检查一次**（`utils/online-data.js` 的 `CHECK_INTERVAL`）。
+  以前每次启动都整包拉 134KB，只为比较一个版本号——线上是 `max-age=0, must-revalidate`，
+  等于每次都真传输。想立刻更新去 **统计 → 🔄 在线词库 → 立即检查**（走 `force: true` 绕过）。
 - 部署与域名细节见 **[deploy/cf/README.md](deploy/cf/README.md)**；
   想换回阿里云 OSS 做主源见 **[在线词库部署-OSS.md](在线词库部署-OSS.md)**（把地址加进 `DATA_URLS` 即可）。
 

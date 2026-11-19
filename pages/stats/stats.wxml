@@ -122,6 +122,10 @@
       <view class="setting-label">🗣 离线发音包</view>
       <view class="setting-value">查看 ›</view>
     </view>
+    <view class="setting-row" bindtap="checkOnline">
+      <view class="setting-label">🔄 在线词库</view>
+      <view class="setting-value">立即检查 ›</view>
+    </view>
 
     <view class="setting-row" bindtap="toggleFeedback">
       <view class="setting-label">📳 触感反馈</view>
