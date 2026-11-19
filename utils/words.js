@@ -441,7 +441,47 @@ const WORDS = {
     { id: "en_437", word: "refuse", phonetic: "/rɪˈfjuːz/", meaning: "v. 拒绝", example: "He refused to answer.", exampleCn: "他拒绝回答。", category: "社交" },
     { id: "en_438", word: "suggest", phonetic: "/səˈdʒest/", meaning: "v. 建议", example: "I suggest we start early.", exampleCn: "我建议我们早点开始。", category: "社交" },
     { id: "en_439", word: "opinion", phonetic: "/əˈpɪnjən/", meaning: "n. 意见；看法", example: "In my opinion, it works.", exampleCn: "在我看来这行得通。", category: "社交" },
-    { id: "en_440", word: "stranger", phonetic: "/ˈstreɪndʒə(r)/", meaning: "n. 陌生人", example: "Don't talk to strangers.", exampleCn: "不要跟陌生人说话。", category: "社交" }
+    { id: "en_440", word: "stranger", phonetic: "/ˈstreɪndʒə(r)/", meaning: "n. 陌生人", example: "Don't talk to strangers.", exampleCn: "不要跟陌生人说话。", category: "社交" },
+    { id: "en_441", word: "installment", phonetic: "/ɪnˈstɔːlmənt/", meaning: "n. 分期付款；一期款项", example: "We pay for the car in monthly installments.", exampleCn: "这辆车我们按月分期付款。", category: "财务" },
+    { id: "en_442", word: "revenue", phonetic: "/ˈrevənjuː/", meaning: "n. 收入；营业额", example: "Revenue grew by 12% this year.", exampleCn: "今年收入增长了百分之十二。", category: "财务" },
+    { id: "en_443", word: "expense", phonetic: "/ɪkˈspens/", meaning: "n. 支出；费用", example: "Travel expenses are covered by the company.", exampleCn: "差旅费由公司报销。", category: "财务" },
+    { id: "en_444", word: "profit", phonetic: "/ˈprɒfɪt/", meaning: "n. 利润", example: "The company made a profit last quarter.", exampleCn: "公司上季度实现了盈利。", category: "财务" },
+    { id: "en_445", word: "loss", phonetic: "/lɒs/", meaning: "n. 亏损；损失", example: "The firm reported a loss of two million.", exampleCn: "公司报告了两百万的亏损。", category: "财务" },
+    { id: "en_446", word: "invoice", phonetic: "/ˈɪnvɔɪs/", meaning: "n. 发票；账单", example: "Please send the invoice by Friday.", exampleCn: "请在周五前把发票发过来。", category: "财务" },
+    { id: "en_447", word: "receipt", phonetic: "/rɪˈsiːt/", meaning: "n. 收据", example: "Keep the receipt for the refund.", exampleCn: "保留收据以便退款。", category: "财务" },
+    { id: "en_448", word: "refund", phonetic: "/ˈriːfʌnd/", meaning: "n. 退款", example: "You can ask for a full refund.", exampleCn: "你可以要求全额退款。", category: "财务" },
+    { id: "en_449", word: "asset", phonetic: "/ˈæset/", meaning: "n. 资产", example: "Brand value is a key asset.", exampleCn: "品牌价值是关键资产。", category: "财务" },
+    { id: "en_450", word: "liability", phonetic: "/ˌlaɪəˈbɪləti/", meaning: "n. 负债", example: "The loan is recorded as a liability.", exampleCn: "这笔贷款记为负债。", category: "财务" },
+    { id: "en_451", word: "equity", phonetic: "/ˈekwəti/", meaning: "n. 股权；权益", example: "She holds 20% equity in the startup.", exampleCn: "她持有这家创业公司两成股权。", category: "财务" },
+    { id: "en_452", word: "capital", phonetic: "/ˈkæpɪtl/", meaning: "n. 资本；本金", example: "They raised capital from investors.", exampleCn: "他们向投资人募集了资金。", category: "财务" },
+    { id: "en_453", word: "cash flow", phonetic: "/kæʃ fləʊ/", meaning: "n. 现金流", example: "Cash flow is tight this month.", exampleCn: "这个月现金流紧张。", category: "财务" },
+    { id: "en_454", word: "balance sheet", phonetic: "/ˈbæləns ʃiːt/", meaning: "n. 资产负债表", example: "Assets are listed on the balance sheet.", exampleCn: "资产列在资产负债表上。", category: "财务" },
+    { id: "en_455", word: "audit", phonetic: "/ˈɔːdɪt/", meaning: "n./v. 审计", example: "The audit starts next week.", exampleCn: "审计下周开始。", category: "财务" },
+    { id: "en_456", word: "depreciation", phonetic: "/dɪˌpriːʃiˈeɪʃn/", meaning: "n. 折旧", example: "Depreciation reduces taxable income.", exampleCn: "折旧会减少应纳税所得。", category: "财务" },
+    { id: "en_457", word: "dividend", phonetic: "/ˈdɪvɪdend/", meaning: "n. 股息；分红", example: "The board approved a higher dividend.", exampleCn: "董事会批准了更高的分红。", category: "财务" },
+    { id: "en_458", word: "interest", phonetic: "/ˈɪntrəst/", meaning: "n. 利息", example: "Interest rates went up again.", exampleCn: "利率又涨了。", category: "财务" },
+    { id: "en_459", word: "loan", phonetic: "/ləʊn/", meaning: "n. 贷款", example: "We applied for a bank loan.", exampleCn: "我们申请了银行贷款。", category: "财务" },
+    { id: "en_460", word: "mortgage", phonetic: "/ˈmɔːɡɪdʒ/", meaning: "n. 房贷；抵押贷款", example: "Their mortgage runs for thirty years.", exampleCn: "他们的房贷要还三十年。", category: "财务" },
+    { id: "en_461", word: "credit", phonetic: "/ˈkredɪt/", meaning: "n. 信用；贷记", example: "The payment was made by credit card.", exampleCn: "这笔钱是用信用卡付的。", category: "财务" },
+    { id: "en_462", word: "debit", phonetic: "/ˈdebɪt/", meaning: "n. 借记；扣款", example: "The amount was debited from my account.", exampleCn: "这笔钱从我的账户扣走了。", category: "财务" },
+    { id: "en_463", word: "investment", phonetic: "/ɪnˈvestmənt/", meaning: "n. 投资", example: "This is a long-term investment.", exampleCn: "这是一笔长期投资。", category: "财务" },
+    { id: "en_464", word: "portfolio", phonetic: "/pɔːtˈfəʊliəʊ/", meaning: "n. 投资组合", example: "Diversify your portfolio.", exampleCn: "分散你的投资组合。", category: "财务" },
+    { id: "en_465", word: "bond", phonetic: "/bɒnd/", meaning: "n. 债券", example: "Government bonds are relatively safe.", exampleCn: "国债相对安全。", category: "财务" },
+    { id: "en_466", word: "shareholder", phonetic: "/ˈʃeəhəʊldə(r)/", meaning: "n. 股东", example: "Shareholders approved the merger.", exampleCn: "股东批准了合并。", category: "财务" },
+    { id: "en_467", word: "forecast", phonetic: "/ˈfɔːkɑːst/", meaning: "n./v. 预测", example: "The sales forecast looks optimistic.", exampleCn: "销售预测看起来很乐观。", category: "财务" },
+    { id: "en_468", word: "fiscal", phonetic: "/ˈfɪskl/", meaning: "adj. 财政的；财年的", example: "The fiscal year ends in March.", exampleCn: "财年在三月结束。", category: "财务" },
+    { id: "en_469", word: "tax", phonetic: "/tæks/", meaning: "n. 税", example: "Income tax is due next month.", exampleCn: "所得税下个月到期。", category: "财务" },
+    { id: "en_470", word: "deduction", phonetic: "/dɪˈdʌkʃn/", meaning: "n. 扣除项", example: "Charity donations may qualify as a deduction.", exampleCn: "慈善捐款也许能作为扣除项。", category: "财务" },
+    { id: "en_471", word: "subsidy", phonetic: "/ˈsʌbsədi/", meaning: "n. 补贴", example: "The farm received a government subsidy.", exampleCn: "这家农场拿到了政府补贴。", category: "财务" },
+    { id: "en_472", word: "reimbursement", phonetic: "/ˌriːɪmˈbɜːsmənt/", meaning: "n. 报销", example: "Submit the form for reimbursement.", exampleCn: "交表格来报销。", category: "财务" },
+    { id: "en_473", word: "payroll", phonetic: "/ˈpeɪrəʊl/", meaning: "n. 工资发放；薪资", example: "Payroll is processed on the 25th.", exampleCn: "工资在每月二十五号发放。", category: "财务" },
+    { id: "en_474", word: "margin", phonetic: "/ˈmɑːdʒɪn/", meaning: "n. 利润率；差额", example: "Our gross margin is around 40%.", exampleCn: "我们的毛利率大约四成。", category: "财务" },
+    { id: "en_475", word: "break-even", phonetic: "/ˌbreɪk ˈiːvn/", meaning: "n./adj. 收支平衡（点）", example: "The store reached break-even last month.", exampleCn: "这家店上个月实现收支平衡。", category: "财务" },
+    { id: "en_476", word: "liquidity", phonetic: "/lɪˈkwɪdəti/", meaning: "n. 流动性", example: "Liquidity is the bank's top concern.", exampleCn: "流动性是这家银行最关心的事。", category: "财务" },
+    { id: "en_477", word: "collateral", phonetic: "/kəˈlætərəl/", meaning: "n. 抵押物", example: "The house serves as collateral.", exampleCn: "这套房子作为抵押物。", category: "财务" },
+    { id: "en_478", word: "overdue", phonetic: "/ˌəʊvəˈdjuː/", meaning: "adj. 逾期的", example: "The invoice is two weeks overdue.", exampleCn: "这张发票逾期两周了。", category: "财务" },
+    { id: "en_479", word: "savings", phonetic: "/ˈseɪvɪŋz/", meaning: "n. 存款；积蓄", example: "She put her savings in a fund.", exampleCn: "她把积蓄投进了一只基金。", category: "财务" },
+    { id: "en_480", word: "quotation", phonetic: "/kwəʊˈteɪʃn/", meaning: "n. 报价单", example: "Could you send a quotation?", exampleCn: "能发一份报价单吗？", category: "财务" }
   ],
   // 示例：将来扩展日语时，按同样字段填充即可，页面逻辑无需改动
   ja: [
@@ -544,7 +584,17 @@ const WORDS = {
     { id: "ja_097", word: "会社", phonetic: "kaisha", meaning: "公司", example: "会社まで一時間かかります。", exampleCn: "到公司要一小时。", category: "工作" },
     { id: "ja_098", word: "休み", phonetic: "yasumi", meaning: "休息；假期", example: "明日は休みです。", exampleCn: "明天放假。", category: "工作" },
     { id: "ja_099", word: "約束", phonetic: "yakusoku", meaning: "约定", example: "友達と約束があります。", exampleCn: "我和朋友有约。", category: "工作" },
-    { id: "ja_100", word: "残業", phonetic: "zangyou", meaning: "加班", example: "今日は残業します。", exampleCn: "今天加班。", category: "工作" }
+    { id: "ja_100", word: "残業", phonetic: "zangyou", meaning: "加班", example: "今日は残業します。", exampleCn: "今天加班。", category: "工作" },
+    { id: "ja_101", word: "予算", phonetic: "yosan", meaning: "预算", example: "今月の予算を確認しましょう。", exampleCn: "我们来确认一下这个月的预算。", category: "财务" },
+    { id: "ja_102", word: "収入", phonetic: "shuunyuu", meaning: "收入", example: "収入が増えました。", exampleCn: "收入增加了。", category: "财务" },
+    { id: "ja_103", word: "支出", phonetic: "shishutsu", meaning: "支出", example: "支出を減らす必要があります。", exampleCn: "需要减少支出。", category: "财务" },
+    { id: "ja_104", word: "請求書", phonetic: "seikyuusho", meaning: "发票；账单", example: "請求書を送ってください。", exampleCn: "请把发票发过来。", category: "财务" },
+    { id: "ja_105", word: "領収書", phonetic: "ryoushuusho", meaning: "收据", example: "領収書をもらえますか。", exampleCn: "能给我收据吗？", category: "财务" },
+    { id: "ja_106", word: "利益", phonetic: "rieki", meaning: "利润", example: "今年は利益が出ました。", exampleCn: "今年有盈利。", category: "财务" },
+    { id: "ja_107", word: "赤字", phonetic: "akaji", meaning: "赤字；亏损", example: "赤字が続いています。", exampleCn: "一直处于亏损状态。", category: "财务" },
+    { id: "ja_108", word: "貯金", phonetic: "chokin", meaning: "存款；积蓄", example: "毎月少しずつ貯金しています。", exampleCn: "每个月存一点钱。", category: "财务" },
+    { id: "ja_109", word: "投資", phonetic: "toushi", meaning: "投资", example: "投資は自己責任で。", exampleCn: "投资要自己负责。", category: "财务" },
+    { id: "ja_110", word: "株", phonetic: "kabu", meaning: "股票；股份", example: "株を少し買いました。", exampleCn: "买了一点股票。", category: "财务" }
   ]
 }
 
@@ -573,7 +623,7 @@ const CATEGORY_ORDER = [
   '四级', '六级', '考研', '雅思托福',
   '日常', '情绪', '工作', '科技', '旅行', '健康', '饮食', '社交',
   '交通', '购物', '学校', '家庭', '身体', '天气', '形容词', '动词',
-  '食物', '数字', '时间', '问候'
+  '食物', '数字', '时间', '问候', '财务'
 ]
 function getExamCategories(lang) {
   const list = getWords(lang)

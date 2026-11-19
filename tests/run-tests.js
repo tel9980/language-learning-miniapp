@@ -511,8 +511,8 @@ eq(plain2[0].active, undefined, 'toPlain 不带 active 字段（高亮靠下标�
 const words = require('../utils/words')
 const EN_WORDS = words.WORDS.en
 const JA_WORDS = words.WORDS.ja
-eq(EN_WORDS.length, 440, 'english word count = 440')
-eq(JA_WORDS.length, 100, 'japanese word count = 100')
+eq(EN_WORDS.length, 480, 'english word count = 480')
+eq(JA_WORDS.length, 110, 'japanese word count = 110')
 const allWords = EN_WORDS.concat(JA_WORDS)
 const idSet = {}
 let dupId = 0
@@ -540,7 +540,7 @@ const jaCats = words.getExamCategories('ja').map(c => c.name)
   ok(jaCats.indexOf(c) >= 0, `japanese category "${c}" is selectable`)
 })
 eq(words.getWordsByCategory('en', '日常').length, 30, 'filter by 日常 returns 30')
-eq(words.getWords('en').length, 440, 'getWords ignores unknown lang fallback')
+eq(words.getWords('en').length, 480, 'getWords ignores unknown lang fallback')
 
 // ---- audio：日语必须带 le=jap，否则有道只返回 1920 字节静音占位文件 ----
 const audio = require('../utils/audio')
@@ -1097,9 +1097,9 @@ async function runExtraTests() {
   let o7 = null
   od.checkUpdate(function (r) { o7 = r }, { force: true })
   eq(o7 && o7.updated, true, '在线版本更新成功')
-  eq(words.getWords('en').length, 1, '内置 440 词被在线词库覆盖')
+  eq(words.getWords('en').length, 1, '内置 480 词被在线词库覆盖')
   eq(words.getWords('en')[0].word, 'zebra-online', '取到的就是在线的词')
-  eq(words.getWords('ja').length, 100, '没覆盖的语种仍用内置词库')
+  eq(words.getWords('ja').length, 110, '没覆盖的语种仍用内置词库')
   ok(words.getExamCategories('en').some(function (c) { return c.name === '日常' }), '在线词的分类也能被分类列表看到')
 
   // 还原：空数组不构成覆盖（getWords 只在非空时才用覆盖层）
@@ -1107,7 +1107,7 @@ async function runExtraTests() {
   let o8 = null
   od.checkUpdate(function (r) { o8 = r }, { force: true })
   eq(o8 && o8.updated, true, '空覆盖层版本也能更新')
-  eq(words.getWords('en').length, 440, '空覆盖层回落到内置词库')
+  eq(words.getWords('en').length, 480, '空覆盖层回落到内置词库')
 
   // 6 小时节流：别每次启动都为「比一个版本号」白拉 134KB
   const realNow = Date.now
@@ -1163,9 +1163,9 @@ async function runExtraTests() {
     words: shipped.words, sentences: shipped.sentences, dialogues: shipped.dialogues
   })).digest('hex').slice(0, 13)
   eq(fp, shipped.version, '指纹与内容一致（改词库才变版本，重复部署不会让用户白拉）')
-  eq(shipped.words.en.length, 440, '发布包英语 440 词')
-  eq(shipped.words.ja.length, 100, '发布包日语 100 词')
-  eq(shipped.sentences.en.length, 112, '发布包英语 112 句')
+  eq(shipped.words.en.length, 480, '发布包英语 480 词')
+  eq(shipped.words.ja.length, 110, '发布包日语 110 词')
+  eq(shipped.sentences.en.length, 120, '发布包英语 120 句')
   eq(shipped.sentences.ja.length, 100, '发布包日语 100 句')
   const cfCopy = require('../deploy/cf/data.json')
   eq(cfCopy.version, shipped.version, '发布目录里的 data.json 与 deploy/data.json 同版本')

@@ -115,7 +115,15 @@ const SENTENCES = {
     { id: 's109', text: 'That is a great question.', cn: '这是个好问题。', scene: '表达观点', level: 'B1' },
     { id: 's110', text: 'Let me think about it for a second.', cn: '让我想一下。', scene: '沟通澄清', level: 'A2' },
     { id: 's111', text: 'I will get back to you as soon as possible.', cn: '我会尽快回复你。', scene: '工作沟通', level: 'B1' },
-    { id: 's112', text: 'Please do not hesitate to contact me.', cn: '请随时联系我。', scene: '工作沟通', level: 'B2' }
+    { id: 's112', text: 'Please do not hesitate to contact me.', cn: '请随时联系我。', scene: '工作沟通', level: 'B2' },
+    { id: 's113', text: 'Could you send me the invoice for last month?', cn: '能把上个月的发票发给我吗？', scene: '财务', level: 'A2' },
+    { id: 's114', text: 'The budget for this quarter has already been approved.', cn: '这个季度的预算已经批准了。', scene: '财务', level: 'B1' },
+    { id: 's115', text: 'Our revenue grew by twelve percent year on year.', cn: '我们的收入同比增长了一成二。', scene: '财务', level: 'B1' },
+    { id: 's116', text: 'Please keep the receipt in case we need to claim it back.', cn: '请保留收据，以防我们需要报销。', scene: '财务', level: 'B1' },
+    { id: 's117', text: 'The audit report will be ready by the end of the week.', cn: '审计报告这周内能出。', scene: '财务', level: 'B2' },
+    { id: 's118', text: 'We need to improve cash flow before the end of the quarter.', cn: '我们得在季度末前改善现金流。', scene: '财务', level: 'B2' },
+    { id: 's119', text: 'Is this expense covered by the company?', cn: '这项费用公司报销吗？', scene: '财务', level: 'A2' },
+    { id: 's120', text: 'They are looking for investors to raise more capital.', cn: '他们在找投资人募集更多资金。', scene: '财务', level: 'B2' }
   ],
   ja: [
     { id: 'js001', text: 'こんにちは、はじめまして。', cn: '你好，初次见面。', scene: '自我介绍', level: 'A1' },
