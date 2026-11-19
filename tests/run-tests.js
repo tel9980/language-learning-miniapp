@@ -274,6 +274,104 @@ global.wx.setStorageSync = _origSet2
 console.error = _origErr
 delete global.wx.showModal
 
+// ---- 写入合并：review 热路径延迟落盘，读仍然立刻可见 ----
+const progKey = profile.nsKey('lp_progress_v1')
+storage.invalidate()
+storage.review('en_001', 1)
+ok(!!storage.getProgress().en_001, 'review 后缓存里立刻可见（读不走磁盘）')
+const diskBefore = String(global.wx.getStorageSync(progKey) || '')
+ok(diskBefore.indexOf('en_001') < 0, '未 flush 前不落盘（写入合并生效）')
+storage.flush()
+ok(String(global.wx.getStorageSync(progKey)).indexOf('en_001') >= 0, 'flush 后落盘')
+
+// 攒够一批写自动 flush：一次 review = 3 次写，FLUSH_MAX_OPS=12 时 5 次 review 必落盘
+storage.invalidate()
+for (let i = 0; i < 5; i++) storage.review('en_9' + i, 1)
+const autoDisk = String(global.wx.getStorageSync(progKey) || '')
+ok(autoDisk.indexOf('en_93') >= 0, '攒够一批自动 flush，不会一直攒着')
+ok(autoDisk.indexOf('en_94') < 0, '触发点之后的写仍在攒着（不是每次都立即落盘）')
+storage.flush()
+
+// invalidate 前先 flush：换档案/导入时不能把没落盘的数据丢掉
+storage.invalidate()
+storage.review('en_keep', 1)
+storage.invalidate()
+ok(String(global.wx.getStorageSync(progKey)).indexOf('en_keep') >= 0, 'invalidate 前会 flush，脏数据不丢')
+
+// ---- init 幂等：首页每次 onShow 都调，不该反复读 Storage ----
+const _origGet3 = global.wx.getStorageSync
+global.wx.getStorageSync = function (k) { _reads++; return _origGet3(k) }
+storage.invalidate()
+_reads = 0
+storage.init()
+ok(_reads > 0, '首次 init 仍会初始化（幂等不等于不做事）')
+_reads = 0
+storage.init(); storage.init()
+eq(_reads, 0, '同一档案重复 init 不再读 Storage')
+global.wx.getStorageSync = _origGet3
+ok(!!_origGet3('lp_migrated_v1'), '老数据迁移留下标记，不再每次扫 10 个老 key')
+
+// ---- 读出的对象是拷贝：改返回值不能污染缓存 ----
+storage.invalidate()
+storage.review('en_clone', 1)
+storage.flush()
+const pc1 = storage.getProgress()
+pc1.en_clone.level = 99
+pc1.en_clone.dirtyFlag = true
+const pc2 = storage.getProgress()
+ok(pc2.en_clone.level !== 99, '改 getProgress() 返回值不影响缓存（一层深拷贝）')
+eq(pc2.en_clone.dirtyFlag, undefined, '给条目加字段也不会带进缓存')
+
+const speakingMod = require('../utils/speaking')
+speakingMod.invalidate()
+speakingMod.record('en_001', 2, 80)
+const sr1 = speakingMod.getRecords()
+sr1.en_001.times = 999
+eq(speakingMod.getRecords().en_001.times, 1, 'speaking 读出的也是拷贝（与 storage 语义一致）')
+speakingMod.flush()
+
+// ---- karaoke 高亮：只在词边界唤醒，不再 60ms 轮询 ----
+const _realNow = Date.now
+const _realST = global.setTimeout
+const _realCT = global.clearTimeout
+let _vnow = 0
+let _tq = []
+Date.now = function () { return _vnow }
+global.setTimeout = function (fn, ms) {
+  const id = _tq.length + 1
+  _tq.push({ id: id, at: _vnow + (ms || 0), fn: fn })
+  return id
+}
+global.clearTimeout = function (id) { _tq = _tq.filter(function (t) { return t.id !== id }) }
+const fires = []
+const hl2 = karaoke.createHighlighter({
+  tokens: ['a', 'bb', 'ccc', 'dddd'], durationMs: 3000,
+  onWord(i) { fires.push(i) }, onDone() { fires.push('done') }
+})
+hl2.start()
+for (let guard = 0; guard < 80 && _tq.length; guard++) {
+  _tq.sort(function (x, y) { return x.at - y.at })
+  const t = _tq.shift()
+  _vnow = t.at
+  t.fn()
+}
+eq(_tq.length, 0, '定时器全部收尾，没有遗留')
+ok(fires.indexOf('done') >= 0, '整段播完触发 onDone')
+const wordFires = fires.filter(function (x) { return x !== 'done' })
+ok(wordFires.length <= 6, '唤醒次数≈词数，不是 3000/60=50 次，实际 ' + wordFires.length)
+let monotonic = true
+for (let i = 1; i < wordFires.length; i++) if (wordFires[i] < wordFires[i - 1]) monotonic = false
+ok(monotonic, '高亮下标单调递增')
+Date.now = _realNow
+global.setTimeout = _realST
+global.clearTimeout = _realCT
+
+// toPlain：不带 active，配合「只传下标」渲染
+const plain2 = karaoke.toPlain(['hello', 'world'])
+eq(plain2.length, 2, 'toPlain 长度不变')
+eq(plain2[0].text, 'hello ', 'toPlain 英文补尾随空格')
+eq(plain2[0].active, undefined, 'toPlain 不带 active 字段（高亮靠下标）')
+
 // ---- words：词库规模与数据完整性 ----
 // 扩充词库时最容易犯的错是 id 撞车、词形重复、字段漏填，这里全部锁死。
 const words = require('../utils/words')

@@ -14,6 +14,10 @@ App({
     // 异步检查在线素材更新（未配置域名时自动 no-op，不影响启动速度与使用）
     onlineData.checkUpdate()
   },
+  // 进后台时把攒着的评分落盘（写入合并的兜底，见 utils/storage.js 的 writeDeferred）
+  onHide() {
+    try { storage.flushAll() } catch (e) {}
+  },
   applyTheme() {
     const t = this.globalData.theme || { fontScale: 1, darkMode: false }
     try {

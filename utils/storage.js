@@ -37,32 +37,46 @@ function defaults() {
 // key 用 nsKey 后的完整名（含档案id），切换档案天然隔离；write 时同步刷新，
 // 外部绕过本模块直写 Storage 的地方（全家包导入/删档案）须显式调用 invalidate()。
 const _cache = {}
+// 拷贝一层嵌套：我们的数据结构都是「map → 条目对象」或「数组 → 条目对象」，
+// 只拷外层的话条目仍然与缓存共享引用，调用方写 prog[id].level = x 会静默改脏缓存
+// （改了却没落盘，下次读到的和磁盘上不一致）。所以对值/元素再拷一层。
 function clone(v) {
-  if (Array.isArray(v)) return v.slice()
-  if (v && typeof v === 'object') return Object.assign({}, v)
+  if (Array.isArray(v)) {
+    return v.map(function (x) {
+      return (x && typeof x === 'object') ? Object.assign({}, x) : x
+    })
+  }
+  if (v && typeof v === 'object') {
+    const out = {}
+    Object.keys(v).forEach(function (k) {
+      const x = v[k]
+      out[k] = (x && typeof x === 'object') ? Object.assign({}, x) : x
+    })
+    return out
+  }
   return v
 }
-function invalidate() { Object.keys(_cache).forEach(function (k) { delete _cache[k] }) }
 
-function read(key, fallback) {
-  const k = profile.nsKey(key)
-  if (k in _cache) return _cache[k] == null ? fallback : clone(_cache[k])
-  try {
-    const v = wx.getStorageSync(k)
-    const val = v ? JSON.parse(v) : fallback
-    _cache[k] = val
-    return clone(val)
-  } catch (e) {
-    return fallback
-  }
-}
+// ---- 延迟落盘（写入合并） ----
+// review()/quizAnswer() 每评一张卡要写 progress+stats+daily 三个 key，
+// progress 是全量 map：学满 440 词时单次 30.9KB，每点一下卡片就同步重写一遍。
+// 这里把热路径的写改成「内存立即生效、磁盘攒一批再落」：
+//   · 读永远读缓存，所以写完全立刻可见，不会读到旧值；
+//   · 1.5s 空闲、攒够 12 次、页面 onHide/onUnload、App 进后台、导入/导出前都会 flush；
+//   · 最坏情况只丢最后 1.5s 内的评分（代价换掉每卡 31KB 的同步写）。
+// 设置类、自建素材、导入这类「低频且必须马上生效」的写仍走 write() 立即落盘。
+const _dirty = {}
+// init() 是否已经为本档案跑过（见 init 注释）
+let _initedFor = ''
+let _flushTimer = null
+let _pendingOps = 0
+const FLUSH_DELAY = 1500
+const FLUSH_MAX_OPS = 12
 
-// 写入失败（存储空间满 / 序列化异常）不能静默吞掉：否则用户以为进度存上了，
+// 真正落盘。写失败（空间满 / 序列化异常）不能静默吞掉：否则用户以为进度存上了，
 // 下次打开却回退。这里只提示一次，避免每写一次弹一次。
 let _writeWarned = false
-function write(key, value) {
-  const k = profile.nsKey(key)
-  _cache[k] = value
+function _persist(k, value) {
   try {
     wx.setStorageSync(k, JSON.stringify(value))
   } catch (e) {
@@ -82,11 +96,70 @@ function write(key, value) {
   }
 }
 
+// 把攒着的脏 key 一次性落盘
+function flush() {
+  if (_flushTimer) { clearTimeout(_flushTimer); _flushTimer = null }
+  _pendingOps = 0
+  const keys = Object.keys(_dirty)
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i]
+    delete _dirty[k]
+    _persist(k, _cache[k])
+  }
+  return keys.length
+}
+
+function invalidate() {
+  // 换档案 / 导入 / 删档案前先把脏数据落盘，否则缓存清掉就永久丢失
+  flush()
+  Object.keys(_cache).forEach(function (k) { delete _cache[k] })
+  _initedFor = ''
+}
+
+function read(key, fallback) {
+  const k = profile.nsKey(key)
+  if (k in _cache) return _cache[k] == null ? fallback : clone(_cache[k])
+  try {
+    const v = wx.getStorageSync(k)
+    const val = v ? JSON.parse(v) : fallback
+    _cache[k] = val
+    return clone(val)
+  } catch (e) {
+    return fallback
+  }
+}
+
+// 立即落盘：设置、主题、自建素材、导入导出这类低频但必须马上生效的写走这里
+function write(key, value) {
+  const k = profile.nsKey(key)
+  _cache[k] = value
+  delete _dirty[k]      // 已经有更新的值了，别让之前攒的旧值盖回来
+  _persist(k, value)
+}
+
+// 延迟落盘：只给「每点一下卡片就写一次」的热路径用
+function writeDeferred(key, value) {
+  const k = profile.nsKey(key)
+  _cache[k] = value
+  _dirty[k] = true
+  _pendingOps += 1
+  if (_pendingOps >= FLUSH_MAX_OPS) { flush(); return }
+  if (!_flushTimer && typeof setTimeout === 'function') {
+    _flushTimer = setTimeout(flush, FLUSH_DELAY)
+  }
+}
+
 function rawHas(key) {
   try { return !!wx.getStorageSync(profile.nsKey(key)) } catch (e) { return false }
 }
 
+// init() 会被首页 onShow 反复调用（每次切回首页都会走一遍）。它做的事
+// （扫老 key、补默认值、补设置字段）都是幂等的「第一次才需要」的活，
+// 所以按档案 id 记住是否已初始化，重复调用直接返回，省掉每次十几条同步 Storage 读。
 function init() {
+  const pid = profile.current()
+  if (_initedFor === pid) return
+  _initedFor = pid
   // 把升级前的老数据搬到默认档案，只做一次
   profile.migrateLegacy([KEY_PROGRESS, KEY_STATS, KEY_SETTINGS, KEY_DAILY, KEY_CUSTOM, KEY_THEME,
     'lp_speak_records_v1', 'lp_speak_focus_v1', 'lp_speak_daily_v1', 'lp_recordings_v1'])
@@ -215,9 +288,10 @@ function review(wordId, quality) {
   if (sched.quality >= 1 && old.reps === 0) d.learned += 1
   daily[tk] = d
 
-  write(KEY_PROGRESS, prog)
-  write(KEY_STATS, stats)
-  write(KEY_DAILY, daily)
+  // 热路径：延迟落盘（见 writeDeferred 注释），读到的仍是内存里的最新值
+  writeDeferred(KEY_PROGRESS, prog)
+  writeDeferred(KEY_STATS, stats)
+  writeDeferred(KEY_DAILY, daily)
   return p
 }
 
@@ -232,8 +306,8 @@ function quizAnswer(correct) {
   d.total += 1
   if (correct) d.correct += 1
   daily[tk] = d
-  write(KEY_STATS, stats)
-  write(KEY_DAILY, daily)
+  writeDeferred(KEY_STATS, stats)
+  writeDeferred(KEY_DAILY, daily)
 }
 
 function getToday() {
@@ -247,8 +321,15 @@ function getMasteredCount(lang) {
   return getWords(lang).filter(w => prog[w.id] && prog[w.id].level >= 4).length
 }
 
+// 页面/App 只需要调这一个：把两个模块攒的脏数据一起落盘
+function flushAll() {
+  flush()
+  try { require('./speaking').flush() } catch (e) {}
+}
+
 // 导出全部学习数据：返回可序列化的普通对象（v2 含口语数据）
 function exportData() {
+  flush()
   let speak = null
   try { speak = require('./speaking').exportData() } catch (e) {}
   return {
@@ -302,5 +383,6 @@ module.exports = {
   getCustomItems, addCustomItems, removeCustomItem,
   getProgress, getStats, getDaily, getDueWords, getNewWords, getToday,
   review, quizAnswer, getMasteredCount, INTERVALS,
-  exportData, importData, migrateProgress, invalidate
+  exportData, importData, migrateProgress, invalidate, flush,
+  FLUSH_DELAY, flushAll
 }

@@ -17,7 +17,18 @@ Page({
     if (intent && intent.mode && intent.mode !== this.data.mode) {
       this.setData({ mode: intent.mode })
     }
+    // 这一轮还没学完就接着学：以前 onShow 一律 load() → 队列重置、index 归零，
+    // 学到第 40 张切去查词页再回来又从第 1 张开始。
+    // 只刷新计数（可能在别的页面做了题，到期数变了），不动队列与当前卡。
+    if (this._queue && this._queue.length && this.data.current && this._roundSig === this._sig()) {
+      this.setData({ dueCount: storage.getDueWords(storage.getCurrentLang()).length })
+      return
+    }
     this.load()
+  },
+  // 一轮的范围指纹：模式 / 语种 / 分类，任一变了才重新排队列
+  _sig() {
+    return [this.data.mode, storage.getCurrentLang(), this.data.catValue || ''].join('|')
   },
   load() {
     const lang = storage.getCurrentLang()
@@ -56,6 +67,7 @@ Page({
     // 队列只在页面内部流转，不进 data：400 词的队列约 60KB，
     // 每次都塞进 setData 会让切页明显发卡，页面其实只需要「当前」和「共几条」。
     this._queue = list
+    this._roundSig = this._sig()
     this.setData({
       queueLen: list.length,
       index: 0,
@@ -95,7 +107,10 @@ Page({
       setTimeout(() => this.load(), 600)
     }
   },
+  onHide() { storage.flushAll() },
   onUnload() {
+    // 评分是延迟落盘的，离开页面前必须冲一次，否则最后几张卡会丢
+    storage.flushAll()
     if (this._player && this._player.destroy) this._player.destroy()
     this._player = null
   }

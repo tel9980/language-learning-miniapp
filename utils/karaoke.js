@@ -44,8 +44,13 @@ function wordTimings(tokens, durationMs) {
   })
 }
 
-// 创建高亮控制器：{ start, stop, destroy }
+// 创建高亮控制器：{ start, stop, retime, destroy }
 // opts: { tokens, durationMs, onWord(index), onDone() }
+//
+// 定时策略：只在「下一个词边界」唤醒一次，而不是每 60ms 轮询一遍。
+// 原来 setInterval(tick, 60)：3 秒音频要醒 50 次，20 句就是 1000 次定时器唤醒，
+// 而实际只需要词边界那 8 次左右。改成边界驱动后，唤醒次数≈词数，
+// 且边界靠 timings 精确计算，不会因为 60ms 粒度抖动而漏词。
 function createHighlighter(opts) {
   opts = opts || {}
   const tokens = opts.tokens || []
@@ -53,43 +58,82 @@ function createHighlighter(opts) {
   let timer = null
   let t0 = 0
   let idx = -1
+  let done = true      // 没 start 之前不调度
 
   function clear() {
-    if (timer) { clearInterval(timer); timer = null }
+    if (timer) { clearTimeout(timer); timer = null }
+  }
+  function totalMs() { return timings.length ? timings[timings.length - 1].end : 0 }
+  function indexAt(elapsed) {
+    for (let i = 0; i < timings.length; i++) {
+      if (elapsed >= timings[i].start && elapsed < timings[i].end) return i
+    }
+    return -1
+  }
+  function emit(cur) {
+    if (cur === idx) return
+    idx = cur
+    if (opts.onWord) opts.onWord(idx)
+  }
+  // 预约下一次唤醒：下一个词的开始时刻（没有下一个就直接等到整段结束）
+  function schedule() {
+    clear()
+    if (done) return
+    const elapsed = Date.now() - t0
+    const total = totalMs()
+    if (!timings.length || elapsed >= total) { finish(); return }
+    let nextAt = total
+    for (let i = 0; i < timings.length; i++) {
+      if (timings[i].start > elapsed) { nextAt = timings[i].start; break }
+    }
+    timer = setTimeout(tick, Math.max(0, nextAt - elapsed))
   }
   function tick() {
+    timer = null
+    if (done) return
     const elapsed = Date.now() - t0
-    let cur = -1
-    for (let i = 0; i < timings.length; i++) {
-      if (elapsed >= timings[i].start && elapsed < timings[i].end) { cur = i; break }
-    }
-    if (cur === -1 && elapsed >= (timings.length ? timings[timings.length - 1].end : 0)) {
-      clear()
-      if (opts.onDone) opts.onDone()
-      return
-    }
-    if (cur !== idx) {
-      idx = cur
-      if (opts.onWord) opts.onWord(idx)
-    }
+    if (elapsed >= totalMs()) { finish(); return }
+    emit(indexAt(elapsed))
+    schedule()
   }
+  // 播完别急着清高亮：让最后一个词停在亮着的状态（和原轮询版一致），
+  // 由 stop() 负责清，否则结尾会闪一下、字幕跳回纯文本。
+  function finish() {
+    clear()
+    if (done) return
+    done = true
+    if (opts.onDone) opts.onDone()
+  }
+
   return {
     start() {
       clear()
+      done = false
       idx = -1
       t0 = Date.now()
       if (opts.onWord) opts.onWord(-1)
-      timer = setInterval(tick, 60)
+      // 立刻点亮第一个词：只按「下一个边界」调度的话，第 0 个词的开始时刻
+      // 就是 t=0，永远等不到「严格晚于当前时刻」的边界，第一个词会被跳过
+      emit(indexAt(0))
+      schedule()
     },
     // 拿到音频真实时长后重排时间表：估算值换成实测值，高亮不会越走越偏。
-    // 不重置起点，保持当前播放进度。
+    // 不重置起点，保持当前播放进度，并重新预约边界。
     retime(durationMs) {
       const next = wordTimings(tokens, durationMs)
       if (!next.length) return
       timings = next
+      if (done) return
+      emit(indexAt(Date.now() - t0))
+      schedule()
     },
-    stop() { clear(); if (opts.onWord) opts.onWord(-1) },
-    destroy() { clear() }
+    stop() {
+      done = true
+      clear()
+      if (opts.onWord) opts.onWord(-1)
+      idx = -1
+    },
+    destroy() { done = true; clear() }
   }
 }
 
@@ -103,4 +147,13 @@ function toView(tokens, activeIdx) {
   })
 }
 
-module.exports = { tokenize, wordTimings, weightOf, createHighlighter, toView, hasKana, isJapaneseish }
+// 只生成文本、不带 active：配合「只传下标」的渲染方式用。
+// 高亮换词时只 setData 一个数字（16B），而不是整个 token 数组（长句 447B），
+// 渲染层也只需重排 class，不用 diff 全部 text 节点。
+function toPlain(tokens) {
+  const list = tokens || []
+  const ja = list.some(function (t) { return isJapaneseish(t) })
+  return list.map(function (t) { return { text: ja ? t : t + ' ' } })
+}
+
+module.exports = { tokenize, wordTimings, weightOf, createHighlighter, toView, toPlain, hasKana, isJapaneseish }

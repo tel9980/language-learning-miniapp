@@ -9,24 +9,81 @@ const KEY_DAILY    = 'lp_speak_daily_v1'   // { 'YYYY-MM-DD': { count, good } }
 
 // 进程内缓存（key 经 nsKey 含档案id，切换档案天然隔离）
 const _cache = {}
+
+// 和 utils/storage.js 保持一致：读出的是「一层嵌套的拷贝」。
+// 原来这里直接返回缓存本体，调用方写 getRecords()[id].times++ 会静默改脏缓存
+// （内存变了但没落盘，下次读到的和磁盘上不一致），两个模块语义不一致本身就是坑。
+function clone(v) {
+  if (Array.isArray(v)) {
+    return v.map(function (x) { return (x && typeof x === 'object') ? Object.assign({}, x) : x })
+  }
+  if (v && typeof v === 'object') {
+    const out = {}
+    Object.keys(v).forEach(function (k) {
+      const x = v[k]
+      out[k] = (x && typeof x === 'object') ? Object.assign({}, x) : x
+    })
+    return out
+  }
+  return v
+}
+
 function read(key, fallback) {
   const k = profile.nsKey(key)
-  if (k in _cache) return _cache[k] == null ? fallback : _cache[k]
+  if (k in _cache) return _cache[k] == null ? fallback : clone(_cache[k])
   try {
     const v = wx.getStorageSync(k)
     const val = v ? JSON.parse(v) : fallback
     _cache[k] = val
-    return val
+    return clone(val)
   } catch (e) {
     return fallback
   }
 }
+
+// ---- 延迟落盘（与 utils/storage.js 同一套策略）----
+// record() 每练一条要写 records+focus+daily 三个 key，records 会随练习量增长到几十 KB，
+// 攒一批再落盘，避免每练一句就同步重写整张表。
+const _dirty = {}
+let _flushTimer = null
+let _pendingOps = 0
+const FLUSH_DELAY = 1500
+const FLUSH_MAX_OPS = 12
+
+function _persist(k, value) {
+  try { wx.setStorageSync(k, JSON.stringify(value)) } catch (e) {
+    if (typeof console !== 'undefined' && console.error) console.error('[speaking] 写入失败', k, e)
+  }
+}
+function flush() {
+  if (_flushTimer) { clearTimeout(_flushTimer); _flushTimer = null }
+  _pendingOps = 0
+  const keys = Object.keys(_dirty)
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i]
+    delete _dirty[k]
+    _persist(k, _cache[k])
+  }
+  return keys.length
+}
 function write(key, value) {
   const k = profile.nsKey(key)
   _cache[k] = value
-  try { wx.setStorageSync(k, JSON.stringify(value)) } catch (e) {}
+  delete _dirty[k]
+  _persist(k, value)
 }
-function invalidate() { Object.keys(_cache).forEach(function (k) { delete _cache[k] }) }
+function writeDeferred(key, value) {
+  const k = profile.nsKey(key)
+  _cache[k] = value
+  _dirty[k] = true
+  _pendingOps += 1
+  if (_pendingOps >= FLUSH_MAX_OPS) { flush(); return }
+  if (!_flushTimer && typeof setTimeout === 'function') _flushTimer = setTimeout(flush, FLUSH_DELAY)
+}
+function invalidate() {
+  flush()
+  Object.keys(_cache).forEach(function (k) { delete _cache[k] })
+}
 function todayKey(d) {
   const t = d || new Date()
   const m = String(t.getMonth() + 1).padStart(2, '0')
@@ -56,9 +113,9 @@ function record(itemId, q, score) {
   if (q >= 1) d.good += 1
   daily[tk] = d
 
-  write(KEY_RECORDS, records)
-  write(KEY_FOCUS, focus)
-  write(KEY_DAILY, daily)
+  writeDeferred(KEY_RECORDS, records)
+  writeDeferred(KEY_FOCUS, focus)
+  writeDeferred(KEY_DAILY, daily)
   return records[itemId]
 }
 
@@ -125,5 +182,5 @@ function importData(data) {
 
 module.exports = {
   record, getRecords, getFocus, getDaily, getToday, getFocusItems, getFocusWords,
-  clearFocus, getSummary, exportData, importData, invalidate
+  clearFocus, getSummary, exportData, importData, invalidate, flush
 }

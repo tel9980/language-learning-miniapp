@@ -146,7 +146,11 @@ function nsKey(baseKey, profileId) {
 }
 
 // 老数据迁移：把无命名空间的旧 key 搬到默认档案（只搬一次，之后删除旧 key）
+// 迁移完打一个标记：否则 storage.init() 每次被调用都要扫 10 个老 key，
+// 而首页每次 onShow 都会调 init()，等于每次回首页 10 次白读。
+const KEY_MIGRATED = 'lp_migrated_v1'
 function migrateLegacy(baseKeys) {
+  try { if (wx.getStorageSync(KEY_MIGRATED)) return false } catch (e) {}
   const keys = baseKeys || ['lp_progress_v1', 'lp_stats_v1', 'lp_settings_v1', 'lp_daily_v1',
     'lp_custom_items_v1', 'lp_theme_v1', 'lp_speak_records_v1', 'lp_speak_focus_v1',
     'lp_speak_daily_v1', 'lp_recordings_v1']
@@ -159,6 +163,8 @@ function migrateLegacy(baseKeys) {
       wx.removeStorageSync(k)
     } catch (e) {}
   })
+  try { wx.setStorageSync(KEY_MIGRATED, '1') } catch (e) {}
+  return true
 }
 
 function modes() { return MODES }

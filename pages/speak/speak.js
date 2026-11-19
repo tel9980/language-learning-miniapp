@@ -29,7 +29,7 @@ Page({
     // 对话展示
     showLine: 0,
     // 逐词高亮（K歌字幕）
-    karaokeOn: false, karaokeTokens: [],
+    karaokeOn: false, karaokeTokens: [], karaokeIdx: -1,
     // A-B 复读
     abLoop: false, abCount: 0,
     // 角色扮演
@@ -65,17 +65,33 @@ Page({
     const p = profile.currentProfile() || {}
     this.setData({ isKid: p.mode === 'kid', stars: storage.getStats().totalCorrect || 0 })
     const intent = nav.takeIntent('pages/speak/speak')
-    this.setData({ sceneIndex: 0 })
-    this.refreshScenes()
     if (intent && intent.focus) {
+      this.refreshScenes()
       this.startFocus()
-    } else {
-      this.buildQueueAndLoad()
+      return
     }
+    // 同一组队列（语种/等级/场景/模式都没变）就接着上次的位置练：
+    // 以前 onShow 一律重建队列并把 index 归零、场景也重置，做到第 87 条
+    // 切去查词页再回来就从头开始，等于白练。
+    const same = this._queue.length && this._queueSig === this._sig() && this._memoIndex > 0
+    this.refreshScenes()
+    if (same) {
+      const i = Math.min(this._memoIndex, this._queue.length - 1)
+      this.setData({ index: i }, () => this.loadCurrent())
+      return
+    }
+    this.buildQueueAndLoad()
   },
 
-  onHide() { this.stopAll() },
-  onUnload() { this.stopAll() },
+  // 队列指纹：决定「要不要重建队列」。变了才重建，没变就沿用。
+  _sig() {
+    return [this.data.track, this.data.levelIndex, this.data.sceneIndex,
+      storage.getCurrentLang(), this.data.mode].join('|')
+  },
+
+  // 评分/录音记录是延迟落盘的，离开页面前必须冲一次
+  onHide() { this.stopAll(); storage.flushAll() },
+  onUnload() { this.stopAll(); storage.flushAll() },
 
   closeGuide() {
     this.setData({ showGuide: false })
@@ -91,9 +107,12 @@ Page({
       const list = level === '全部' ? sentences.getDialogues(lang) : sentences.getDialogues(lang, level)
       scenes = list.map((d, i) => ({ name: d.scene, index: i }))
     }
+    // 场景数可能因切语种/等级而变少，下标要夹紧，否则取到 undefined
+    const si = Math.min(this.data.sceneIndex, Math.max(0, scenes.length - 1))
     this.setData({
       scenes: scenes,
       sceneNames: scenes.map(s => s.name),
+      sceneIndex: si,
       focusCount: speaking.getFocusItems(this.allItems(lang)).length,
       todayCount: speaking.getToday().count
     })
@@ -134,6 +153,9 @@ Page({
     const done = pool.filter(w => records[w.id])
     const queue = fresh.concat(done)
     this._queue = queue
+    this._memoIndex = 0
+    this._queueSig = [this.data.track, this.data.levelIndex, this.data.sceneIndex,
+      storage.getCurrentLang(), 'train'].join('|')
     this.setData(Object.assign({
       queueLen: queue.length, index: 0, showLine: 0, mode: 'train', abCount: 0
     }, this._progress(0, queue.length)), () => this.loadCurrent())
@@ -182,15 +204,15 @@ Page({
       const prev = this._queue[this.data.index - 1]
       otherLine = prev ? { role: prev.role, text: prev.word, cn: prev.meaning } : null
     }
-    this.setData({
+    this._memoIndex = this.data.index
+    // 一次 setData 搞定：以前是 setData({...}, () => setData(progress))，
+    // 同一个动作要渲染两轮，进度条会先显示上一张的数字再跳。
+    this.setData(Object.assign({
       current: w, hasRecording: false, justRated: false,
       score: null, recognized: '', playingMine: false, scoreDetail: null, wrongWords: [],
       showLine: 0, revealed: false, otherLine,
-      karaokeOn: false, karaokeTokens: karaoke.toView(tokens, -1), abCount: 0
-    }, () => {
-      // 进度随当前索引更新
-      this.setData(this._progress(this.data.index, this._queue.length))
-    })
+      karaokeOn: false, karaokeIdx: -1, karaokeTokens: karaoke.toPlain(tokens), abCount: 0
+    }, this._progress(this.data.index, this._queue.length)))
   },
 
   // ---------- 音频播放（带降级兜底 + 逐词高亮 + AB复读） ----------
@@ -240,7 +262,9 @@ Page({
     this._highlighter = karaoke.createHighlighter({
       tokens: tokens,
       durationMs: duration,
-      onWord(idx) { that.setData({ karaokeOn: idx >= 0, karaokeTokens: karaoke.toView(tokens, idx) }) },
+      // 只传下标：整句 token 数组不再每个词都重发一遍（长句 447B → 16B），
+      // 渲染层也只需改一个 class，不用 diff 全部 text 节点
+      onWord(idx) { that.setData({ karaokeOn: idx >= 0, karaokeIdx: idx }) },
       onDone() { that.setData({ karaokeOn: false }) }
     })
     this._highlighter.start()
@@ -498,7 +522,11 @@ Page({
     }
     this.stopAll()
     this._queue = list
-    this.setData(Object.assign({ mode: 'focus', queueLen: list.length, index: 0 }, this._progress(0, list.length)), () => this.loadCurrent())
+    this._memoIndex = 0
+    this.setData(Object.assign({ mode: 'focus', queueLen: list.length, index: 0 }, this._progress(0, list.length)), () => {
+      this._queueSig = this._sig()
+      this.loadCurrent()
+    })
   },
   backToTrain() {
     this.stopAll()

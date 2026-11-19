@@ -20,7 +20,14 @@ Page({
     progress: 0, indexLetters: ['A', 'B', 'C', 'D']
   },
   onShow() {
-    this.syncTheme(); this.buildQuiz() },
+    this.syncTheme()
+    // 做了一半就接着做：以前每次 onShow 都 buildQuiz() 重新随机 10 题，
+    // 做完 9 题切去查词页再回来，题目全换成新的，等于白做。
+    if (this.data.queue.length && !this.data.finished) return
+    this.buildQuiz()
+  },
+  onHide() { storage.flushAll() },
+  onUnload() { storage.flushAll() },
   buildQuiz() {
     const lang = storage.getCurrentLang()
     const words = shuffle(getWords(lang)).slice(0, 10)
