@@ -614,7 +614,9 @@ eq(badMp3(enAudioIds).length, 0, 'English audio files are real mp3')
 const enKb = kbOf(enAudioIds)
 ok(enKb < 1200, 'English audio stays under 1.2MB (actual ' + enKb.toFixed(0) + 'KB, 主包上限 2MB)')
 
-// 有本地音频时 speak() 不应走网络
+// 代码包内的 mp3 真机播不了 —— 实录报错：
+//   [InnerAudio] operateAudio fail: errMsg="operateAudio:fail:access denied, appId=wx..."
+// 所以必须先复制到 USER_DATA_PATH 再播。这段锁死「复制一次、之后复用」的契约。
 let playedSrc = null
 global.wx.createInnerAudioContext = function () {
   const c = { onEnded() {}, onError(fn) { c._onErr = fn }, stop() {}, destroy() {}, play() {} }
@@ -622,12 +624,52 @@ global.wx.createInnerAudioContext = function () {
   global.__lastCtx = c        // 让测试能主动模拟「播放失败」
   return c
 }
+const _pkgFs = {}
+global.wx.env = { USER_DATA_PATH: 'wxfile://usr' }
+global.wx.getFileSystemManager = function () {
+  return {
+    readFileSync(p) {
+      if (p in _pkgFs) return _pkgFs[p]
+      if (/\.mp3$/.test(p)) return 'MP3:' + p          // 模拟代码包内的文件
+      throw new Error('no such file: ' + p)
+    },
+    writeFileSync(p, data) { _pkgFs[p] = String(data) },
+    accessSync(p) { if (!(p in _pkgFs)) throw new Error('no such file') },
+    mkdirSync() {},
+    statSync(p) {
+      if (!(p in _pkgFs)) throw new Error('no such file')
+      return { size: _pkgFs[p].length, lastModifiedTime: 1 }
+    },
+    readdirSync() {
+      const pre = 'wxfile://usr/pkg-audio/'
+      return Object.keys(_pkgFs).filter(function (k) { return k.indexOf(pre) === 0 })
+        .map(function (k) { return k.slice(pre.length) })
+    },
+    unlinkSync(p) { delete _pkgFs[p] }
+  }
+}
 playedSrc = null
 au.speak('すみません、駅はどこですか。', false, { id: 'js015' })
-eq(playedSrc, '/packageJa/ja/js015.mp3', 'speak plays the bundled file when the item has one')
+eq(playedSrc, 'wxfile://usr/pkg-audio/packageJa_ja_js015.mp3', '代码包音频先复制到用户目录再播（真机才不会 access denied）')
+ok(!!_pkgFs[playedSrc], '副本文件确实写了出来')
+playedSrc = null
+au.speak('すみません、駅はどこですか。', false, { id: 'js015' })
+eq(playedSrc, 'wxfile://usr/pkg-audio/packageJa_ja_js015.mp3', '第二次直接播副本，不再读包')
 playedSrc = null
 au.speak('hello', false, {})
 ok(/^https:\/\//.test(playedSrc || ''), 'speak still goes online for items without bundled audio')
+
+// pkg-audio：路径扁平化 / 复制后再复制不重复写 / 读不到包内文件时返回空串
+const pkgAudio = require('../utils/pkg-audio')
+eq(pkgAudio.nameOf('/packageJa/ja/js015.mp3'), 'packageJa_ja_js015.mp3', '包内路径压成扁平文件名')
+eq(pkgAudio.ensure('/packageJa/ja/js015.mp3'), 'wxfile://usr/pkg-audio/packageJa_ja_js015.mp3', 'ensure 返回可播路径')
+eq(pkgAudio.ensure('/assets/audio/en/nope.mp3'), 'wxfile://usr/pkg-audio/assets_audio_en_nope.mp3', '任意包内路径都能复制')
+const _fsNoMp3 = global.wx.getFileSystemManager
+global.wx.getFileSystemManager = function () {
+  return { readFileSync() { throw new Error('denied') }, statSync() { throw new Error('none') }, mkdirSync() {}, writeFileSync() {}, readdirSync() { return [] }, unlinkSync() {} }
+}
+eq(pkgAudio.ensure('/packageJa/ja/blocked.mp3'), '', '读不到包内文件时返回空串（调用方退回在线链）')
+global.wx.getFileSystemManager = _fsNoMp3
 
 // ---- 发音缓存：同一句第二次听不再联网 ----
 const ttsCache = require('../utils/tts-cache')

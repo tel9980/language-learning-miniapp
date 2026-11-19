@@ -18,6 +18,7 @@
 // 否则界面切到日语后练英文词（"hello"）会被读成日式口音。
 const localAudio = require('./local-audio')
 const ttsCache = require('./tts-cache')
+const pkgAudio = require('./pkg-audio')
 
 // 单次下载的看门狗时长：wx.downloadFile 没有 timeout 参数，默认要等 60 秒才失败，
 // 弱网下用户看到的就是「点了没反应」。8 秒还没下完就放弃这个源、换下一个（有道↔百度）。
@@ -142,6 +143,13 @@ function speak(text, slow, handlers) {
     localAudio.ensureLoaded('ja')
   }
   if (localPath) {
+    // 代码包内的 mp3 真机播不了（operateAudio:fail:access denied），
+    // 必须先复制到用户目录再播；复制失败就直接走在线链，别让用户点了个寂寞。
+    const playable = pkgAudio.ensure(localPath)
+    if (!playable) {
+      console.warn('[audio] 离线音频不可用，改用在线链', localPath)
+      return runNetwork()
+    }
     let lp = null
     let fellBack = false
     function playLocal() {
@@ -153,13 +161,13 @@ function speak(text, slow, handlers) {
         onError(err) {
           if (fellBack) return
           fellBack = true
-          console.error('[audio] 本地音频播放失败，改用在线链', localPath, err && (err.errMsg || err))
+          console.error('[audio] 本地音频播放失败，改用在线链', playable, err && (err.errMsg || err))
           if (lp) lp.destroy()
           const p = runNetwork()
           keep.push(p)
         }
       })
-      lp.play(localPath)
+      lp.play(playable)
     }
     const keep = []
     playLocal()
