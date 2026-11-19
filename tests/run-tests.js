@@ -1262,4 +1262,22 @@ async function runExtraTests() {
   await new Promise(function (r) { setTimeout(r, 30) })
   eq(playedSrc, 'wxfile://usr/pkg-audio/packageJa_ja_js015.mp3', '分包就绪后自动播本地副本（前缀 id 也命中）')
   ctl.stop()
+
+  // 分包真加载失败时：同一批 mp3 在 CDN 上也有一份，改成流播，别让用户听到静默。
+  eq(laJa.remoteFor('st_js015'), 'https://yb.qy663.de5.net/audio/js015.mp3', '日语素材有 CDN 兜底地址（前缀 id 也认）')
+  eq(laJa.remoteFor('s001'), '', '英语在主包里，不需要 CDN 兜底')
+  delete require.cache[require.resolve('../utils/audio')]
+  delete require.cache[require.resolve('../utils/local-audio')]
+  const savedLoad = global.wx.loadSubpackage
+  global.wx.loadSubpackage = function (o) { setTimeout(function () { if (o.fail) o.fail({ errMsg: 'loadSubpackage:fail' }) }, 0) }
+  const auCdn = require('../utils/audio')
+  const laCdn = require('../utils/local-audio')
+  eq(laCdn.isReady('ja'), false, '分包加载失败后仍未就绪')
+  playedSrc = null
+  const ctl2 = auCdn.speak('すみません、駅はどこですか。', false, { id: 'st_js015' })
+  eq(ctl2.pending, true, '日语整句先挂起等分包')
+  await new Promise(function (r) { setTimeout(r, 40) })
+  eq(playedSrc, 'https://yb.qy663.de5.net/audio/js015.mp3', '分包加载失败 → 流播 CDN 上的同一批音频')
+  ctl2.stop()
+  global.wx.loadSubpackage = savedLoad
 }

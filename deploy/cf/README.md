@@ -72,3 +72,12 @@ https://yb.qy663.de5.net
 
 没加也不影响练习：客户端拉不到会静默回退到内置词库，只是「改了词库不更新」。
 开发者工具里可以先勾掉「校验合法域名」自测。
+
+## 顺带托管的日语音频
+
+发布时 `deploy.sh` / CI 会把 `packageJa/ja/*.mp3`（353 条、约 1.8MB）复制到 `deploy/cf/audio/` 一起发布，线上地址形如
+`https://yb.qy663.de5.net/audio/js015.mp3`。
+
+用途：小程序里日语音频在 `packageJa` 分包，个别真机上 `wx.loadSubpackage` 会失败；这时客户端改流播这份 CDN 副本
+（`utils/local-audio.js` 的 `remoteFor()`），避免「点了没声音」。`deploy/cf/audio/` 不进仓库（见 `.gitignore`），
+每次发布由脚本从分包目录现铺。

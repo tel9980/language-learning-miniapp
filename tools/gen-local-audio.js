@@ -16,7 +16,9 @@ const w = require('../utils/words')
 
 const ROOT = path.join(__dirname, '..')
 const REGION = {
-  ja: { base: '/packageJa/ja/', name: 'jaAudio', dir: 'packageJa/ja' },
+  // 日语在主包放不下、只能在分包里；分包在个别真机上会加载失败，所以同一批 mp3
+  // 还会随 Pages 部署到 CDN，加载失败时直接流播（见 utils/local-audio.js 的 remoteFor）
+  ja: { base: '/packageJa/ja/', name: 'jaAudio', dir: 'packageJa/ja', remote: 'https://yb.qy663.de5.net/audio/' },
   en: { base: '/assets/audio/en/', name: '', dir: 'assets/audio/en' }
 }
 
@@ -45,7 +47,7 @@ Object.keys(REGION).forEach(lang => {
     sizes[lang] = (sizes[lang] || 0) + fs.statSync(p).size
     return true
   })
-  out[lang] = { base: r.base, name: r.name, ids: ids }
+  out[lang] = { base: r.base, name: r.name, remote: r.remote || '', ids: ids }
 })
 
 const q = v => "'" + v + "'"
@@ -68,6 +70,7 @@ Object.keys(out).forEach(lang => {
   const r = out[lang]
   lines.push('  ' + lang + ': {')
   lines.push('    base: ' + q(r.base) + ',')
+  lines.push('    remote: ' + q(r.remote || '') + ',')
   lines.push('    name: ' + q(r.name) + ',  // 分包名；空串表示在主包里，随时可用')
   lines.push('    count: ' + r.ids.length + ',')
   lines.push('    bytes: ' + (sizes[lang] || 0) + ',')

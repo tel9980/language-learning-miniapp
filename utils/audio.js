@@ -106,6 +106,32 @@ function createPlayer(opts) {
   return { play, stop, destroy }
 }
 
+// 直接流播一个远程 mp3（不经过 downloadFile：真机上 InnerAudioContext 播网络音频
+// 不受 downloadFile 合法域名限制）。分包加载失败时用它播 CDN 上的同一批离线音频。
+function playRemote(url, slow, handlers) {
+  let lp = null
+  function start() {
+    lp = createPlayer({
+      rate: slow ? 0.75 : 1,
+      onPlay() { if (handlers.onPlay) handlers.onPlay() },
+      onEnded: handlers.onEnded,
+      onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
+      onError(err) {
+        console.error('[audio] CDN 离线音频播放失败', url, err && (err.errMsg || err))
+        if (handlers.onError) handlers.onError(err)
+      }
+    })
+    lp.play(url)
+  }
+  start()
+  return {
+    remote: true,
+    stop() { if (lp) lp.stop() },
+    destroy() { if (lp) lp.destroy() },
+    retry() { start() }
+  }
+}
+
 // 带降级的发音播放
 //
 // 源顺序按「词 / 句」分流，避免整句一上来就撞有道的 500：
@@ -149,6 +175,15 @@ function speak(text, slow, handlers) {
       if (cancelled) { if (handlers.onLoading) handlers.onLoading(false); return }
       const again = Object.assign({}, handlers, { _waitedJa: true })
       if (handlers.onLoading) handlers.onLoading(false)
+      if (!localAudio.pathFor(handlers.id)) {
+        // 分包没起来（个别真机会加载失败/超时）：同一批音频在 CDN 上也有一份，直接流播。
+        const remote = localAudio.remoteFor(handlers.id)
+        if (remote) {
+          console.warn('[audio] 日语分包未就绪，改用 CDN 音频', handlers.id, remote)
+          inner = playRemote(remote, slow, handlers)
+          return
+        }
+      }
       inner = speak(text, slow, again)
     })
     return {

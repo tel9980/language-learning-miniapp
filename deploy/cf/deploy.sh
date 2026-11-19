@@ -25,6 +25,11 @@ export CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-fb907fe08010a1b319f68be56
 echo "→ 先刷新词库 JSON（deploy/data.json 与 deploy/cf/data.json）"
 ( cd .. && node export-data.js )
 
+echo "→ 把日语离线音频铺到 CDN（分包加载失败时的兜底源）"
+rm -rf audio && mkdir -p audio
+cp ../packageJa/ja/*.mp3 audio/
+echo "   $(ls audio | wc -l | tr -d ' ') 个 mp3，$(du -sh audio | cut -f1)"
+
 echo "→ 发布到 Cloudflare Pages"
 npx --yes wrangler@3 pages deploy . --project-name yuban-data --branch main --commit-dirty=true
 

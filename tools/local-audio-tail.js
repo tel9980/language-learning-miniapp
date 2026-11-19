@@ -30,6 +30,23 @@ function pathFor(id) {
   return ''
 }
 
+// 同一批音频在 CDN 上也有一份（Pages 部署时随包复制过去）。
+// 分包在个别真机上会加载失败/超时，这时直接流播 CDN 那份，总比彻底没声音好。
+// 注意：/audio/ 路径是 deploy 时把 packageJa/ja/*.mp3 原样铺上去得到的。
+function remoteFor(id) {
+  if (!id) return ''
+  const langs = Object.keys(REGION)
+  const ids = idCandidates(id)
+  for (let li = 0; li < langs.length; li++) {
+    const r = REGION[langs[li]]
+    if (!r.remote) continue
+    for (let ii = 0; ii < ids.length; ii++) {
+      if (r.ids[ids[ii]]) return r.remote + ids[ii] + '.mp3'
+    }
+  }
+  return ''
+}
+
 function has(id) { return !!pathFor(id) }
 
 // 素材 id 属于哪个语种的离线包；没有返回空串
@@ -95,6 +112,7 @@ module.exports = {
   BASE: BASE,
   idCandidates: idCandidates,
   pathFor: pathFor,
+  remoteFor: remoteFor,
   has: has,
   langOf: langOf,
   ensureLoaded: ensureLoaded,
