@@ -1032,8 +1032,14 @@ async function runExtraTests() {
     else o.fail({ errMsg: 'request:fail' })
   }
 
-  eq(od.configured(), false, '默认不配置在线词库')
-  eq(od.sources().length, 0, '默认没有可用的源')
+  // 仓库里默认可能是「已启用」（填了备案域名），先记下来再从「未配置」状态测
+  const shippedSources = od.DATA_URLS.slice()
+  ok(shippedSources.every(function (u) { return /^https:\/\/.+\.json$/.test(u) }),
+    '仓库里配置的地址都是 https 的 .json')
+  od.DATA_URLS.splice(0, od.DATA_URLS.length)
+
+  eq(od.configured(), false, '清空后视为未配置')
+  eq(od.sources().length, 0, '清空后没有可用的源')
   let o1 = null
   od.checkUpdate(function (r) { o1 = r })
   eq(o1 && o1.reason, 'not-configured', '未配置时回调 not-configured')
@@ -1083,7 +1089,28 @@ async function runExtraTests() {
   eq(o6 && o6.updated, false, '版本号相同不重复写入')
   eq(o6.reason, 'same-version', '同版本标记 same-version')
 
+  // 端到端：拉到的在线数据必须真的替换掉内置词库（否则整条通道等于白搭）
+  const onlineWord = { id: 'en_9001', word: 'zebra-online', phonetic: '/ˈziːbrə/', meaning: '在线斑马',
+    example: 'A zebra online.', exampleCn: '一只在线斑马。', category: '日常' }
+  reqLog = []
+  replies = [{ kind: 'ok', data: { version: 'v9', words: { en: [onlineWord], ja: [] } } }]
+  let o7 = null
+  od.checkUpdate(function (r) { o7 = r })
+  eq(o7 && o7.updated, true, '在线版本更新成功')
+  eq(words.getWords('en').length, 1, '内置 440 词被在线词库覆盖')
+  eq(words.getWords('en')[0].word, 'zebra-online', '取到的就是在线的词')
+  eq(words.getWords('ja').length, 100, '没覆盖的语种仍用内置词库')
+  ok(words.getExamCategories('en').some(function (c) { return c.name === '日常' }), '在线词的分类也能被分类列表看到')
+
+  // 还原：空数组不构成覆盖（getWords 只在非空时才用覆盖层）
+  replies = [{ kind: 'ok', data: { version: 'v10', words: { en: [], ja: [] } } }]
+  let o8 = null
+  od.checkUpdate(function (r) { o8 = r })
+  eq(o8 && o8.updated, true, '空覆盖层版本也能更新')
+  eq(words.getWords('en').length, 440, '空覆盖层回落到内置词库')
+
   od.DATA_URLS.splice(0, od.DATA_URLS.length)
+  Array.prototype.push.apply(od.DATA_URLS, shippedSources)
   global.wx.request = origReq
-  ok(!od.configured(), '测试后还原为未配置状态')
+  eq(od.DATA_URLS.length, shippedSources.length, '测试后还原仓库里的配置')
 }

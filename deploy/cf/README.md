@@ -1,17 +1,37 @@
-# 在线词库 · Cloudflare 备用源（已上线）
+# 在线词库 · Cloudflare（已上线，走备案域名）
 
-**线上地址（已验证）：<https://yuban-data.tel9980-fb9.workers.dev/data.json>**
+**线上地址：<https://yb.qy663.de5.net/data.json>** —— 已备案域名 + Cloudflare Worker。
 
 - 版本 `20261119072403`｜136983 字节｜440 英语词 / 100 日语词 / 112 + 100 句 / 16 组对话
-- 响应头：`Content-Type: application/json; charset=utf-8`、`Access-Control-Allow-Origin: *`、`Cache-Control: public, max-age=60`、`ETag: "20261119072403"`
-- 与仓库里 `deploy/data.json` **字节完全一致**（部署后实测比对过）
+- 响应头：`Content-Type: application/json; charset=utf-8`、`Access-Control-Allow-Origin: *`、
+  `Cache-Control: public, max-age=60`、`ETag: "20261119072403"`
+- 与仓库里 `deploy/data.json` **逐字节一致**（部署后实测比对）
+- 说明页：<https://yb.qy663.de5.net/>
+- 裸 workers.dev 地址也在跑同一份脚本（<https://yuban-data.tel9980-fb9.workers.dev/data.json>），
+  但 `*.workers.dev` 不是备案域名、加不进小程序白名单，**只适合自测**。
 
-打开 <https://yuban-data.tel9980-fb9.workers.dev/> 是人看的说明页（版本号、词句条数）。
+## 域名是怎么挂上的（两样东西，缺一不可）
+
+1. **proxied CNAME**：`yb` → `yuban-data.tel9980-fb9.workers.dev`
+2. **Worker 路由**：`yb.qy663.de5.net/*` → `yuban-data`
+
+只做第 1 步会返回 **522 超时**（本次就踩到了）：没有路由时 Cloudflare 把它当普通源站，
+去连 workers.dev 的公网地址，连不上就 522。
+
+两步都是幂等的，写成脚本了：
+
+```bash
+node deploy/cf/setup-domain.js                                    # 默认 yb.qy663.de5.net
+DOMAIN=data.你的域名.com ZONE=你的域名.com node deploy/cf/setup-domain.js
+```
+
+（`qy663.de5.net` 这个 zone 已经在本账号里，所以脚本能直接建 DNS 记录和路由。）
 
 ## 为什么是 Worker，不是 Pages
 
-本机 `~/.dsh/cf-token` 的权限只有 **Workers Scripts:Edit + D1:Edit**，没有 **Pages:Edit**
-（调 Pages 接口直接 403），所以走 Worker 这条路，一条命令就能上。
+本机 `~/.dsh/cf-token` 的权限是 **Workers Scripts:Edit + D1:Edit**；即便后来在控制台补了
+Pages:Edit，这个 token 值调 Pages 接口**仍然 403**（改权限后要重新生成 token 值才会生效），
+所以走 Worker 这条路，一条命令就能上。功能上两者等价——毕竟要发的只是一份静态 JSON。
 
 对「发一个 JSON 文件」这件事，两者代价一样：整份 data.json 内联进脚本（128KB，
 Free 计划脚本上限 3MB），响应时直接吐字符串，连 `JSON.parse` 都省了。
@@ -34,6 +54,7 @@ deploy/cf/
 ├── data.json          ← 由 node deploy/export-data.js 自动同步（不要手改）
 ├── build-worker.js    ← 把 data.json 内联成 worker.js（含说明页 HTML）
 ├── push-worker.js     ← 上传到 Cloudflare（顺便打开 workers.dev 路由）
+├── setup-domain.js    ← 把 Worker 挂到备案域名（CNAME + Worker 路由）
 ├── worker.js          ← 生成物，已 gitignore
 ├── index.html         ← Pages 方案用的说明页（Worker 方案不用）
 ├── _headers           ← Pages 方案用的响应头（Worker 方案不用）
@@ -59,31 +80,29 @@ node deploy/cf/push-worker.js     # 上传（token 自动读 ~/.dsh/cf-token）
 
 打开 `utils/online-data.js`：
 
+**已经接好了**，`utils/online-data.js` 里就是：
+
 ```js
 const DATA_URLS = [
-  'https://你的备案域名.com/yuban/data.json',              // 主源（OSS / 自己的服务器）
-  'https://yuban-data.tel9980-fb9.workers.dev/data.json'   // 备源（Cloudflare，已上线）
+  'https://yb.qy663.de5.net/data.json'
 ]
 ```
 
-按顺序试：主源网络失败或返回非法数据 → 自动换备源；全挂就静默用内置词库。
-默认 `[]` 是关闭状态（完全离线），要用就把地址填进去。
+按顺序试：失败或返回非法数据 → 自动换下一个；全挂就静默用内置词库或缓存。
+以后想加阿里云 OSS 做主源，把它加在数组前面即可（多源降级已经支持）。
 
 然后微信公众平台 → 开发管理 → 开发设置 → 服务器域名 → 把用到的**所有**域名加进
 **request 合法域名**（多个源就要加多条）。开发者工具里可以先勾掉「校验合法域名」。
 
-## ⚠️ 备案这道坎（唯一真正的限制）
+## 备案这道坎（已经解决）
 
-微信小程序真机要求 request 合法域名**已完成 ICP 备案**，而 `*.workers.dev`
-和 `*.pages.dev` 都不是你备案的域名，**备不了案 → 真机加不进白名单**。
+微信小程序真机要求 request 合法域名**已完成 ICP 备案**。`qy663.de5.net` 是已备案域名，
+`yb.qy663.de5.net` 走的就是它，所以：
 
-- **开发者工具 / 自测**：直接填上面的 workers.dev 地址，勾掉「校验合法域名」，立刻能用。
-- **要真机可用**：必须是你**已备案**的域名。做法是在 Cloudflare 给这个 Worker 绑一个
-  Custom Domain（Workers → yuban-data → Settings → Domains & Routes → Add custom domain，
-  填 `data.你的域名.com`，按提示在 DNS 加 CNAME），然后小程序里填
-  `https://data.你的域名.com/data.json`。
-
-备案是域名层面的事，Cloudflare 只负责把内容托管出去。
+- ✅ **真机可用**——前提是去微信公众平台 → 开发管理 → 开发设置 → 服务器域名 →
+  **request 合法域名**里加上 `https://yb.qy663.de5.net`。
+- 开发者工具里可以先勾掉「校验合法域名」自测。
+- 想换域名：改 `DATA_URLS` + 重跑 `setup-domain.js`（带 `DOMAIN` / `ZONE` 环境变量）。
 
 ## 想要 Pages 版本怎么办
 

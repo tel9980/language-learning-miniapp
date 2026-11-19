@@ -255,21 +255,22 @@ tabBar 五项：首页 / 口语 / 学习 / 测验 / 统计。
 node tests/run-tests.js
 ```
 
-## 在线词库更新（可选，需你自己的备案域名）
+## 在线词库更新（已启用，走备案域名）
 
-默认完全离线、用内置词库。若你有**已备案的 https 域名**，可把词库放上去，以后加词改句**不用重新提交小程序版本**：
+词库默认内置在包里，但**在线更新通道已经开好**：素材放到
+**<https://yb.qy663.de5.net/data.json>**（Cloudflare Worker + 已备案域名 `yb.qy663.de5.net`），
+改词加句**不用重新提交小程序版本**，用户下次启动自动拉到新素材。
 
-1. 按 **[在线词库部署-OSS.md](在线词库部署-OSS.md)** 把 `deploy/data.json` 传到阿里云 OSS 并绑定备案域名。
-2. （可选）备用源已经在 Cloudflare 上跑着了：**<https://yuban-data.tel9980-fb9.workers.dev/data.json>**
-   —— 更新方式与细节见 **[deploy/cf/README.md](deploy/cf/README.md)**。
-3. 把地址按优先级填进 `utils/online-data.js` 的 `DATA_URLS`（填 `[]` 即不启用，默认完全离线）。
-4. 小程序后台把用到的域名加进 **request 合法域名**（测试号可先跳过）。
+- 客户端逻辑在 `utils/online-data.js`：`DATA_URLS` 按顺序试（主源挂了换下一个），
+  全挂就静默用本地缓存或内置词库，**绝不阻断练习**。
+- 更新素材：改 `utils/words.js` / `utils/sentences.js` → `node deploy/export-data.js`
+  → `node deploy/cf/build-worker.js` → `node deploy/cf/push-worker.js`。
+- 部署与域名细节见 **[deploy/cf/README.md](deploy/cf/README.md)**；
+  想换回阿里云 OSS 做主源见 **[在线词库部署-OSS.md](在线词库部署-OSS.md)**（把地址加进 `DATA_URLS` 即可）。
 
-拉不到 / 没配置时自动用内置词库，**完全无感**；主源网络失败或数据不合法会自动换备源，全挂才放弃（缓存里那版仍然可用）。
-以后更新：改素材 → 跑 `node deploy/export-data.js`（会同时刷新 `deploy/data.json` 和 `deploy/cf/data.json`）→ 覆盖上传，或直接跑 `bash deploy/cf/deploy.sh`。
-
-⚠️ 备案这道坎：`*.pages.dev` / `*.workers.dev` 不是你备案的域名，**真机加不进合法域名**。想在开发者工具里试就关掉「校验合法域名」直接填；要真机可用必须把**已备案**域名 CNAME 到 Pages。
-
+⚠️ **必须做的一步**：微信公众平台 → 开发管理 → 开发设置 → 服务器域名 → **request 合法域名**
+里加上 `https://yb.qy663.de5.net`。没加的话真机上拉不到（会静默回退到内置词库，功能不受影响，但更新不生效）。
+开发者工具里可以先勾掉「校验合法域名」自测。
 
 ## 后续可选项（以及为什么现在没做）
 

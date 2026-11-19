@@ -2,16 +2,19 @@
 // 设计目标：拉不到 / 没配置 / 测试号阶段，一律无感使用内置词库，绝不阻断练习。
 const STORAGE_KEY = 'lp_online_data_v1'
 
-// ⬇️ 这里填你备案域名的 JSON 地址，按优先级从前往后填，例如：
-// const DATA_URLS = [
-//   'https://你的备案域名.com/yuban/data.json',                  // 主源（如阿里云 OSS）
-//   'https://yuban-data.tel9980-fb9.workers.dev/data.json'        // 备源（Cloudflare，已在线上）
-// ]
-// 留空数组 [] 表示不启用在线更新（默认，完全离线）。
-// 主源挂了会自动试下一个，全挂就静默用内置词库，绝不阻断练习。
-const DATA_URLS = []
+// 在线词库地址，按优先级从前往后填：
+//   主源：自己的备案域名（Cloudflare Worker，已上线）
+//   以后想加 OSS 或其他镜像，往数组后面追加即可，主源失败会自动换下一个
+// 留空数组 [] 表示不启用在线更新（完全离线）。
+// 全挂就静默用内置词库，绝不阻断练习。
+//
+// ⚠️ 这个域名必须加进小程序后台的 request 合法域名，否则真机上拉不到（会静默回退）。
+// ⚠️ *.workers.dev 不是备案域名、加不进白名单，所以这里只放备案域名；
+//    仅开发者工具里可用：https://yuban-data.tel9980-fb9.workers.dev/data.json
+const DATA_URLS = [
+  'https://yb.qy663.de5.net/data.json'
+]
 
-// 兼容旧写法：DATA_URL 就是主源（导出时动态取，改了 DATA_URLS 立刻生效）
 
 // 进程内缓存：getOverride 会被 getWords/getSentences 高频调用，避免每次读 Storage
 let _cacheLoaded = false
