@@ -2,6 +2,7 @@
 // 与 storage.exportData()（单档案）互补：这里导出"所有档案 + 全局数据"。
 // 注意：录音文件是设备本地路径，无法跨设备搬运；导入后录音条目会保留但需重录声音。
 const profile = require('./profile')
+const progressKeys = require('./progress-keys')
 
 const FORMAT = 'yuban-family-backup'
 const VERSION = 1
@@ -26,6 +27,33 @@ function rawSet(key, value) {
 function rawRemove(key) {
   try { wx.removeStorageSync(key) } catch (e) {}
 }
+// 进度表在存储里按分片存放（见 utils/progress-keys.js），备份文件里仍保持
+// 「整表」形状：这样新老备份互认，导入时再按当前分片规则拆开写。
+function readProgressOf(profileId) {
+  const merged = {}
+  const legacy = parse(rawGet(profile.nsKey('lp_progress_v1', profileId)), null)
+  if (legacy && typeof legacy === 'object') Object.assign(merged, legacy)
+  progressKeys.shardKeys().forEach(function (k) {
+    const part = parse(rawGet(profile.nsKey(k, profileId)), null)
+    if (part && typeof part === 'object') Object.assign(merged, part)
+  })
+  return merged
+}
+function writeProgressOf(profileId, map) {
+  const buckets = []
+  for (let i = 0; i < progressKeys.SHARDS; i++) buckets.push({})
+  Object.keys(map || {}).forEach(function (id) {
+    buckets[progressKeys.shardIndexOf(id)][id] = map[id]
+  })
+  for (let i = 0; i < progressKeys.SHARDS; i++) {
+    const key = profile.nsKey(progressKeys.shardKeyAt(i), profileId)
+    if (Object.keys(buckets[i]).length) rawSet(key, JSON.stringify(buckets[i]))
+    else rawRemove(key)
+  }
+  // 老整表 key 必须清掉，否则下次启动会被当成老数据再并进来
+  rawRemove(profile.nsKey('lp_progress_v1', profileId))
+}
+
 function parse(v, fallback) {
   if (!v) return fallback
   try { return typeof v === 'string' ? JSON.parse(v) : v } catch (e) { return fallback }
@@ -41,6 +69,10 @@ function exportAll() {
       const v = rawGet(profile.nsKey(k, p.id))
       if (v) bag[k] = parse(v, null)
     })
+    // 进度表：分片合并成整表再放进备份
+    const mergedProgress = readProgressOf(p.id)
+    if (Object.keys(mergedProgress).length) bag.lp_progress_v1 = mergedProgress
+    else delete bag.lp_progress_v1
     // 录音只保留元数据，剔除本机路径，避免误导
     if (bag.lp_recordings_v1 && Array.isArray(bag.lp_recordings_v1)) {
       bag.lp_recordings_v1 = bag.lp_recordings_v1.map(function (r) {
@@ -86,6 +118,11 @@ function mergeMap(local, incoming) {
 function writeBag(profileId, bag, mode) {
   PROFILE_KEYS.forEach(function (k) {
     if (!(k in bag)) return
+    if (k === 'lp_progress_v1') {
+      const incoming = bag[k] && typeof bag[k] === 'object' ? bag[k] : {}
+      writeProgressOf(profileId, mode === 'merge' ? Object.assign(readProgressOf(profileId), incoming) : incoming)
+      return
+    }
     const key = profile.nsKey(k, profileId)
     let value = bag[k]
     if (mode === 'merge') value = mergeMap(rawGet(key), value)
@@ -104,6 +141,7 @@ function importAll(payload, mode) {
     // 先清掉现有所有档案的命名空间数据
     profile.list().forEach(function (p) {
       PROFILE_KEYS.forEach(function (k) { rawRemove(profile.nsKey(k, p.id)) })
+      progressKeys.shardKeys().forEach(function (k) { rawRemove(profile.nsKey(k, p.id)) })
     })
     rawRemove(KEY_COMMENTS); rawRemove(KEY_REMINDER)
   }

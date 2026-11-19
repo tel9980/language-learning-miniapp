@@ -73,6 +73,73 @@ let _pendingOps = 0
 const FLUSH_DELAY = 1500
 const FLUSH_MAX_OPS = 12
 
+// ---- 进度表分片 ----
+// review() 每评一张卡都要落一次 progress，而 progress 是全量 map：学满 440 词时
+// 序列化 31.4KB（实测），整表重写就是一次 31KB 的同步写。
+// 这里按 wordId 的哈希把进度表拆成 8 片，一次只写改动所在的那一片（约 4KB）。
+// 内存里仍保留合并视图 _progress 作为唯一真相，读永远读它，所以对页面完全透明。
+const progressKeys = require('./progress-keys')
+const PROGRESS_SHARDS = progressKeys.SHARDS
+const shardIndexOf = progressKeys.shardIndexOf
+const shardKeyAt = progressKeys.shardKeyAt
+let _progress = null            // 合并视图（null 表示还没从分片加载）
+// 取某一片的当前内容（值仍是 _progress 里的同一批对象引用，改了会一起变）
+function shardSliceOf(index) {
+  const out = {}
+  const ids = Object.keys(_progress || {})
+  for (let i = 0; i < ids.length; i++) {
+    if (shardIndexOf(ids[i]) === index) out[ids[i]] = _progress[ids[i]]
+  }
+  return out
+}
+// 不走 _cache 直读：分片只在启动时读一次，没必要在缓存里留一份 31KB 的副本
+function readPlain(key, fallback) {
+  try {
+    const v = wx.getStorageSync(profile.nsKey(key))
+    return v ? JSON.parse(v) : fallback
+  } catch (e) { return fallback }
+}
+// 把整张表写成分片（导入、老数据迁移用；热路径走 writeDeferred 只写单片）
+function writeProgressAll(map) {
+  _progress = map || {}
+  for (let i = 0; i < PROGRESS_SHARDS; i++) {
+    const slice = shardSliceOf(i)
+    if (Object.keys(slice).length) write(shardKeyAt(i), slice)
+    else {
+      const k = profile.nsKey(shardKeyAt(i))
+      if (k in _cache) delete _cache[k]
+      try { wx.removeStorageSync(k) } catch (e) {}
+    }
+  }
+  // 老版本的单表 key 必须清掉，否则下次启动会把它当老数据再并进来
+  const legacyKey = profile.nsKey(KEY_PROGRESS)
+  if (legacyKey in _cache) delete _cache[legacyKey]
+  try { wx.removeStorageSync(legacyKey) } catch (e) {}
+}
+function loadProgress() {
+  if (_progress) return _progress
+  const merged = {}
+  let shardSeen = false
+  for (let i = 0; i < PROGRESS_SHARDS; i++) {
+    const part = readPlain(shardKeyAt(i), null)
+    if (part && typeof part === 'object') {
+      shardSeen = true
+      Object.assign(merged, part)
+    }
+  }
+  // 老版本把整张表存在一个 key 里：读出来合并进分片，然后删掉旧 key 腾出空间（一次性）
+  const legacy = readPlain(KEY_PROGRESS, null)
+  if (legacy && typeof legacy === 'object') {
+    Object.assign(merged, legacy)
+    _progress = merged
+    writeProgressAll(merged)
+    return _progress
+  }
+  _progress = merged
+  if (shardSeen) _progress = merged
+  return _progress
+}
+
 // 真正落盘。写失败（空间满 / 序列化异常）不能静默吞掉：否则用户以为进度存上了，
 // 下次打开却回退。这里只提示一次，避免每写一次弹一次。
 let _writeWarned = false
@@ -113,6 +180,7 @@ function invalidate() {
   // 换档案 / 导入 / 删档案前先把脏数据落盘，否则缓存清掉就永久丢失
   flush()
   Object.keys(_cache).forEach(function (k) { delete _cache[k] })
+  _progress = null      // 分片的合并视图一并作废，下次读会重新加载
   _initedFor = ''
 }
 
@@ -169,7 +237,7 @@ function init() {
   if (!rawHas(KEY_SETTINGS)) write(KEY_SETTINGS, d.settings)
   if (!rawHas(KEY_STATS)) write(KEY_STATS, d.stats)
   if (!rawHas(KEY_DAILY)) write(KEY_DAILY, d.daily)
-  if (!rawHas(KEY_PROGRESS)) write(KEY_PROGRESS, d.progress)
+  loadProgress()   // 进度表按分片懒加载，老版本单表在这里自动拆片
   if (!rawHas(KEY_CUSTOM)) write(KEY_CUSTOM, d.custom)
   if (!rawHas(KEY_THEME)) write(KEY_THEME, d.theme)
   // 老用户补齐新增设置字段
@@ -220,7 +288,7 @@ function removeCustomItem(id) {
   write(KEY_CUSTOM, read(KEY_CUSTOM, []).filter(function (x) { return x.id !== id }))
 }
 
-function getProgress() { return read(KEY_PROGRESS, {}) }
+function getProgress() { return clone(loadProgress()) }
 function getStats() { return read(KEY_STATS, defaults().stats) }
 function getDaily() { return read(KEY_DAILY, {}) }
 
@@ -251,7 +319,7 @@ function getNewWords(lang, limit, category) {
 
 // 复习打分：quality 0=不记得 3=模糊 5=记得（兼容口语三档 0/1/2）
 function review(wordId, quality) {
-  const prog = getProgress()
+  const prog = loadProgress()   // 直接用合并视图，避免 440 条整表克隆
   const stats = getStats()
   const daily = getDaily()
   const tk = todayKey()
@@ -288,8 +356,10 @@ function review(wordId, quality) {
   if (sched.quality >= 1 && old.reps === 0) d.learned += 1
   daily[tk] = d
 
-  // 热路径：延迟落盘（见 writeDeferred 注释），读到的仍是内存里的最新值
-  writeDeferred(KEY_PROGRESS, prog)
+  // 热路径：延迟落盘（见 writeDeferred 注释），读到的仍是内存里的最新值。
+  // 进度只写改动所在的那一片：整表 31.4KB，单片约 4KB。
+  const shard = shardIndexOf(wordId)
+  writeDeferred(shardKeyAt(shard), shardSliceOf(shard))
   writeDeferred(KEY_STATS, stats)
   writeDeferred(KEY_DAILY, daily)
   return p
@@ -363,7 +433,7 @@ function importData(data) {
   if (!data.progress || !data.stats || !data.settings || !data.daily) {
     return { ok: false, reason: '备份内容不完整' }
   }
-  write(KEY_PROGRESS, migrateProgress(data.progress))
+  writeProgressAll(migrateProgress(data.progress))
   write(KEY_STATS, data.stats)
   write(KEY_SETTINGS, data.settings)
   write(KEY_DAILY, data.daily)
@@ -384,5 +454,5 @@ module.exports = {
   getProgress, getStats, getDaily, getDueWords, getNewWords, getToday,
   review, quizAnswer, getMasteredCount, INTERVALS,
   exportData, importData, migrateProgress, invalidate, flush,
-  FLUSH_DELAY, flushAll
+  FLUSH_DELAY, flushAll, PROGRESS_SHARDS, writeProgressAll
 }

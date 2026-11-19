@@ -302,29 +302,135 @@ global.wx.setStorageSync = _origSet2
 console.error = _origErr
 delete global.wx.showModal
 
-// ---- 写入合并：review 热路径延迟落盘，读仍然立刻可见 ----
+// ---- 写入合并 + 进度分片：review 热路径延迟落盘，读仍然立刻可见 ----
 const progKey = profile.nsKey('lp_progress_v1')
+const SHARD_N = storage.PROGRESS_SHARDS
+// 进度表按 wordId 哈希拆成 8 片，读回来要合并
+function shardIndexOfId(id) {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) & 0xffff
+  return h % SHARD_N
+}
+function shardKeyOfId(id) { return profile.nsKey('lp_progress_v1_s' + shardIndexOfId(id)) }
+function progFromDisk() {
+  const out = {}
+  for (let i = 0; i < SHARD_N; i++) {
+    const raw = global.wx.getStorageSync(profile.nsKey('lp_progress_v1_s' + i))
+    if (raw) Object.assign(out, JSON.parse(raw))
+  }
+  return out
+}
 storage.invalidate()
 storage.review('en_001', 1)
 ok(!!storage.getProgress().en_001, 'review 后缓存里立刻可见（读不走磁盘）')
-const diskBefore = String(global.wx.getStorageSync(progKey) || '')
-ok(diskBefore.indexOf('en_001') < 0, '未 flush 前不落盘（写入合并生效）')
+eq(Object.keys(progFromDisk()).length, 0, '未 flush 前不落盘（写入合并生效）')
 storage.flush()
-ok(String(global.wx.getStorageSync(progKey)).indexOf('en_001') >= 0, 'flush 后落盘')
+ok(!!progFromDisk().en_001, 'flush 后落盘（写进 en_001 所在分片）')
+ok(!global.wx.getStorageSync(progKey), '不再写整表 key（旧格式已废弃，只为迁移而读）')
 
-// 攒够一批写自动 flush：一次 review = 3 次写，FLUSH_MAX_OPS=12 时 5 次 review 必落盘
+// 只写改动的那一片：清空后评一个词，除它所在分片外其他分片都不该出现它
+for (let i = 0; i < SHARD_N; i++) {
+  try { global.wx.removeStorageSync(profile.nsKey('lp_progress_v1_s' + i)) } catch (e) {}
+}
+storage.writeProgressAll({})
+storage.review('en_001', 1)
+storage.flush()
+ok(!!progFromDisk().en_001, '分片落盘后能读回该词')
+let otherShardHasIt = false
+for (let i = 0; i < SHARD_N; i++) {
+  if (i === shardIndexOfId('en_001')) continue
+  const raw = global.wx.getStorageSync(profile.nsKey('lp_progress_v1_s' + i))
+  if (raw && JSON.parse(raw).en_001) otherShardHasIt = true
+}
+ok(!otherShardHasIt, '只写改动所在的分片，其他分片不动')
+
+// 攒够一批写自动 flush：一次 review = 3 次写（分片 progress + stats + daily），
+// FLUSH_MAX_OPS=12 时第 5 次 review 的第一次写会触发 flush
+storage.writeProgressAll({})
 storage.invalidate()
 for (let i = 0; i < 5; i++) storage.review('en_9' + i, 1)
-const autoDisk = String(global.wx.getStorageSync(progKey) || '')
-ok(autoDisk.indexOf('en_93') >= 0, '攒够一批自动 flush，不会一直攒着')
-ok(autoDisk.indexOf('en_94') < 0, '触发点之后的写仍在攒着（不是每次都立即落盘）')
+const autoDisk = progFromDisk()
+ok(!!autoDisk.en_93, '攒够一批自动 flush，不会一直攒着')
+ok(!autoDisk.en_94, '触发点之后的写仍在攒着（不是每次都立即落盘）')
 storage.flush()
 
 // invalidate 前先 flush：换档案/导入时不能把没落盘的数据丢掉
 storage.invalidate()
 storage.review('en_keep', 1)
 storage.invalidate()
-ok(String(global.wx.getStorageSync(progKey)).indexOf('en_keep') >= 0, 'invalidate 前会 flush，脏数据不丢')
+ok(!!progFromDisk().en_keep, 'invalidate 前会 flush，脏数据不丢')
+
+// ---- 老版本单表迁移：读一次就拆片，并把旧 key 删掉 ----
+const _legacyId = profile.nsKey('lp_progress_v1')
+global.wx.setStorageSync(_legacyId, JSON.stringify({
+  en_001: { level: 3, ef: 2.5, reps: 4, lapses: 0, dueAt: Date.now() },
+  en_002: { level: 1, ef: 2.5, reps: 1, lapses: 1, dueAt: Date.now() }
+}))
+for (let i = 0; i < SHARD_N; i++) {
+  try { global.wx.removeStorageSync(profile.nsKey('lp_progress_v1_s' + i)) } catch (e) {}
+}
+storage.invalidate()
+eq(Object.keys(storage.getProgress()).length, 2, '老单表进度读得出来')
+ok(!global.wx.getStorageSync(_legacyId), '迁移后旧单表 key 被删掉（腾出空间）')
+eq(Object.keys(progFromDisk()).length, 2, '迁移后进度已落到分片里')
+storage.invalidate()
+eq(Object.keys(storage.getProgress()).length, 2, '重新加载（走分片）仍然是同样两条')
+
+// ---- 导入：整表覆盖要写成分片，且旧格式不能残留 ----
+const _imp = storage.importData({
+  format: 'yuban-lang-backup', version: 3,
+  progress: { en_010: { level: 2, reps: 2, lapses: 0, dueAt: Date.now() } },
+  stats: { totalLearned: 0, totalReviews: 0, totalCorrect: 0, streak: 0, lastActive: '', firstDay: '' },
+  settings: { lang: 'en', dailyGoal: 20, feedbackEnabled: true, guideSeen: false },
+  daily: {}
+})
+ok(_imp.ok, 'importData 接受合法备份')
+storage.flush()
+eq(Object.keys(progFromDisk()).length, 1, '导入的进度写进了分片')
+ok(!!progFromDisk().en_010, '导入的进度条目在分片里')
+ok(!global.wx.getStorageSync(progKey), '导入后没有残留整表 key')
+
+// ---- 全家包备份：导出把分片合成整表，导入再拆回分片 ----
+storage.writeProgressAll({})
+storage.review('en_bk1', 1)
+storage.flush()
+const _fb = require('../utils/family-backup')
+const _fbPack = _fb.exportAll()
+const _fbBag = (_fbPack.data && _fbPack.data[profile.current()]) || {}
+ok(!!(_fbBag.lp_progress_v1 && _fbBag.lp_progress_v1.en_bk1),
+  '全家包导出把分片合成整表（分片里的词不丢）')
+ok(!_fbBag.lp_progress_v1_s0, '备份文件里不带分片 key（形状不变，老备份仍可导入）')
+const _fbImp = _fb.importAll(_fbPack, 'overwrite')
+ok(_fbImp.ok, 'overwrite 导入成功')
+ok(!!progFromDisk().en_bk1, '导入后进度落在分片里')
+ok(!global.wx.getStorageSync(progKey), '导入后没有残留整表 key')
+
+// ---- 删档案要连 8 个分片一起清（否则白占 10MB 配额） ----
+const _tmpProfile = profile.add('临时', 'teen')
+global.wx.setStorageSync(profile.nsKey('lp_progress_v1_s0', _tmpProfile), JSON.stringify({ x: 1 }))
+global.wx.setStorageSync(profile.nsKey('lp_progress_v1_s7', _tmpProfile), JSON.stringify({ y: 2 }))
+const _rmTmp = profile.remove(_tmpProfile)
+ok(_rmTmp.ok, '临时档案可删除')
+ok(!global.wx.getStorageSync(profile.nsKey('lp_progress_v1_s0', _tmpProfile)), '删档案会清掉进度分片')
+ok(!global.wx.getStorageSync(profile.nsKey('lp_progress_v1_s7', _tmpProfile)), '删档案清掉全部分片')
+storage.writeProgressAll({})
+
+// ---- 单片写入体积：整表 31KB 时，一次评分只写 4KB 量级 ----
+storage.writeProgressAll({})
+const _wordsAll = require('../utils/words').getWords('en')
+_wordsAll.forEach(function (w) { storage.review(w.id, 1) })
+storage.flush()
+// 清掉写统计，重新只做一次「评分 + 落盘」
+let _bytesWritten = 0
+const _origSetBytes = global.wx.setStorageSync
+global.wx.setStorageSync = function (k, v) { _bytesWritten += String(v).length; return _origSetBytes(k, v) }
+storage.review('en_005', 1)
+storage.flush()
+global.wx.setStorageSync = _origSetBytes
+const _fullSize = JSON.stringify(storage.getProgress()).length
+ok(_bytesWritten > 0 && _bytesWritten < _fullSize / 3,
+  '一次评分落盘远小于整表（写 ' + _bytesWritten + 'B / 整表 ' + _fullSize + 'B）')
+storage.writeProgressAll({})
 
 // ---- init 幂等：首页每次 onShow 都调，不该反复读 Storage ----
 const _origGet3 = global.wx.getStorageSync

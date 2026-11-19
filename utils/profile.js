@@ -116,9 +116,12 @@ function remove(id) {
   if (id === DEFAULT_ID || arr.length <= 1) return { ok: false, reason: '默认档案不能删除' }
   const p = arr.find(function (x) { return x.id === id })
   if (!p) return { ok: false, reason: '档案不存在' }
-  const baseKeys = ['lp_progress_v1', 'lp_stats_v1', 'lp_settings_v1', 'lp_daily_v1',
+  // 进度表按分片存放（见 utils/progress-keys.js），删档案时要连分片一起清，
+  // 否则每次删档案都会留下 8 个分片占着 10MB 配额不放。
+  const baseKeys = ['lp_progress_v1'].concat(require('./progress-keys').shardKeys()).concat([
+    'lp_stats_v1', 'lp_settings_v1', 'lp_daily_v1',
     'lp_custom_items_v1', 'lp_theme_v1', 'lp_speak_records_v1', 'lp_speak_focus_v1',
-    'lp_speak_daily_v1', 'lp_recordings_v1']
+    'lp_speak_daily_v1', 'lp_recordings_v1'])
   baseKeys.forEach(function (k) {
     try { wx.removeStorageSync(nsKey(k, id)) } catch (e) {}
   })
