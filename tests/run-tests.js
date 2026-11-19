@@ -132,8 +132,8 @@ eq(new Set(allIds).size, allIds.length, 'sentence ids unique')
 // ---- 日语素材（原来只有 2 句、0 组对话，切到日语练口语几乎是空的）----
 const jaSent = sentences.getSentences('ja')
 const jaDlg = sentences.getDialogues('ja')
-ok(jaSent.length >= 60, 'Japanese sentences >= 60')
-ok(jaDlg.length >= 5, 'Japanese dialogues >= 5')
+ok(jaSent.length >= 100, 'Japanese sentences >= 100')
+ok(jaDlg.length >= 8, 'Japanese dialogues >= 8')
 const jaIds = jaSent.map(function (x) { return x.id })
 eq(new Set(jaIds).size, jaIds.length, 'Japanese sentence ids unique')
 const jaTexts = jaSent.map(function (x) { return x.text })
@@ -512,7 +512,7 @@ const words = require('../utils/words')
 const EN_WORDS = words.WORDS.en
 const JA_WORDS = words.WORDS.ja
 eq(EN_WORDS.length, 440, 'english word count = 440')
-eq(JA_WORDS.length, 50, 'japanese word count = 50')
+eq(JA_WORDS.length, 100, 'japanese word count = 100')
 const allWords = EN_WORDS.concat(JA_WORDS)
 const idSet = {}
 let dupId = 0
@@ -552,13 +552,27 @@ ok(audio.ttsUrl('How are you', true, 'en_US').indexOf('type=1') > 0, 'slow mode 
 ok(audio.baiduUrl('How are you doing today', false, 'en_US').indexOf('lan=en') > 0, 'baidu url carries lan=en')
 ok(audio.baiduUrl('ありがとう', false, 'ja_JP').indexOf('lan=jap') > 0, 'baidu url carries lan=jap')
 
-// ---- 日语离线音频：每个素材都必须有对应 mp3，且随包发布 ----
-// 日语没有可用的免费在线合成源（有道只支持词、百度 403、同声传译只支持中英文），
-// 所以这些 mp3 是素材的组成部分：新增日语素材却忘了跑 tools/gen-ja-audio.py，
-// 真机上就是「点了没声音」。这里把这条契约钉死。
+// ---- 离线音频：每个素材都必须有对应 mp3 ----
+// 日语没有可用的免费在线合成源（有道只支持词、百度 403、同声传译只支持中英文）；
+// 英语虽然有在线源，但学英语最常练、断网时也该能听。所以这些 mp3 是素材的
+// 组成部分：新增素材却忘了重跑合成，真机上就是「点了没声音」。这里把契约钉死。
 const fs = require('fs')
 const pathMod = require('path')
 const localAudio = require('../utils/local-audio')
+
+// 日语在 packageJa 分包里（1.8MB，主包放不下）：分包没加载好之前不能给路径，
+// 否则播放必然失败、还会白弹一次错误提示。
+eq(localAudio.pathFor('js015'), '', 'no path for subpackaged audio before the subpackage loads')
+eq(localAudio.isReady('ja'), false, 'Japanese audio region starts as not-ready')
+localAudio.ensureLoaded('ja')   // 测试环境没有 wx.loadSubpackage → 同步标为可用
+eq(localAudio.isReady('ja'), true, 'ensureLoaded marks the region ready when loadSubpackage is unavailable')
+eq(localAudio.pathFor('js015'), '/packageJa/ja/js015.mp3', 'Japanese audio lives in the subpackage')
+eq(localAudio.pathFor('s001'), '/assets/audio/en/s001.mp3', 'English audio lives in the main package')
+eq(localAudio.langOf('js015'), 'ja', 'langOf maps a Japanese id to its region')
+eq(localAudio.langOf('s001'), 'en', 'langOf maps an English id to its region')
+eq(localAudio.langOf('nope'), '', 'langOf returns empty for unknown ids')
+eq(localAudio.pathFor('nope'), '', 'unknown id has no audio')
+
 const audioIds = []
 jaSent.forEach(function (x) { audioIds.push(x.id) })
 jaDlg.forEach(function (d) { d.lines.forEach(function (l) { audioIds.push(l.id) }) })
@@ -568,18 +582,37 @@ words.getWords('ja').forEach(function (w) {
 })
 const noAudio = audioIds.filter(function (id) { return !localAudio.has(id) })
 eq(noAudio.length, 0, 'every Japanese item has bundled audio (missing: ' + noAudio.slice(0, 5).join(',') + ')')
-const badAudio = audioIds.filter(function (id) {
-  const f = pathMod.join(__dirname, '..', localAudio.pathFor(id))
-  if (!fs.existsSync(f)) return true
-  const head = fs.readFileSync(f).slice(0, 3)
-  // mp3 特征：ID3 标签或帧同步 0xFFE
-  return !(head.toString('latin1') === 'ID3' || (head[0] === 0xff && (head[1] & 0xe0) === 0xe0))
-})
+
+// mp3 特征：ID3 标签或帧同步 0xFFE
+function badMp3(ids) {
+  return ids.filter(function (id) {
+    const f = pathMod.join(__dirname, '..', localAudio.pathFor(id))
+    if (!fs.existsSync(f)) return true
+    const head = fs.readFileSync(f).slice(0, 3)
+    return !(head.toString('latin1') === 'ID3' || (head[0] === 0xff && (head[1] & 0xe0) === 0xe0))
+  })
+}
+function kbOf(ids) {
+  return ids.reduce(function (sum, id) {
+    return sum + fs.statSync(pathMod.join(__dirname, '..', localAudio.pathFor(id))).size
+  }, 0) / 1024
+}
+const badAudio = badMp3(audioIds)
 eq(badAudio.length, 0, 'bundled audio files are real mp3 (bad: ' + badAudio.slice(0, 5).join(',') + ')')
-const audioKb = audioIds.reduce(function (sum, id) {
-  return sum + fs.statSync(pathMod.join(__dirname, '..', localAudio.pathFor(id))).size
-}, 0) / 1024
-ok(audioKb < 1200, 'bundled audio stays under 1.2MB (actual ' + audioKb.toFixed(0) + 'KB, 主包上限 2MB)')
+const audioKb = kbOf(audioIds)
+ok(audioKb < 1900, 'Japanese audio stays under 1.9MB (actual ' + audioKb.toFixed(0) + 'KB, 分包上限 2MB)')
+ok(localAudio.countOf('ja') === audioIds.length,
+  'local-audio index covers exactly the current Japanese items (' + localAudio.countOf('ja') + ' vs ' + audioIds.length + ')')
+
+// 英语：只预生成句子与对话台词（单词在线发音一直稳，880 个文件塞不进主包）
+const enAudioIds = []
+sentences.getSentences('en').forEach(function (x) { enAudioIds.push(x.id) })
+sentences.getDialogues('en').forEach(function (d) { d.lines.forEach(function (l) { enAudioIds.push(l.id) }) })
+const enMissing = enAudioIds.filter(function (id) { return !localAudio.has(id) })
+eq(enMissing.length, 0, 'every English sentence has bundled audio (missing: ' + enMissing.slice(0, 5).join(',') + ')')
+eq(badMp3(enAudioIds).length, 0, 'English audio files are real mp3')
+const enKb = kbOf(enAudioIds)
+ok(enKb < 1200, 'English audio stays under 1.2MB (actual ' + enKb.toFixed(0) + 'KB, 主包上限 2MB)')
 
 // 有本地音频时 speak() 不应走网络
 let playedSrc = null
@@ -590,7 +623,7 @@ global.wx.createInnerAudioContext = function () {
 }
 playedSrc = null
 au.speak('すみません、駅はどこですか。', false, { id: 'js015' })
-eq(playedSrc, '/assets/audio/ja/js015.mp3', 'speak plays the bundled file when the item has one')
+eq(playedSrc, '/packageJa/ja/js015.mp3', 'speak plays the bundled file when the item has one')
 playedSrc = null
 au.speak('hello', false, {})
 ok(/^https:\/\//.test(playedSrc || ''), 'speak still goes online for items without bundled audio')

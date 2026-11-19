@@ -37,6 +37,13 @@
       { "pagePath": "pages/stats/stats", "text": "统计" }
     ]
   },
+  "subpackages": [
+    {
+      "root": "packageJa",
+      "name": "jaAudio",
+      "pages": ["pages/offline/offline"]
+    }
+  ],
   "plugins": {
     "ihearing-eval": {
       "version": "0.0.6",

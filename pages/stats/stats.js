@@ -290,6 +290,11 @@ Page({
   },
 
   // 清掉发音缓存：听力靠它提速，但占本地文件配额，空间紧张时用户得能自己清
+  // 离线发音包在 packageJa 分包里（日语音频 1.8MB，主包放不下）
+  openOfflineAudio() {
+    wx.navigateTo({ url: '/packageJa/pages/offline/offline' })
+  },
+
   clearTtsCache() {
     const that = this
     const kb = Math.round(ttsCache.totalBytes() / 1024)

@@ -121,6 +121,11 @@ function speak(text, slow, handlers) {
   // 随包音频优先：日语素材的 mp3 打在代码包里（见 utils/local-audio.js），
   // 播到就是 0 请求、0 配额、断网可用。真出问题（文件缺失/解码失败）再退回网络链。
   const localPath = handlers.id ? localAudio.pathFor(handlers.id) : ''
+  // 日语音频在分包里：分包还没加载好时 pathFor 返回空串，这里顺手催一下加载，
+  // 用户再点一次就能听到（不会白撞一次必然失败的在线请求）
+  if (handlers.id && !localPath && localAudio.langOf(handlers.id) === 'ja' && !localAudio.isReady('ja')) {
+    localAudio.ensureLoaded('ja')
+  }
   if (localPath) {
     let lp = null
     let fellBack = false

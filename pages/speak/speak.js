@@ -2,6 +2,7 @@ const storage = require('../../utils/storage')
 const speaking = require('../../utils/speaking')
 const sentences = require('../../utils/sentences')
 const audio = require('../../utils/audio')
+const localAudio = require('../../utils/local-audio')
 const speechScore = require('../../utils/speech-score')
 const recordings = require('../../utils/recordings')
 const karaoke = require('../../utils/karaoke')
@@ -62,6 +63,8 @@ Page({
 
   onShow() {
     this.syncTheme()
+    // 换到日语时确保离线音频分包已加载（主包里没有日语音频）
+    localAudio.ensureLoaded(storage.getCurrentLang())
     this.setData({ scoreSupported: speechScore.isSupported(storage.getCurrentLang()) })
     const p = profile.currentProfile() || {}
     this.setData({ isKid: p.mode === 'kid', stars: storage.getStats().totalCorrect || 0 })

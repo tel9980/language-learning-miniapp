@@ -9,6 +9,9 @@ App({
   onLaunch() {
     storage.init()
     this.globalData.lang = storage.getCurrentLang()
+    // 日语离线音频在 packageJa 分包里（1.8MB，主包放不下），启动就预载，
+    // 用户第一次点发音时已经就位；加载失败也不影响启动（会退回在线合成）
+    try { require('./utils/local-audio').ensureLoaded(this.globalData.lang) } catch (e) {}
     this.globalData.theme = storage.getTheme()
     this.applyTheme()
     // 异步检查在线素材更新（未配置域名时自动 no-op，不影响启动速度与使用）

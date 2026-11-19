@@ -3,6 +3,7 @@ const nav = require('../../utils/nav')
 const storage = require('../../utils/storage')
 const { getWords, getLangMeta, getExamCategories } = require('../../utils/words')
 const audio = require('../../utils/audio')
+const localAudio = require('../../utils/local-audio')
 
 Page({
   behaviors: [theme],
@@ -13,6 +14,8 @@ Page({
   },
   onShow() {
     this.syncTheme()
+    // 换到日语时确保离线音频分包已加载（主包里没有日语音频）
+    localAudio.ensureLoaded(storage.getCurrentLang())
     const intent = nav.takeIntent('pages/learn/learn')
     if (intent && intent.mode && intent.mode !== this.data.mode) {
       this.setData({ mode: intent.mode })

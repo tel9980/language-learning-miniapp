@@ -118,6 +118,11 @@
       <view class="setting-label">🔊 发音缓存</view>
       <view class="setting-value">{{ttsCacheKb>0?(ttsCacheKb+'KB · 清理'):'空'}} ›</view>
     </view>
+    <view class="setting-row" bindtap="openOfflineAudio">
+      <view class="setting-label">🗣 离线发音包</view>
+      <view class="setting-value">查看 ›</view>
+    </view>
+
     <view class="setting-row" bindtap="toggleFeedback">
       <view class="setting-label">📳 触感反馈</view>
       <view class="switch {{feedbackEnabled?'on':''}}"><view class="knob"></view></view>
