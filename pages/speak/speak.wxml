@@ -50,7 +50,7 @@
     <view class="focus-bar returning" bindtap="backToTrain" wx:else>
       <view class="focus-info">
         <view class="focus-title">↩ 返回日常练习</view>
-        <view class="muted">重点复练模式 · 共 {{queue.length}} 条</view>
+        <view class="muted">重点复练模式 · 共 {{queueLen}} 条</view>
       </view>
       <view class="arrow">›</view>
     </view>
@@ -63,7 +63,7 @@
 
   <view class="card stage" wx:if="{{current}}">
     <view class="progress-dots" wx:if="{{showDots}}">
-      <view wx:for="{{queue}}" wx:key="id" wx:for-index="idx" class="dot {{index===idx?'on':(idx<index?'done':'')}}"></view>
+      <view wx:for="{{dots}}" wx:key="*this" wx:for-index="idx" class="dot {{index===idx?'on':(idx<index?'done':'')}}"></view>
     </view>
     <view class="progress-bar-row" wx:else>
       <view class="progress-bar"><view class="progress-bar-fill" style="width:{{progressPercent}}%"></view></view>

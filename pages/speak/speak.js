@@ -19,7 +19,7 @@ Page({
     track: 'sentence',        // word | sentence | dialogue | custom
     sceneIndex: 0, scenes: [], sceneNames: [],
     levelIndex: 0, levelNames: ['全部', 'A1', 'A2', 'B1', 'B2'],
-    queue: [], index: 0, current: null,
+    queueLen: 0, dots: [], index: 0, current: null,
     showDots: true, progressText: '0 / 0', progressPercent: 0,
     recording: false, hasRecording: false, playingMine: false,
     focusCount: 0, justRated: false, todayCount: 0,
@@ -40,6 +40,7 @@ Page({
     isKid: false, stars: 0, showStar: false
   },
 
+  _queue: [],
   _audioPlayer: null,
   _recManager: null,
   _recognizer: null,
@@ -132,8 +133,9 @@ Page({
     const fresh = pool.filter(w => !records[w.id])
     const done = pool.filter(w => records[w.id])
     const queue = fresh.concat(done)
+    this._queue = queue
     this.setData(Object.assign({
-      queue, index: 0, showLine: 0, mode: 'train', abCount: 0
+      queueLen: queue.length, index: 0, showLine: 0, mode: 'train', abCount: 0
     }, this._progress(0, queue.length)), () => this.loadCurrent())
   },
 
@@ -155,8 +157,11 @@ Page({
   // 避免为每个条目都渲染一个 view 节点（220 词 = 220 个节点，明显拖慢渲染）
   _progress(index, total) {
     const n = total || 0
+    const showDots = n > 0 && n <= 20
+    const dots = []
+    if (showDots) for (let i = 0; i < n; i++) dots.push(i)
     return {
-      showDots: n > 0 && n <= 20,
+      showDots, dots,
       progressText: n ? (Math.min(index + 1, n) + ' / ' + n) : '0 / 0',
       progressPercent: n ? Math.round((index + 1) / n * 100) : 0
     }
@@ -164,7 +169,7 @@ Page({
 
   loadCurrent() {
     this.stopAll()
-    const w = this.data.queue[this.data.index] || null
+    const w = this._queue[this.data.index] || null
     this._recFilePath = null
     this._savePromise = null
     this._lastScore = null
@@ -174,7 +179,7 @@ Page({
     // 角色扮演：取上一条对方台词作为提示
     let otherLine = null
     if (this.data.rolePlay && this.data.track === 'dialogue') {
-      const prev = this.data.queue[this.data.index - 1]
+      const prev = this._queue[this.data.index - 1]
       otherLine = prev ? { role: prev.role, text: prev.word, cn: prev.meaning } : null
     }
     this.setData({
@@ -184,7 +189,7 @@ Page({
       karaokeOn: false, karaokeTokens: karaoke.toView(tokens, -1), abCount: 0
     }, () => {
       // 进度随当前索引更新
-      this.setData(this._progress(this.data.index, this.data.queue.length))
+      this.setData(this._progress(this.data.index, this._queue.length))
     })
   },
 
@@ -202,7 +207,14 @@ Page({
         wx.showToast({ title: tip, icon: 'none' })
       },
       onError() {
-        wx.showToast({ title: '这句暂时读不出来，点一下再试', icon: 'none' })
+        // 日语整句没有可用的免费合成源（有道只支持词、百度 403、同声传译只支持中英文），
+        // 别说成「网络不好」，直接讲清楚能怎么办。
+        const ja = audio.needJapaneseVoice(text)
+        const long = ja && String(text).trim().length > 6
+        wx.showToast({
+          title: long ? '日语整句暂无合成发音，可点单词单独听' : '这句暂时读不出来，点一下再试',
+          icon: 'none'
+        })
         that.stopHighlight()
       },
       onEnded() {
@@ -449,7 +461,7 @@ Page({
 
   next() {
     const i = this.data.index + 1
-    if (i < this.data.queue.length) {
+    if (i < this._queue.length) {
       this.setData({ index: i }, () => this.loadCurrent())
     } else if (this.data.mode === 'focus') {
       this.setData({ mode: 'train', sceneIndex: this.data.sceneIndex }, () => {
@@ -476,7 +488,8 @@ Page({
       return
     }
     this.stopAll()
-    this.setData(Object.assign({ mode: 'focus', queue: list, index: 0 }, this._progress(0, list.length)), () => this.loadCurrent())
+    this._queue = list
+    this.setData(Object.assign({ mode: 'focus', queueLen: list.length, index: 0 }, this._progress(0, list.length)), () => this.loadCurrent())
   },
   backToTrain() {
     this.stopAll()

@@ -27,5 +27,9 @@ const out = path.join(__dirname, 'data.json')
 fs.writeFileSync(out, JSON.stringify(payload))
 console.log('✅ 已导出:', out)
 console.log('   version:', payload.version)
-console.log('   词:', payload.words.en.length, '| 句:', payload.sentences.en.length, '| 对话:', payload.dialogues.en.length)
+Object.keys(payload.words).forEach(function (lang) {
+  console.log('   [' + lang + '] 词:', (payload.words[lang] || []).length,
+    '| 句:', (payload.sentences[lang] || []).length,
+    '| 对话:', (payload.dialogues[lang] || []).length)
+})
 console.log('   把 data.json 上传到你的 OSS 即可，小程序下次启动自动更新。')

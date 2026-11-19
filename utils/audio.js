@@ -99,9 +99,10 @@ function speak(text, slow, handlers) {
 
   let sources
   if (jaText) {
-    // 日语：有道词典音对单词还行，但整句一样会 500。
-    // 装了同声传译插件就让它直接上，省掉两次必然失败的请求。
-    sources = (words > 2 && pluginTtsAvailable()) ? [] : [yd, ydBackup]
+    // 日语：有道 dictvoice 只有「词」能出声（且必须带 le=jap），整句返回 0 字节或 500；
+    // 百度 lan=jap 是 403；同声传译的 textToSpeech 只支持中英文。
+    // 所以整句不去撞必然失败的请求，直接交给插件兜底、插件不行就报错让页面提示。
+    sources = (words > 2) ? [] : [yd, ydBackup]
   } else if (words > 2) {
     sources = [bd, yd, ydBackup]
   } else {
@@ -154,4 +155,4 @@ function speak(text, slow, handlers) {
   }
 }
 
-module.exports = { ttsUrl, baiduUrl, isJapaneseText, createPlayer, speak }
+module.exports = { ttsUrl, baiduUrl, isJapaneseText, needJapaneseVoice, createPlayer, speak }

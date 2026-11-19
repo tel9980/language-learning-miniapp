@@ -129,6 +129,24 @@ ok(sentences.getSentences('en').length >= 100, 'English sentences >= 100')
 const allIds = sentences.getSentences('en').map(function (x) { return x.id })
 eq(new Set(allIds).size, allIds.length, 'sentence ids unique')
 
+// ---- 日语素材（原来只有 2 句、0 组对话，切到日语练口语几乎是空的）----
+const jaSent = sentences.getSentences('ja')
+const jaDlg = sentences.getDialogues('ja')
+ok(jaSent.length >= 60, 'Japanese sentences >= 60')
+ok(jaDlg.length >= 5, 'Japanese dialogues >= 5')
+const jaIds = jaSent.map(function (x) { return x.id })
+eq(new Set(jaIds).size, jaIds.length, 'Japanese sentence ids unique')
+const jaTexts = jaSent.map(function (x) { return x.text })
+eq(new Set(jaTexts).size, jaTexts.length, 'Japanese sentences have no duplicate text')
+ok(jaSent.every(function (x) { return x.cn && x.scene && x.level }), 'Japanese sentences all have cn/scene/level')
+ok(jaSent.some(function (x) { return x.level === 'A1' }) && jaSent.some(function (x) { return x.level === 'B2' }),
+  'Japanese sentences span A1..B2')
+const jaDlgIds = []
+jaDlg.forEach(function (d) { d.lines.forEach(function (l) { jaDlgIds.push(l.id) }) })
+eq(new Set(jaDlgIds).size, jaDlgIds.length, 'Japanese dialogue line ids unique')
+ok(jaDlg.every(function (d) { return d.lines.length >= 3 }), 'each Japanese dialogue has >= 3 lines')
+ok(jaSent.some(function (x) { return /[\u3040-\u309f\u30a0-\u30ff]/.test(x.text) }), 'Japanese sentences contain kana')
+
 // ---- nav（tabBar 跳转必须走 switchTab，且能跨 tab 传意图） ----
 global.wx = global.wx || {}
 let lastSwitch = null, lastNav = null
