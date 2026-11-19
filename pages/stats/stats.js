@@ -5,6 +5,7 @@ const recordings = require('../../utils/recordings')
 const achievements = require('../../utils/achievements')
 const theme = require('../../utils/theme')
 const familyBackup = require('../../utils/family-backup')
+const ttsCache = require('../../utils/tts-cache')
 const { getWords } = require('../../utils/words')
 
 const app = getApp()
@@ -15,11 +16,13 @@ Page({
     stats: {}, mastered: 0, accuracy: 0, dailyGoal: 20,
     levels: [], days: [], speak: {},
     calendar: [], unlockedCount: 0, badges: [],
-    feedbackEnabled: true, fontScale: 1, darkMode: false
+    feedbackEnabled: true, fontScale: 1, darkMode: false, ttsCacheKb: 0
   },
   onShow() {
     this.syncTheme()
     this.refresh()
+    // 发音缓存体积（离线缓存 mp3 用掉了多少本地空间）
+    this.setData({ ttsCacheKb: Math.round(ttsCache.totalBytes() / 1024) })
   },
   refresh() {
     const lang = storage.getCurrentLang()
@@ -284,6 +287,26 @@ Page({
     app.refreshTheme()
     this.syncTheme()
     wx.showToast({ title: v ? '已开启深色模式' : '已关闭深色模式', icon: 'none' })
+  },
+
+  // 清掉发音缓存：听力靠它提速，但占本地文件配额，空间紧张时用户得能自己清
+  clearTtsCache() {
+    const that = this
+    const kb = Math.round(ttsCache.totalBytes() / 1024)
+    if (kb <= 0) {
+      wx.showToast({ title: '还没有缓存的发音', icon: 'none' })
+      return
+    }
+    wx.showModal({
+      title: '清掉发音缓存？',
+      content: '会释放约 ' + kb + 'KB 空间。清理后第一次听同一句话会重新联网下载，之后又快起来。',
+      success(res) {
+        if (!res.confirm) return
+        ttsCache.clear()
+        wx.showToast({ title: '已清理', icon: 'none' })
+        that.setData({ ttsCacheKb: 0 })
+      }
+    })
   },
 
   exportProgress() {

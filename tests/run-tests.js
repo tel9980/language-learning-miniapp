@@ -595,6 +595,75 @@ playedSrc = null
 au.speak('hello', false, {})
 ok(/^https:\/\//.test(playedSrc || ''), 'speak still goes online for items without bundled audio')
 
+// ---- 发音缓存：同一句第二次听不再联网 ----
+const ttsCache = require('../utils/tts-cache')
+const _memFs = {}
+const _origFs = global.wx.getFileSystemManager
+const _origEnv = global.wx.env
+const _origDownload = global.wx.downloadFile
+global.wx.env = { USER_DATA_PATH: 'wxfile://usr' }
+global.wx.getFileSystemManager = function () {
+  return {
+    accessSync(p) { if (!(p in _memFs)) throw new Error('no such file') },
+    mkdirSync() {},
+    copyFileSync(from, to) { _memFs[to] = _memFs[from] || 'x'.repeat(500 * 1024) },
+    statSync(p) { if (!(p in _memFs)) throw new Error('no such file'); return { size: _memFs[p].length } },
+    unlinkSync(p) { delete _memFs[p] }
+  }
+}
+ttsCache.clear()
+const _dlCalls = []
+global.wx.downloadFile = function (o) {
+  _dlCalls.push(o.url)
+  _memFs['wxfile://tmp_tts.mp3'] = 'x'.repeat(500 * 1024)
+  o.success({ statusCode: 200, tempFilePath: 'wxfile://tmp_tts.mp3' })
+}
+playedSrc = null
+au.speak('How are you doing today', false, {})
+eq(_dlCalls.length, 1, '首次发音要下载一次（下载才能顺便进缓存）')
+eq(playedSrc, 'wxfile://tmp_tts.mp3', '下载后播的是本地临时文件，不是远端 URL')
+const _bdUrl = audio.baiduUrl('How are you doing today', false, 'en_US')
+ok(!!ttsCache.fileOf(_bdUrl), '下载的音频写进了缓存')
+
+playedSrc = null
+au.speak('How are you doing today', false, {})
+eq(_dlCalls.length, 1, '同一句第二次听不再联网（缓存命中）')
+eq(playedSrc, ttsCache.fileOf(_bdUrl), '第二次直接播缓存文件')
+
+// 主源下载失败要落到下一个源，不能直接静音
+_dlCalls.length = 0
+global.wx.downloadFile = function (o) {
+  _dlCalls.push(o.url)
+  if (o.url.indexOf('baidu') >= 0) { o.fail({ errMsg: 'downloadFile:fail' }); return }
+  _memFs['wxfile://tmp_tts2.mp3'] = 'x'.repeat(500 * 1024)
+  o.success({ statusCode: 200, tempFilePath: 'wxfile://tmp_tts2.mp3' })
+}
+playedSrc = null
+au.speak('This sentence was never cached before', false, {})
+eq(_dlCalls.length, 2, '主源失败后换下一个源（共 2 次下载）')
+ok(_dlCalls[1].indexOf('youdao') >= 0, '第二个源就是有道')
+eq(playedSrc, 'wxfile://tmp_tts2.mp3', '有道下载成功后照常有声（不会静音）')
+
+// 缓存按「最久未使用」淘汰，总量不超过 3MB
+ttsCache.clear()
+for (let i = 0; i < 8; i++) {
+  _memFs['wxfile://t' + i + '.mp3'] = 'x'.repeat(500 * 1024)
+  ttsCache.store('https://example.com/a' + i + '.mp3', 'wxfile://t' + i + '.mp3')
+}
+ok(ttsCache.totalBytes() <= ttsCache.MAX_BYTES, '缓存总量不超过上限（实际 ' + Math.round(ttsCache.totalBytes() / 1024) + 'KB）')
+eq(ttsCache.fileOf('https://example.com/a0.mp3'), '', '最旧的缓存先被淘汰')
+ok(!!ttsCache.fileOf('https://example.com/a7.mp3'), '最新的缓存还在')
+
+// 缓存文件被系统清掉后，索引也要自愈，不能继续指向不存在的文件
+const _alive = ttsCache.fileOf('https://example.com/a7.mp3')
+delete _memFs[_alive]
+eq(ttsCache.fileOf('https://example.com/a7.mp3'), '', '文件没了就当作没缓存（不会给出死路径）')
+
+global.wx.getFileSystemManager = _origFs
+global.wx.env = _origEnv
+global.wx.downloadFile = _origDownload
+ttsCache.clear()
+
 // ---- storage.getNewWords：可按分类取新词 ----
 // 不传分类时按词库数组顺序取，考试词永远排在最前（日常/旅行那 220 个词排不上号），
 // 所以学习页必须能把分类传下来。这里锁死「传分类只返回该分类」的契约。

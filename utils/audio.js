@@ -17,6 +17,7 @@
 // 不加 le 只会拿到 1920 字节的静音占位文件）。纯拉丁字母的文本一律按 lang 走，
 // 否则界面切到日语后练英文词（"hello"）会被读成日式口音。
 const localAudio = require('./local-audio')
+const ttsCache = require('./tts-cache')
 const KANJI_RE = /[\u4e00-\u9fff]/
 function needJapaneseVoice(text) {
   return isJapaneseText(text) || KANJI_RE.test(text || '')
@@ -168,10 +169,19 @@ function speak(text, slow, handlers) {
     let triedPlugin = false
     let lastHost = ''
 
+    // 记录「这次播的是缓存文件」，播放失败时好把坏缓存删掉、退回在线重试同一源
+    let curCached = ''
     const player = createPlayer({
       onEnded() { if (handlers.onEnded) handlers.onEnded() },
       onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
-      onError() { next() }
+      onError() {
+        if (curCached) {
+          ttsCache.forget(curCached)
+          curCached = ''
+          i = Math.max(0, i - 1)   // 退回上一个源，改成在线下载重试
+        }
+        next()
+      }
     })
 
     function hostOf(id) { return id === 'baidu' ? 'baidu' : 'youdao' }
@@ -184,7 +194,7 @@ function speak(text, slow, handlers) {
         // 只有跨主机（有道↔百度）才提示，同类换 type 静默，避免刷屏
         if (lastHost && host !== lastHost && handlers.onFallback) handlers.onFallback(s.id)
         lastHost = host
-        player.play(s.url)
+        playSource(s)
         return
       }
       if (!triedPlugin && pluginTtsAvailable()) {
@@ -203,11 +213,33 @@ function speak(text, slow, handlers) {
       if (handlers.onError) handlers.onError()
     }
 
+    // 播一个网络源：命中缓存就直接放本地文件（0 请求），否则先下载再播。
+    // 下载而不是把 URL 直接丢给播放器，为的是顺手把音频存进缓存（utils/tts-cache.js），
+    // 同一句下次再听就不用再联网了。
+    function playSource(s) {
+      const cached = ttsCache.fileOf(s.url)
+      if (cached) { curCached = s.url; player.play(cached); return }
+      curCached = ''
+      if (typeof wx.downloadFile !== 'function') { player.play(s.url); return }
+      try {
+        wx.downloadFile({
+          url: s.url,
+          success(res) {
+            if (res && res.statusCode === 200 && res.tempFilePath) {
+              player.play(res.tempFilePath)
+              ttsCache.store(s.url, res.tempFilePath)
+            } else { next() }
+          },
+          fail() { next() }
+        })
+      } catch (e) { player.play(s.url) }
+    }
+
     next()
     return {
       stop: player.stop,
       destroy: player.destroy,
-      retry() { i = 0; triedPlugin = false; lastHost = ''; next() }
+      retry() { i = 0; triedPlugin = false; lastHost = ''; curCached = ''; next() }
     }
   }
 }
