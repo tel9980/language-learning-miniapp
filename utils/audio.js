@@ -1,5 +1,7 @@
 // 音频工具：统一 TTS 地址生成 + 播放管理 + 发音源降级兜底
 //
+// 日语素材优先播随包发布的离线音频（utils/local-audio.js），不联网也不占配额。
+//
 // 降级链：有道主源 → 有道 type 切换 → 百度翻译 TTS → 微信同声传译本地合成（需插件）
 //
 // 为什么要挂百度：有道 dictvoice 本质是「词典发音」接口，单词基本没问题，
@@ -14,6 +16,7 @@
 // 判定「要不要按日语合成」：有假名或有汉字 ⇒ 按日语读（「家」「部屋」这类纯汉字词
 // 不加 le 只会拿到 1920 字节的静音占位文件）。纯拉丁字母的文本一律按 lang 走，
 // 否则界面切到日语后练英文词（"hello"）会被读成日式口音。
+const localAudio = require('./local-audio')
 const KANJI_RE = /[\u4e00-\u9fff]/
 function needJapaneseVoice(text) {
   return isJapaneseText(text) || KANJI_RE.test(text || '')
@@ -61,6 +64,10 @@ function createPlayer(opts) {
     if (opts.onEnded) ctx.onEnded(opts.onEnded)
     if (opts.onError) ctx.onError(opts.onError)
     ctx.src = src
+    // 本地音频只有正常语速一版，慢速用变速播放实现（网络源靠 URL 参数区分，不受影响）
+    if (opts.rate && opts.rate !== 1) {
+      try { ctx.playbackRate = opts.rate } catch (e) {}
+    }
     ctx.play()
   }
   function stop() {
@@ -97,61 +104,96 @@ function speak(text, slow, handlers) {
   const ydBackup = { id: 'youdao-backup', url: ttsUrl(text, !slow, jaText ? 'ja_JP' : lang) }
   const bd = { id: 'baidu', url: baiduUrl(text, slow, lang) }
 
-  let sources
-  if (jaText) {
-    // 日语：有道 dictvoice 只有「词」能出声（且必须带 le=jap），整句返回 0 字节或 500；
-    // 百度 lan=jap 是 403；同声传译的 textToSpeech 只支持中英文。
-    // 所以整句不去撞必然失败的请求，直接交给插件兜底、插件不行就报错让页面提示。
-    sources = (words > 2) ? [] : [yd, ydBackup]
-  } else if (words > 2) {
-    sources = [bd, yd, ydBackup]
-  } else {
-    sources = [yd, ydBackup, bd]
+  // 随包音频优先：日语素材的 mp3 打在代码包里（见 utils/local-audio.js），
+  // 播到就是 0 请求、0 配额、断网可用。真出问题（文件缺失/解码失败）再退回网络链。
+  const localPath = handlers.id ? localAudio.pathFor(handlers.id) : ''
+  if (localPath) {
+    let lp = null
+    let fellBack = false
+    function playLocal() {
+      lp = createPlayer({
+        rate: slow ? 0.75 : 1,
+        onEnded: handlers.onEnded,
+        onError() {
+          if (fellBack) return
+          fellBack = true
+          if (lp) lp.destroy()
+          const p = runNetwork()
+          keep.push(p)
+        }
+      })
+      lp.play(localPath)
+    }
+    const keep = []
+    playLocal()
+    return {
+      local: true,
+      stop() { if (lp) lp.stop() },
+      destroy() { if (lp) lp.destroy(); keep.forEach(function (p) { try { p.destroy() } catch (e) {} }) },
+      retry() { if (fellBack) keep.forEach(function (p) { try { p.retry() } catch (e) {} }); else playLocal() }
+    }
   }
 
-  let i = 0
-  let triedPlugin = false
-  let lastHost = ''
+  return runNetwork()
 
-  const player = createPlayer({
-    onEnded() { if (handlers.onEnded) handlers.onEnded() },
-    onError() { next() }
-  })
-
-  function hostOf(id) { return id === 'baidu' ? 'baidu' : 'youdao' }
-
-  function next() {
-    if (i < sources.length) {
-      const s = sources[i]
-      i += 1
-      const host = hostOf(s.id)
-      // 只有跨主机（有道↔百度）才提示，同类换 type 静默，避免刷屏
-      if (lastHost && host !== lastHost && handlers.onFallback) handlers.onFallback(s.id)
-      lastHost = host
-      player.play(s.url)
-      return
+  // 网络发音链（本地音频不可用时走这里）
+  function runNetwork() {
+    let sources
+    if (jaText) {
+      // 日语：有道 dictvoice 只有「词」能出声（且必须带 le=jap），整句返回 0 字节或 500；
+      // 百度 lan=jap 是 403；同声传译的 textToSpeech 只支持中英文。
+      // 所以整句不去撞必然失败的请求，直接交给插件兜底、插件不行就报错让页面提示。
+      sources = (words > 2) ? [] : [yd, ydBackup]
+    } else if (words > 2) {
+      sources = [bd, yd, ydBackup]
+    } else {
+      sources = [yd, ydBackup, bd]
     }
-    if (!triedPlugin && pluginTtsAvailable()) {
-      triedPlugin = true
-      if (handlers.onFallback) handlers.onFallback('wesisi-tts')
-      try {
-        require('./speech-score').tts(text, lang, function (r) {
-          if (r && r.ok && r.filename) player.play(r.filename)
-          else if (handlers.onError) handlers.onError()
-        })
-      } catch (e) {
-        if (handlers.onError) handlers.onError()
+
+    let i = 0
+    let triedPlugin = false
+    let lastHost = ''
+
+    const player = createPlayer({
+      onEnded() { if (handlers.onEnded) handlers.onEnded() },
+      onError() { next() }
+    })
+
+    function hostOf(id) { return id === 'baidu' ? 'baidu' : 'youdao' }
+
+    function next() {
+      if (i < sources.length) {
+        const s = sources[i]
+        i += 1
+        const host = hostOf(s.id)
+        // 只有跨主机（有道↔百度）才提示，同类换 type 静默，避免刷屏
+        if (lastHost && host !== lastHost && handlers.onFallback) handlers.onFallback(s.id)
+        lastHost = host
+        player.play(s.url)
+        return
       }
-      return
+      if (!triedPlugin && pluginTtsAvailable()) {
+        triedPlugin = true
+        if (handlers.onFallback) handlers.onFallback('wesisi-tts')
+        try {
+          require('./speech-score').tts(text, lang, function (r) {
+            if (r && r.ok && r.filename) player.play(r.filename)
+            else if (handlers.onError) handlers.onError()
+          })
+        } catch (e) {
+          if (handlers.onError) handlers.onError()
+        }
+        return
+      }
+      if (handlers.onError) handlers.onError()
     }
-    if (handlers.onError) handlers.onError()
-  }
 
-  next()
-  return {
-    stop: player.stop,
-    destroy: player.destroy,
-    retry() { i = 0; triedPlugin = false; lastHost = ''; next() }
+    next()
+    return {
+      stop: player.stop,
+      destroy: player.destroy,
+      retry() { i = 0; triedPlugin = false; lastHost = ''; next() }
+    }
   }
 }
 

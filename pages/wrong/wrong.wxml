@@ -23,7 +23,7 @@
         </view>
         <view class="word-meaning">{{item.meaning}}</view>
         <view class="word-meta">当前等级 L{{item.level}} · 复习间隔 {{item.interval}} 天
-          <text class="play" data-word="{{item.word}}" catchtap="playWord">🔊</text>
+          <text class="play" data-word="{{item.word}}" data-id="{{item.id}}" catchtap="playWord">🔊</text>
         </view>
         <view class="word-detail" wx:if="{{expandedId === item.id}}">
           <view class="detail-en">{{item.example}}</view>
@@ -50,7 +50,7 @@
     <view class="review-card card" wx:if="{{current}}">
       <view class="review-word">{{current.word}}</view>
       <view class="review-phonetic">{{current.phonetic}}
-        <text class="play" data-word="{{current.word}}" catchtap="playWord">🔊</text>
+        <text class="play" data-word="{{current.word}}" data-id="{{current.id}}" catchtap="playWord">🔊</text>
       </view>
       <view class="review-hint">想想它是什么意思？</view>
       <view class="answer-area" wx:if="{{showAnswer}}">

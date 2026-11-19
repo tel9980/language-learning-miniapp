@@ -34,7 +34,7 @@
           <text class="word-text">{{item.word}}</text>
           <text class="word-phonetic">{{item.phonetic}}</text>
         </view>
-        <view class="play-btn" data-word="{{item.word}}" catchtap="playWord">🔊</view>
+        <view class="play-btn" data-word="{{item.word}}" data-id="{{item.id}}" catchtap="playWord">🔊</view>
         <view class="fav-btn {{favIds.indexOf(item.id) >= 0 ? 'on' : ''}}" data-id="{{item.id}}" catchtap="toggleFav">{{favIds.indexOf(item.id) >= 0 ? '⭐' : '☆'}}</view>
       </view>
       <view class="word-meaning">{{item.meaning}}</view>

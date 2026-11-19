@@ -194,12 +194,13 @@ Page({
   },
 
   // ---------- 音频播放（带降级兜底 + 逐词高亮 + AB复读） ----------
-  playText(text, slow) {
+  playText(text, slow, id) {
     this.stopAudio()
     const that = this
     const tokens = karaoke.tokenize(text)
     const duration = Math.max(2200, tokens.length * 480)
     this._audioPlayer = audio.speak(text, slow, {
+      id: id,
       lang: storage.getCurrentLang() === 'ja' ? 'ja_JP' : 'en_US',
       onFallback(src) {
         const tip = src === 'wesisi-tts' ? '切换本地合成发音…'
@@ -222,7 +223,7 @@ Page({
         if (that._abPlaying && that.data.abLoop) {
           that._abPlaying = false
           that.setData({ abCount: that.data.abCount + 1 })
-          setTimeout(function () { if (that.data.abLoop) that.playText(text, slow) }, 400)
+          setTimeout(function () { if (that.data.abLoop) that.playText(text, slow, id) }, 400)
         }
       }
     })
@@ -245,9 +246,9 @@ Page({
     this._abPlaying = false
     if (this._audioPlayer) { try { this._audioPlayer.destroy() } catch (e) {} this._audioPlayer = null }
   },
-  playStd() { if (this.data.current) { this._abPlaying = false; this.playText(this.data.current.word, false) } },
-  playSlow() { if (this.data.current) { this._abPlaying = false; this.playText(this.data.current.word, true) } },
-  playExample() { if (this.data.current) { this._abPlaying = false; this.playText(this.data.current.example, false) } },
+  playStd() { if (this.data.current) { this._abPlaying = false; this.playText(this.data.current.word, false, this.data.current.id) } },
+  playSlow() { if (this.data.current) { this._abPlaying = false; this.playText(this.data.current.word, true, this.data.current.id) } },
+  playExample() { if (this.data.current) { this._abPlaying = false; this.playText(this.data.current.example, false, this.data.current.id ? this.data.current.id + '_ex' : '') } },
 
   // A-B 复读：循环朗读当前这一条
   toggleAB() {
@@ -256,7 +257,7 @@ Page({
     feedback.tap()
     if (on && this.data.current) {
       this._abPlaying = false
-      this.playText(this.data.current.word, true)
+      this.playText(this.data.current.word, true, this.data.current.id)
       wx.showToast({ title: 'A-B 复读已开启：慢速循环这一句', icon: 'none' })
     } else {
       this.stopAudio()

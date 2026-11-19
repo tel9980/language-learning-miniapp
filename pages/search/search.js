@@ -144,7 +144,7 @@ Page({
     const word = e.currentTarget.dataset.word
     if (!word) return
     if (this._player) this._player.destroy()
-    this._player = audio.speak(word, false, {})
+    this._player = audio.speak(word, false, { id: e.currentTarget.dataset.id })
   },
 
   onUnload() {

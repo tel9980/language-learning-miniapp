@@ -1,6 +1,25 @@
 {
   "description": "项目配置文件",
-  "packOptions": { "ignore": [] },
+  "packOptions": {
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "tools"
+      },
+      {
+        "type": "folder",
+        "value": "tests"
+      },
+      {
+        "type": "folder",
+        "value": "deploy"
+      },
+      {
+        "type": "suffix",
+        "value": ".md"
+      }
+    ]
+  },
   "setting": {
     "urlCheck": false,
     "es6": true,

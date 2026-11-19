@@ -320,6 +320,49 @@ ok(audio.ttsUrl('How are you', true, 'en_US').indexOf('type=1') > 0, 'slow mode 
 ok(audio.baiduUrl('How are you doing today', false, 'en_US').indexOf('lan=en') > 0, 'baidu url carries lan=en')
 ok(audio.baiduUrl('ありがとう', false, 'ja_JP').indexOf('lan=jap') > 0, 'baidu url carries lan=jap')
 
+// ---- 日语离线音频：每个素材都必须有对应 mp3，且随包发布 ----
+// 日语没有可用的免费在线合成源（有道只支持词、百度 403、同声传译只支持中英文），
+// 所以这些 mp3 是素材的组成部分：新增日语素材却忘了跑 tools/gen-ja-audio.py，
+// 真机上就是「点了没声音」。这里把这条契约钉死。
+const fs = require('fs')
+const pathMod = require('path')
+const localAudio = require('../utils/local-audio')
+const audioIds = []
+jaSent.forEach(function (x) { audioIds.push(x.id) })
+jaDlg.forEach(function (d) { d.lines.forEach(function (l) { audioIds.push(l.id) }) })
+words.getWords('ja').forEach(function (w) {
+  audioIds.push(w.id)
+  if (w.example) audioIds.push(w.id + '_ex')
+})
+const noAudio = audioIds.filter(function (id) { return !localAudio.has(id) })
+eq(noAudio.length, 0, 'every Japanese item has bundled audio (missing: ' + noAudio.slice(0, 5).join(',') + ')')
+const badAudio = audioIds.filter(function (id) {
+  const f = pathMod.join(__dirname, '..', localAudio.pathFor(id))
+  if (!fs.existsSync(f)) return true
+  const head = fs.readFileSync(f).slice(0, 3)
+  // mp3 特征：ID3 标签或帧同步 0xFFE
+  return !(head.toString('latin1') === 'ID3' || (head[0] === 0xff && (head[1] & 0xe0) === 0xe0))
+})
+eq(badAudio.length, 0, 'bundled audio files are real mp3 (bad: ' + badAudio.slice(0, 5).join(',') + ')')
+const audioKb = audioIds.reduce(function (sum, id) {
+  return sum + fs.statSync(pathMod.join(__dirname, '..', localAudio.pathFor(id))).size
+}, 0) / 1024
+ok(audioKb < 1200, 'bundled audio stays under 1.2MB (actual ' + audioKb.toFixed(0) + 'KB, 主包上限 2MB)')
+
+// 有本地音频时 speak() 不应走网络
+let playedSrc = null
+global.wx.createInnerAudioContext = function () {
+  const c = { onEnded() {}, onError() {}, stop() {}, destroy() {}, play() {} }
+  Object.defineProperty(c, 'src', { set(v) { playedSrc = v }, get() { return playedSrc } })
+  return c
+}
+playedSrc = null
+au.speak('すみません、駅はどこですか。', false, { id: 'js015' })
+eq(playedSrc, '/assets/audio/ja/js015.mp3', 'speak plays the bundled file when the item has one')
+playedSrc = null
+au.speak('hello', false, {})
+ok(/^https:\/\//.test(playedSrc || ''), 'speak still goes online for items without bundled audio')
+
 // ---- storage.getNewWords：可按分类取新词 ----
 // 不传分类时按词库数组顺序取，考试词永远排在最前（日常/旅行那 220 个词排不上号），
 // 所以学习页必须能把分类传下来。这里锁死「传分类只返回该分类」的契约。
