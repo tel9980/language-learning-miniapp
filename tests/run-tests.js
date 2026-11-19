@@ -1018,4 +1018,72 @@ async function runExtraTests() {
   au2.speak('hello world again', false, { onPlay() { startedByPlay += 1 } })
   eq(startedByPlay, 1, '没有 onPlay 事件时立即回调（不会永久不亮）')
   global.wx.createInnerAudioContext = origCreate2
+
+  // H. 在线词库多源降级：主源挂了自动换备源，全挂静默降级用旧数据
+  const od = require('../utils/online-data')
+  const origReq = global.wx.request
+  let reqLog = []
+  let replies = []
+  global.wx.request = function (o) {
+    reqLog.push(o.url)
+    const r = replies.shift() || { kind: 'fail' }
+    if (r.kind === 'ok') o.success({ statusCode: 200, data: r.data })
+    else if (r.kind === 'http') o.success({ statusCode: r.code, data: null })
+    else o.fail({ errMsg: 'request:fail' })
+  }
+
+  eq(od.configured(), false, '默认不配置在线词库')
+  eq(od.sources().length, 0, '默认没有可用的源')
+  let o1 = null
+  od.checkUpdate(function (r) { o1 = r })
+  eq(o1 && o1.reason, 'not-configured', '未配置时回调 not-configured')
+  eq(reqLog.length, 0, '未配置时一个请求都不发')
+
+  // DATA_URLS 是同一个数组对象，直接 push 即可模拟「填了地址」
+  od.DATA_URLS.push('https://primary.example.com/data.json', 'https://backup.example.com/data.json')
+  ok(od.configured(), '填了地址就算已配置')
+  eq(od.sources().length, 2, '两个源都被识别')
+  eq(od.DATA_URL, 'https://primary.example.com/data.json', 'DATA_URL 兼容旧用法，指向主源')
+
+  reqLog = []
+  replies = [{ kind: 'ok', data: { version: 'v1', words: { en: [{ id: 'x' }] } } }]
+  let o2 = null
+  od.checkUpdate(function (r) { o2 = r })
+  eq(o2 && o2.updated, true, '主源正常时更新成功')
+  eq(o2.source, 'https://primary.example.com/data.json', '报告来源是主源')
+  eq(reqLog.length, 1, '主源成功就不再请求备源')
+  eq(od.getOverride() && od.getOverride().version, 'v1', '数据已进内存缓存')
+
+  reqLog = []
+  replies = [{ kind: 'fail' }, { kind: 'ok', data: { version: 'v2', words: { en: [{ id: 'y' }] } } }]
+  let o3 = null
+  od.checkUpdate(function (r) { o3 = r })
+  eq(o3 && o3.updated, true, '主源网络失败后备源顶上')
+  eq(o3.source, 'https://backup.example.com/data.json', '报告来源是备源')
+  eq(reqLog.length, 2, '两个源各请求一次')
+
+  reqLog = []
+  replies = [{ kind: 'http', code: 500 }, { kind: 'ok', data: { version: 'v3', words: { en: [{}] } } }]
+  let o4 = null
+  od.checkUpdate(function (r) { o4 = r })
+  eq(o4 && o4.updated, true, '主源返回 500 也换备源')
+
+  reqLog = []
+  replies = [{ kind: 'fail' }, { kind: 'fail' }]
+  let o5 = null
+  od.checkUpdate(function (r) { o5 = r })
+  eq(o5 && o5.ok, false, '两个源都挂时报告失败')
+  eq(o5.reason, 'network', '失败原因是 network')
+  eq(od.getOverride() && od.getOverride().version, 'v3', '全挂时仍保留上次拉到的数据')
+
+  reqLog = []
+  replies = [{ kind: 'ok', data: { version: 'v3', words: { en: [{}] } } }]
+  let o6 = null
+  od.checkUpdate(function (r) { o6 = r })
+  eq(o6 && o6.updated, false, '版本号相同不重复写入')
+  eq(o6.reason, 'same-version', '同版本标记 same-version')
+
+  od.DATA_URLS.splice(0, od.DATA_URLS.length)
+  global.wx.request = origReq
+  ok(!od.configured(), '测试后还原为未配置状态')
 }

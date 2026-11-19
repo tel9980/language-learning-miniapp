@@ -260,10 +260,15 @@ node tests/run-tests.js
 默认完全离线、用内置词库。若你有**已备案的 https 域名**，可把词库放上去，以后加词改句**不用重新提交小程序版本**：
 
 1. 按 **[在线词库部署-OSS.md](在线词库部署-OSS.md)** 把 `deploy/data.json` 传到阿里云 OSS 并绑定备案域名。
-2. 把得到的 https 地址填进 `utils/online-data.js` 的 `DATA_URL`（留空即不启用）。
-3. 小程序后台把该域名加进 **request 合法域名**（测试号可先跳过）。
+2. （可选）按 **[deploy/cf/README.md](deploy/cf/README.md)** 在 Cloudflare Pages 上再放一份**备用源**。
+3. 把地址按优先级填进 `utils/online-data.js` 的 `DATA_URLS`（填 `[]` 即不启用，默认完全离线）。
+4. 小程序后台把用到的域名加进 **request 合法域名**（测试号可先跳过）。
 
-拉不到 / 没配置时自动用内置词库，**完全无感**。以后更新：改素材 → 跑 `node deploy/export-data.js` → 覆盖上传 `data.json` 即可。
+拉不到 / 没配置时自动用内置词库，**完全无感**；主源网络失败或数据不合法会自动换备源，全挂才放弃（缓存里那版仍然可用）。
+以后更新：改素材 → 跑 `node deploy/export-data.js`（会同时刷新 `deploy/data.json` 和 `deploy/cf/data.json`）→ 覆盖上传，或直接跑 `bash deploy/cf/deploy.sh`。
+
+⚠️ 备案这道坎：`*.pages.dev` / `*.workers.dev` 不是你备案的域名，**真机加不进合法域名**。想在开发者工具里试就关掉「校验合法域名」直接填；要真机可用必须把**已备案**域名 CNAME 到 Pages。
+
 
 ## 后续可选项（以及为什么现在没做）
 

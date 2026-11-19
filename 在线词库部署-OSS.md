@@ -79,3 +79,18 @@ https://data.你的域名.com
 - **个人使用：0 元**。OSS 公共读 + 少量流量在免费额度内；免费 SSL 证书。
 - **最大坑**：OSS 默认域名没备案 → 必须绑你自己的备案域名（第三步）。
 - **备用方案**：如果你有现成服务器/网站，直接在网站根目录放 `data.json` 即可，跳过 OSS 全部步骤。
+
+---
+
+## 备用源：Cloudflare Pages（可选）
+
+OSS 欠费、被限流、或者临时想替换文件时，可以再放一份到 Cloudflare Pages 当备源，
+小程序会自动降级过去。做法见 **[deploy/cf/README.md](deploy/cf/README.md)**：
+
+```bash
+node deploy/export-data.js        # 同时刷新 deploy/data.json 和 deploy/cf/data.json
+bash deploy/cf/deploy.sh          # 需要 CLOUDFLARE_API_TOKEN
+```
+
+把两个地址都填进 `utils/online-data.js` 的 `DATA_URLS`（主源在前），两个域名都要加进
+**request 合法域名**。注意 `*.pages.dev` 无法备案，真机可用仍需你自己的备案域名 CNAME 到 Pages。
