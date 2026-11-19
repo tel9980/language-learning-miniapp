@@ -4,13 +4,28 @@
 const _ready = { ja: false, en: true }
 let _pending = null
 
+// 跟读队列里的素材 id 是「前缀_原始id」（句子 st_s001、对话台词 dl_d003_1），
+// 而音频文件名用的是原始 id（s001 / d003_1）。两种都认，否则对话台词永远命中不了。
+const ID_PREFIXES = ['st_', 'dl_', 'sp_']
+function idCandidates(id) {
+  const out = [id]
+  for (let i = 0; i < ID_PREFIXES.length; i++) {
+    const p = ID_PREFIXES[i]
+    if (id.length > p.length && id.indexOf(p) === 0) out.push(id.slice(p.length))
+  }
+  return out
+}
+
 // 返回代码包内的音频路径；没有对应音频、或分包还没加载好时返回空字符串
 function pathFor(id) {
   if (!id) return ''
   const langs = Object.keys(REGION)
-  for (let i = 0; i < langs.length; i++) {
-    const r = REGION[langs[i]]
-    if (r.ids[id]) return _ready[langs[i]] ? r.base + id + '.mp3' : ''
+  const ids = idCandidates(id)
+  for (let li = 0; li < langs.length; li++) {
+    const r = REGION[langs[li]]
+    for (let ii = 0; ii < ids.length; ii++) {
+      if (r.ids[ids[ii]]) return _ready[langs[li]] ? r.base + ids[ii] + '.mp3' : ''
+    }
   }
   return ''
 }
@@ -21,8 +36,11 @@ function has(id) { return !!pathFor(id) }
 function langOf(id) {
   if (!id) return ''
   const langs = Object.keys(REGION)
-  for (let i = 0; i < langs.length; i++) {
-    if (REGION[langs[i]].ids[id]) return langs[i]
+  const ids = idCandidates(id)
+  for (let li = 0; li < langs.length; li++) {
+    for (let ii = 0; ii < ids.length; ii++) {
+      if (REGION[langs[li]].ids[ids[ii]]) return langs[li]
+    }
   }
   return ''
 }
@@ -75,6 +93,7 @@ const BASE = REGION.ja.base
 module.exports = {
   REGION: REGION,
   BASE: BASE,
+  idCandidates: idCandidates,
   pathFor: pathFor,
   has: has,
   langOf: langOf,

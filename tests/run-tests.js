@@ -573,6 +573,13 @@ eq(localAudio.langOf('s001'), 'en', 'langOf maps an English id to its region')
 eq(localAudio.langOf('nope'), '', 'langOf returns empty for unknown ids')
 eq(localAudio.pathFor('nope'), '', 'unknown id has no audio')
 
+// 跟读队列里的 id 带前缀（句子 st_ / 对话台词 dl_），而 mp3 文件名用原始 id。
+// 两种都得认，否则对话台词永远命中不了离线音频、只能走在线链。
+eq(localAudio.idCandidates('dl_d003_1').join(','), 'dl_d003_1,d003_1', 'id candidates strip the queue prefix')
+eq(localAudio.pathFor('st_s001'), '/assets/audio/en/s001.mp3', 'prefixed sentence id finds the same mp3')
+eq(localAudio.pathFor('dl_d003_1'), '/assets/audio/en/d003_1.mp3', 'prefixed dialogue line id finds the same mp3')
+eq(localAudio.langOf('dl_d003_1'), 'en', 'langOf understands prefixed ids')
+
 const audioIds = []
 jaSent.forEach(function (x) { audioIds.push(x.id) })
 jaDlg.forEach(function (d) { d.lines.forEach(function (l) { audioIds.push(l.id) }) })
@@ -658,6 +665,11 @@ eq(playedSrc, 'wxfile://usr/pkg-audio/packageJa_ja_js015.mp3', '第二次直接�
 playedSrc = null
 au.speak('hello', false, {})
 ok(/^https:\/\//.test(playedSrc || ''), 'speak still goes online for items without bundled audio')
+// 对话台词在队列里的 id 是 dl_d003_1，音频文件是 d003_1.mp3 —— 必须能对上，
+// 否则「情景对话」整段都只能走在线链（真机上就是听不出声）。
+playedSrc = null
+au.speak('Hi, I do not think we have met.', false, { id: 'dl_d003_1' })
+eq(playedSrc, 'wxfile://usr/pkg-audio/assets_audio_en_d003_1.mp3', '对话台词也走离线音频（队列 id 带 dl_ 前缀）')
 
 // pkg-audio：路径扁平化 / 复制后再复制不重复写 / 读不到包内文件时返回空串
 const pkgAudio = require('../utils/pkg-audio')

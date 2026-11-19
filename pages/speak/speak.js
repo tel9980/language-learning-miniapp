@@ -210,7 +210,7 @@ Page({
     let otherLine = null
     if (this.data.rolePlay && this.data.track === 'dialogue') {
       const prev = this._queue[this.data.index - 1]
-      otherLine = prev ? { role: prev.role, text: prev.word, cn: prev.meaning } : null
+      otherLine = prev ? { role: prev.role, text: prev.word, cn: prev.meaning, id: prev.id } : null
     }
     this._memoIndex = this.data.index
     // 一次 setData 搞定：以前是 setData({...}, () => setData(progress))，
@@ -323,7 +323,7 @@ Page({
   },
   revealLine() { this.setData({ revealed: true }) },
   playOtherLine() {
-    if (this.data.otherLine) this.playText(this.data.otherLine.text, false)
+    if (this.data.otherLine) this.playText(this.data.otherLine.text, false, this.data.otherLine.id)
   },
 
   playMine() {
