@@ -1,0 +1,59 @@
+name: 校验与发布
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  check:
+    name: 单元测试 + 全量校验
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 单元测试
+        run: node tests/run-tests.js
+
+      - name: 全量校验（JSON / 语法 / 页面四件套 / 主包与分包体积）
+        run: node tools/validate.js
+
+      - name: 检查导出物与仓库一致（改词库后忘了重新导出会在这里失败）
+        run: |
+          node deploy/export-data.js
+          git diff --exit-code deploy/data.json deploy/cf/data.json
+
+  deploy:
+    name: 发布在线词库到 Cloudflare Pages
+    needs: check
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 发布（没配 secret 就跳过，不失败）
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "::notice::没配 CLOUDFLARE_API_TOKEN，跳过自动发布（手动跑 bash deploy/cf/deploy.sh 即可）"
+            exit 0
+          fi
+          node deploy/export-data.js
+          npx --yes wrangler@3 pages deploy deploy/cf --project-name yuban-data --branch main --commit-dirty=true
+          node -e '
+            fetch("https://yb.qy663.de5.net/data.json", { headers: { "User-Agent": "ci-check" } })
+              .then(r => r.text().then(t => {
+                if (r.status !== 200) { console.error("线上不是 200"); process.exit(1) }
+                const d = JSON.parse(t)
+                console.log("线上版本 " + d.version + "｜en " + d.words.en.length + " 词 / ja " + d.words.ja.length + " 词")
+              }))
+              .catch(e => { console.error(e.message); process.exit(1) })
+          '

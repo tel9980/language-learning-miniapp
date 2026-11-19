@@ -24,7 +24,7 @@
   <dl>
     <dt>状态</dt><dd id="state">检查中…</dd>
     <dt>版本号</dt><dd id="version">—</dd>
-    <dt>生成时间</dt><dd id="generated">—</dd>
+    <dt>文件大小</dt><dd id="bytes">—</dd>
     <dt>英语</dt><dd id="en">—</dd>
     <dt>日语</dt><dd id="ja">—</dd>
     <dt>数据文件</dt><dd><code id="file">data.json</code></dd>
@@ -43,7 +43,11 @@
     function n(a) { return Array.isArray(a) ? a.length : 0 }
     document.getElementById('state').innerHTML = '<span class="ok">✅ 数据可读</span>'
     document.getElementById('version').textContent = d.version || '—'
-    document.getElementById('generated').textContent = d.generatedAt || '—'
+    // 版本号是内容指纹（c+sha1 前 13 位）：词库没改就不变，客户端不会白拉
+    fetch('data.json', { method: 'HEAD' }).then(function (r) {
+      const n = Number(r.headers.get('content-length') || 0)
+      document.getElementById('bytes').textContent = n ? (n / 1024).toFixed(0) + ' KB' : '—'
+    }).catch(function () {})
     document.getElementById('en').textContent = n(w.en) + ' 词 / ' + n(s.en) + ' 句 / ' + n(g.en) + ' 组对话'
     document.getElementById('ja').textContent = n(w.ja) + ' 词 / ' + n(s.ja) + ' 句 / ' + n(g.ja) + ' 组对话'
   }).catch(function (e) {
