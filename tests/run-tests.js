@@ -256,10 +256,30 @@ global.wx.setStorageSync = _origSet2
 console.error = _origErr
 delete global.wx.showModal
 
-console.log(`\n单元测试结果：${pass} 通过 / ${fail} 失败`)
-if (fail) {
-  failures.forEach(f => console.log('  ✗ ' + f))
-  process.exit(1)
-} else {
-  console.log('✅ ALL TESTS PASSED')
+// ---- recordings：wx.saveFile 会把临时文件「移走」，必须拿到 permanent 路径 ----
+// 锁死 speak.js 回放修复的前提：save() 返回的 entry.filePath 不能等于传进去的临时路径。
+const recordings = require('../utils/recordings')
+global.wx.saveFile = function (o) {
+  global.__saveFrom = o.tempFilePath
+  o.success({ savedFilePath: 'wxfile://store_0' })
 }
+recordings.save('wxfile://tmp_abc.mp3', { label: 'hi' }).then((entry) => {
+  eq(global.__saveFrom, 'wxfile://tmp_abc.mp3', 'saveFile receives the temp path')
+  ok(!!entry, 'save resolves an entry')
+  ok(entry.filePath !== 'wxfile://tmp_abc.mp3', 'entry.filePath is permanent, not the stale temp path')
+  eq(entry.filePath, 'wxfile://store_0', 'entry.filePath is the savedFilePath')
+
+  // 落盘失败返回 null，页面据此提示重录，而不是拿失效路径去播
+  global.wx.saveFile = function (o) { o.fail({ errMsg: 'saveFile:fail' }) }
+  return recordings.save('wxfile://tmp_def.mp3', {})
+}).then((entry) => {
+  eq(entry, null, 'save resolves null when saveFile fails')
+
+  console.log(`\n单元测试结果：${pass} 通过 / ${fail} 失败`)
+  if (fail) {
+    failures.forEach(f => console.log('  ✗ ' + f))
+    process.exit(1)
+  } else {
+    console.log('✅ ALL TESTS PASSED')
+  }
+})

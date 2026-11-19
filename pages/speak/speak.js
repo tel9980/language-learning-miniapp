@@ -45,6 +45,7 @@ Page({
   _recognizer: null,
   _evaluator: null,
   _recFilePath: null,
+  _savePromise: null,
   _lastScore: null,
   _lastRecognized: '',
   _lastWrong: [],
@@ -165,6 +166,7 @@ Page({
     this.stopAll()
     const w = this.data.queue[this.data.index] || null
     this._recFilePath = null
+    this._savePromise = null
     this._lastScore = null
     this._lastRecognized = ''
     this._abPlaying = false
@@ -263,15 +265,29 @@ Page({
   },
 
   playMine() {
-    if (!this._recFilePath) return
-    this.stopAudio()
+    if (!this._recFilePath && !this._savePromise) return
     const that = this
-    this._audioPlayer = audio.createPlayer({
-      onEnded() { that.setData({ playingMine: false }) },
-      onError() { that.setData({ playingMine: false }); wx.showToast({ title: '回放失败', icon: 'none' }) }
-    })
-    this._audioPlayer.play(this._recFilePath)
-    this.setData({ playingMine: true })
+    const start = () => {
+      // wx.saveFile 会把临时文件「移走」，临时路径随即失效。
+      // 必须等落盘完成、改用返回的 permanent 路径再播，否则一直是「回放失败」。
+      if (!that._recFilePath) {
+        wx.showToast({ title: '录音已失效，请重录', icon: 'none' })
+        return
+      }
+      that.stopAudio()
+      that._audioPlayer = audio.createPlayer({
+        onEnded() { that.setData({ playingMine: false }) },
+        onError() {
+          that.setData({ playingMine: false, hasRecording: false })
+          wx.showToast({ title: '回放失败，请重录一次', icon: 'none' })
+        }
+      })
+      that._audioPlayer.play(that._recFilePath)
+      that.setData({ playingMine: true })
+    }
+    // 刚录完就点「听我的」时，落盘还可能在途，等它完成
+    if (this._savePromise) this._savePromise.then(start).catch(start)
+    else start()
   },
 
   // ---------- 录音 ----------
@@ -286,16 +302,25 @@ Page({
 
   // 存一条录音到「全家录音墙」，插件路径与自带录音器路径共用
   _saveRecording(filePath) {
-    if (!filePath) return
+    if (!filePath) return Promise.resolve(null)
+    const that = this
     const cur = this.data.current
-    recordings.save(filePath, {
+    const p = recordings.save(filePath, {
       itemId: cur ? cur.id : '',
       label: cur ? cur.word : '',
       cn: cur ? cur.meaning : '',
       kind: this.data.track,
       score: this._lastScore,
       recognized: this._lastRecognized
+    }).then((entry) => {
+      // 关键：落盘成功后临时文件已被移走，后续播放必须用 entry.filePath
+      if (entry && entry.filePath) that._recFilePath = entry.filePath
+      else wx.showToast({ title: '录音没能存下来（空间可能已满）', icon: 'none' })
+      that._savePromise = null
+      return entry
     })
+    this._savePromise = p
+    return p
   },
 
   toggleRecord() {

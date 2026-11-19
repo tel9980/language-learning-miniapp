@@ -39,7 +39,12 @@ function save(tempFilePath, meta) {
         })
         resolve(entry)
       },
-      fail() { resolve(null) }
+      fail(err) {
+        // wx.saveFile 会「移动」临时文件；失败时临时文件还在，但随时会被回收。
+        // 这里至少留下日志，便于排查「空间已满 / 临时文件过期」。
+        console.error('[recordings] 落盘失败，录音未保存', tempFilePath, err)
+        resolve(null)
+      }
     })
   })
 }

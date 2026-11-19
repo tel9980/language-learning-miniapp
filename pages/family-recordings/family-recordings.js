@@ -32,7 +32,7 @@ Page({
     this._player = wx.createInnerAudioContext()
     this._player.src = item.filePath
     this._player.onEnded(() => that.setData({ playingId: '' }))
-    this._player.onError(() => { wx.showToast({ title: '播放失败', icon: 'none' }); that.setData({ playingId: '' }) })
+    this._player.onError(() => { wx.showToast({ title: '这条录音可能已过期，请重录', icon: 'none' }); that.setData({ playingId: '' }) })
     this._player.play()
     this.setData({ playingId: id })
   },
