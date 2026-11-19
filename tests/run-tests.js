@@ -976,4 +976,46 @@ async function runExtraTests() {
   const dupPool = pool.concat([{ id: 'e', word: 'auto', meaning: 'n. 车', example: 'Auto.', exampleCn: '汽车。' }])
   const dupItems = quizUtil.buildItems([pool[2]], dupPool, progMap, function () { return 0 })
   eq(dupItems[0].options.filter(function (o) { return o === 'n. 车' }).length, 1, '释义相同的词不当干扰项')
+
+  // G. 逐词高亮的起点：必须由「音频真正开始播放」触发，不能点下去就跑
+  //    （原来点一下就 start()，网络源第一次要下载，字幕先跑完、声音后到）
+  const karaoke2 = require('../utils/karaoke')
+  const toks2 = ['I', 'am', 'fine']
+  let started = 0
+  const hl = karaoke2.createHighlighter({
+    tokens: toks2, durationMs: 3000,
+    onWord(i) { if (i >= 0) started += 1 }
+  })
+  hl.retime(2000)                       // 启动前拿到真实时长：只记时间表，不该点亮任何词
+  eq(started, 0, '未 start 时 retime 不点亮任何词')
+  hl.start()
+  eq(started, 1, 'start 立刻点亮第一个词')
+  hl.destroy()
+
+  // audio: 播放器要能报「开始出声」，没有 onPlay 的老环境退化为立即回调
+  const au2 = require('../utils/audio')
+  let playCb = null
+  const origCreate2 = global.wx.createInnerAudioContext
+  global.wx.createInnerAudioContext = function () {
+    const c = { onEnded() {}, onError() {}, stop() {}, destroy() {}, play() {}, onPlay(fn) { playCb = fn } }
+    Object.defineProperty(c, 'src', { set(v) { this._src = v }, get() { return this._src } })
+    return c
+  }
+  let startedByPlay = 0
+  au2.speak('hello world again', false, { onPlay() { startedByPlay += 1 } })
+  eq(startedByPlay, 0, '音频没开始播放前不回调 onPlay')
+  ok(typeof playCb === 'function', '播放器挂了 onPlay 监听')
+  playCb()
+  eq(startedByPlay, 1, '音频开始播放时回调 onPlay')
+
+  startedByPlay = 0
+  global.wx.createInnerAudioContext = function () {
+    // 老基础库没有 onPlay：应立即回调，行为与改造前一致
+    const c = { onEnded() {}, onError() {}, stop() {}, destroy() {}, play() {} }
+    Object.defineProperty(c, 'src', { set(v) { this._src = v }, get() { return this._src } })
+    return c
+  }
+  au2.speak('hello world again', false, { onPlay() { startedByPlay += 1 } })
+  eq(startedByPlay, 1, '没有 onPlay 事件时立即回调（不会永久不亮）')
+  global.wx.createInnerAudioContext = origCreate2
 }

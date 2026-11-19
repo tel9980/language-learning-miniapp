@@ -235,9 +235,23 @@ Page({
     const duration = karaoke.isJapaneseish(text)
       ? Math.max(1200, String(text).replace(/\s/g, '').length * 190)
       : Math.max(2200, tokens.length * 480)
+    // 高亮控制器先建好（不启动），等音频真正出声再 start。
+    // 原来点下去就 start，网络源第一次要点下载，字幕会自己先跑完、声音后到，
+    // 弱网下（甚至等到 8 秒看门狗）尤其明显。
+    if (this._highlighter) this._highlighter.destroy()
+    this._highlighter = karaoke.createHighlighter({
+      tokens: tokens,
+      durationMs: duration,
+      // 只传下标：整句 token 数组不再每个词都重发一遍（长句 447B → 16B），
+      // 渲染层也只需改一个 class，不用 diff 全部 text 节点
+      onWord(idx) { that.setData({ karaokeOn: idx >= 0, karaokeIdx: idx }) },
+      onDone() { that.setData({ karaokeOn: false }) }
+    })
     this._audioPlayer = audio.speak(text, slow, {
       id: id,
       lang: storage.getCurrentLang() === 'ja' ? 'ja_JP' : 'en_US',
+      // 真正开始出声的那一刻，才是字幕应该起跑的时刻
+      onPlay() { if (that._highlighter) that._highlighter.start() },
       // 弱网下下载可能要好几百毫秒甚至触发 8 秒看门狗，页面得让用户看到「在等」
       onLoading(on) { that.setData({ audioLoading: on }) },
       onFallback(src) {
@@ -269,17 +283,6 @@ Page({
         }
       }
     })
-    // 逐词高亮
-    if (this._highlighter) this._highlighter.destroy()
-    this._highlighter = karaoke.createHighlighter({
-      tokens: tokens,
-      durationMs: duration,
-      // 只传下标：整句 token 数组不再每个词都重发一遍（长句 447B → 16B），
-      // 渲染层也只需改一个 class，不用 diff 全部 text 节点
-      onWord(idx) { that.setData({ karaokeOn: idx >= 0, karaokeIdx: idx }) },
-      onDone() { that.setData({ karaokeOn: false }) }
-    })
-    this._highlighter.start()
   },
   stopHighlight() {
     if (this._highlighter) { this._highlighter.destroy(); this._highlighter = null }

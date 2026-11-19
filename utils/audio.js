@@ -74,6 +74,16 @@ function createPlayer(opts) {
     if (opts.rate && opts.rate !== 1) {
       try { ctx.playbackRate = opts.rate } catch (e) {}
     }
+    // 真实播放起点：逐词高亮不能从「点下去」开始计时 ——
+    // 网络源第一次要点下载（几百毫秒，弱网更久），字幕会先跑完、声音后到。
+    // 老基础库没有 onPlay 时退化为立即回调，行为和以前一致。
+    if (opts.onPlay) {
+      if (typeof ctx.onPlay === 'function') {
+        ctx.onPlay(function () { try { opts.onPlay() } catch (e) {} })
+      } else {
+        try { opts.onPlay() } catch (e) {}
+      }
+    }
     // 真实时长：逐词高亮按它对齐，比按字数估算准得多。
     // duration 在部分机型上要 canplay 之后才可读，所以延后一拍取。
     // 变速播放时实际耗时是 duration/rate，这里一并换算成「播放实际耗时」。
@@ -137,6 +147,7 @@ function speak(text, slow, handlers) {
     function playLocal() {
       lp = createPlayer({
         rate: slow ? 0.75 : 1,
+        onPlay() { if (handlers.onPlay) handlers.onPlay() },
         onEnded: handlers.onEnded,
         onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
         onError() {
@@ -202,6 +213,7 @@ function speak(text, slow, handlers) {
       setLoading(false)
     }
     const player = createPlayer({
+      onPlay() { if (handlers.onPlay) handlers.onPlay() },
       onEnded() { if (handlers.onEnded) handlers.onEnded() },
       onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
       onError() {
