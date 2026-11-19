@@ -18,6 +18,11 @@
 // 否则界面切到日语后练英文词（"hello"）会被读成日式口音。
 const localAudio = require('./local-audio')
 const ttsCache = require('./tts-cache')
+
+// 单次下载的看门狗时长：wx.downloadFile 没有 timeout 参数，默认要等 60 秒才失败，
+// 弱网下用户看到的就是「点了没反应」。8 秒还没下完就放弃这个源、换下一个（有道↔百度）。
+// 这个值要明显长于正常首包时间（实测整句 200~400ms、分包音频约 1s），又不能长到让人觉得卡死。
+const DOWNLOAD_TIMEOUT = 8000
 const KANJI_RE = /[\u4e00-\u9fff]/
 function needJapaneseVoice(text) {
   return isJapaneseText(text) || KANJI_RE.test(text || '')
@@ -176,6 +181,26 @@ function speak(text, slow, handlers) {
 
     // 记录「这次播的是缓存文件」，播放失败时好把坏缓存删掉、退回在线重试同一源
     let curCached = ''
+
+    // 加载态 + 下载看门狗：同一次播放里只保存一份计时器，
+    // 换源/停止/销毁都要把它清掉，否则迟到的回调会把已经切走的播放又拉起来。
+    let loading = false
+    let dlToken = 0        // 每次发起下载自增；回调里 token 对不上就丢弃
+    let dlTimer = null
+
+    function setLoading(on) {
+      if (loading === on) return
+      loading = on
+      if (handlers.onLoading) { try { handlers.onLoading(on) } catch (e) {} }
+    }
+    function clearDownloadTimer() {
+      if (dlTimer) { clearTimeout(dlTimer); dlTimer = null }
+    }
+    function teardown() {
+      dlToken += 1
+      clearDownloadTimer()
+      setLoading(false)
+    }
     const player = createPlayer({
       onEnded() { if (handlers.onEnded) handlers.onEnded() },
       onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
@@ -221,32 +246,66 @@ function speak(text, slow, handlers) {
     // 播一个网络源：命中缓存就直接放本地文件（0 请求），否则先下载再播。
     // 下载而不是把 URL 直接丢给播放器，为的是顺手把音频存进缓存（utils/tts-cache.js），
     // 同一句下次再听就不用再联网了。
+    //
+    // 弱网保护：wx.downloadFile 没有 timeout 参数，默认要等 60 秒才回调失败，
+    // 这段时间用户看到的是「点了没反应」。这里挂一个看门狗，超时就放弃当前源直接降级，
+    // 同时把「正在加载」告诉页面（handlers.onLoading），至少让人知道它在等。
     function playSource(s) {
       const cached = ttsCache.fileOf(s.url)
-      if (cached) { curCached = s.url; player.play(cached); return }
+      if (cached) {
+        curCached = s.url
+        dlToken += 1                 // 让还在飞的下载回调失效
+        clearDownloadTimer()
+        setLoading(false)
+        player.play(cached)
+        return
+      }
       curCached = ''
       if (typeof wx.downloadFile !== 'function') { player.play(s.url); return }
+      const token = ++dlToken
+      let done = false
+      setLoading(true)
+      dlTimer = setTimeout(function () {
+        dlTimer = null
+        if (done || token !== dlToken) return
+        done = true
+        console.warn('[audio] 下载超时（' + DOWNLOAD_TIMEOUT + 'ms），降级到下一个源', s.id)
+        setLoading(false)
+        next()
+      }, DOWNLOAD_TIMEOUT)
+      function settle(res) {
+        if (done || token !== dlToken) return
+        done = true
+        clearDownloadTimer()
+        setLoading(false)
+        if (res && res.statusCode === 200 && res.tempFilePath) {
+          player.play(res.tempFilePath)
+          ttsCache.store(s.url, res.tempFilePath)
+        } else { next() }
+      }
       try {
         wx.downloadFile({
           url: s.url,
-          success(res) {
-            if (res && res.statusCode === 200 && res.tempFilePath) {
-              player.play(res.tempFilePath)
-              ttsCache.store(s.url, res.tempFilePath)
-            } else { next() }
-          },
-          fail() { next() }
+          success(res) { settle(res) },
+          fail() { settle(null) }
         })
-      } catch (e) { player.play(s.url) }
+      } catch (e) {
+        // 连下载都起不来：退回让播放器自己去拉 URL（老基础库/异常情况）
+        if (done || token !== dlToken) return
+        done = true
+        clearDownloadTimer()
+        setLoading(false)
+        player.play(s.url)
+      }
     }
 
     next()
     return {
-      stop: player.stop,
-      destroy: player.destroy,
-      retry() { i = 0; triedPlugin = false; lastHost = ''; curCached = ''; next() }
+      stop() { teardown(); player.stop() },
+      destroy() { teardown(); player.destroy() },
+      retry() { teardown(); i = 0; triedPlugin = false; lastHost = ''; curCached = ''; next() }
     }
   }
 }
 
-module.exports = { ttsUrl, baiduUrl, isJapaneseText, needJapaneseVoice, createPlayer, speak }
+module.exports = { ttsUrl, baiduUrl, isJapaneseText, needJapaneseVoice, createPlayer, speak, DOWNLOAD_TIMEOUT }

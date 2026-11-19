@@ -101,6 +101,7 @@
       <button class="play-btn" bindtap="playSlow">🐢 慢速</button>
       <button class="play-btn primary" bindtap="playStd">▶️ 标准发音</button>
     </view>
+    <view class="stage-loading" wx:if="{{audioLoading}}">⏳ 正在加载发音…</view>
 
     <!-- A-B 复读 / 角色扮演 / 显示台词 -->
     <view class="tool-row">

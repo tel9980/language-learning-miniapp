@@ -32,6 +32,7 @@ Page({
     showLine: 0,
     // 逐词高亮（K歌字幕）
     karaokeOn: false, karaokeTokens: [], karaokeIdx: -1,
+    audioLoading: false,      // 网络发音下载中（弱网时给用户一个「在等」的信号）
     // A-B 复读
     abLoop: false, abCount: 0,
     // 角色扮演
@@ -237,6 +238,8 @@ Page({
     this._audioPlayer = audio.speak(text, slow, {
       id: id,
       lang: storage.getCurrentLang() === 'ja' ? 'ja_JP' : 'en_US',
+      // 弱网下下载可能要好几百毫秒甚至触发 8 秒看门狗，页面得让用户看到「在等」
+      onLoading(on) { that.setData({ audioLoading: on }) },
       onFallback(src) {
         const tip = src === 'wesisi-tts' ? '切换本地合成发音…'
           : (src === 'baidu' ? '换用备用发音…' : '切换发音源…')
@@ -285,6 +288,8 @@ Page({
   stopAudio() {
     this.stopHighlight()
     this._abPlaying = false
+    // 只在真的在加载时才 setData，避免每次切词都白渲染一轮
+    if (this.data.audioLoading) this.setData({ audioLoading: false })
     if (this._audioPlayer) { try { this._audioPlayer.destroy() } catch (e) {} this._audioPlayer = null }
   },
   playStd() { if (this.data.current) { this._abPlaying = false; this.playText(this.data.current.word, false, this.data.current.id) } },

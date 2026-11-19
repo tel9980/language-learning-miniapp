@@ -557,10 +557,12 @@ function getWords(lang) {
   return WORDS[lang] || WORDS.en
 }
 
+// tts: 微信同声传译插件用的语种码（en-US）
+// voice: 有道/百度/本地音频那条链用的语种码（en_US）——两者格式不同，别混用
 function getLangMeta(lang) {
   const map = {
-    en: { name: "英语", flag: "🇬🇧", tts: "en-US" },
-    ja: { name: "日语", flag: "🇯🇵", tts: "ja-JP" }
+    en: { name: "英语", flag: "🇬🇧", tts: "en-US", voice: "en_US" },
+    ja: { name: "日语", flag: "🇯🇵", tts: "ja-JP", voice: "ja_JP" }
   }
   return map[lang] || map.en
 }

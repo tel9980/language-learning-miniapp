@@ -5,6 +5,7 @@ const storage = require('../../utils/storage')
 const speaking = require('../../utils/speaking')
 const sentences = require('../../utils/sentences')
 const { getWords, getLangMeta } = require('../../utils/words')
+const audio = require('../../utils/audio')
 const pager = require('../../utils/pager')
 
 Page({
@@ -44,7 +45,7 @@ Page({
       const p = prog[w.id]
       if (p && p.dueAt <= now) {
         dueCount++
-        items.push({ id: w.id, label: w.word, sub: w.meaning, type: 'due', typeName: '复习', target: '/pages/learn/learn?mode=due' })
+        items.push({ id: w.id, say: w.word, sayId: w.id, label: w.word, sub: w.meaning, type: 'due', typeName: '复习', target: '/pages/learn/learn?mode=due' })
       }
     })
 
@@ -52,7 +53,7 @@ Page({
     const allItems = words.concat(sentences.getAllItems(lang))
     const focusItems = speaking.getFocusItems(allItems)
     focusItems.forEach(function (it) {
-      items.push({ id: 'f_' + it.id, label: it.word, sub: '重点复练 ×' + it.focusCount, type: 'focus', typeName: '口语', target: '/pages/speak/speak?focus=1' })
+      items.push({ id: 'f_' + it.id, say: it.word, sayId: it.id, label: it.word, sub: '重点复练 ×' + it.focusCount, type: 'focus', typeName: '口语', target: '/pages/speak/speak?focus=1' })
     })
 
     // 3) 错词本（lapses>0）
@@ -61,7 +62,7 @@ Page({
       const p = prog[w.id]
       if (p && p.lapses > 0) {
         wrongCount++
-        items.push({ id: 'w_' + w.id, label: w.word, sub: '答错 ' + p.lapses + ' 次', type: 'wrong', typeName: '错词', target: '/pages/wrong/wrong' })
+        items.push({ id: 'w_' + w.id, say: w.word, sayId: w.id, label: w.word, sub: '答错 ' + p.lapses + ' 次', type: 'wrong', typeName: '错词', target: '/pages/wrong/wrong' })
       }
     })
 
@@ -73,6 +74,25 @@ Page({
       allDone: items.length === 0
     })
   },
+
+  // 清单里直接听一条：以前看到想听的内容必须跳去对应练习页才能听。
+  // 带上素材 id 是为了让日语素材走随包离线音频（0 请求、断网可用）。
+  playItem(e) {
+    const ds = e.currentTarget.dataset
+    const text = ds.text
+    if (!text || !String(text).trim()) return
+    this.stopPlay()
+    this._player = audio.speak(text, false, {
+      id: ds.id,
+      lang: getLangMeta(this.data.lang).voice,
+      onError() { wx.showToast({ title: '这句暂时读不出来，点一下再试', icon: 'none' }) }
+    })
+  },
+  stopPlay() {
+    if (this._player) { try { this._player.destroy() } catch (e) {} this._player = null }
+  },
+  onHide() { this.stopPlay() },
+  onUnload() { this.stopPlay() },
 
   loadMore() {
     if (!this._pager.more()) return

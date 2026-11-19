@@ -6,9 +6,11 @@
 // 只缓存网络源（有道 / 百度）下载到的 mp3；日语随包音频本来就在本地（utils/local-audio.js），
 // 不经过这里。
 //
-// 缓存上限 3MB：录音符文件已经占了 10MB 配额里的一大块（utils/recordings.js 用 8MB 上限），
-// 这里必须给录音让路。3MB 大约能存 300 句短句，按最近最少使用淘汰。
-const MAX_BYTES = 3 * 1024 * 1024
+// 缓存额度来自 utils/file-budget.js：本地文件空间是录音和缓存共用的一份 10MB，
+// 录音分 6MB、这里分 2.5MB（大约 400 句短句），按最近最少使用淘汰。
+// 两端共用一个账本，就不会再出现「两个模块各自按整份配额估算、谁后写谁静默失败」。
+const budget = require('./file-budget')
+const MAX_BYTES = budget.TTS_BYTES
 const KEY = 'lp_tts_cache_v1'   // 设备级缓存，不分档案（同一个设备上音源是共享的）
 const DIR_NAME = 'tts'
 let _index = null               // { [hash]: { path, size, at } }
@@ -73,17 +75,20 @@ function totalBytes() {
   return n
 }
 
-// 按「最久未使用」淘汰到上限以内
-function trim() {
+// 按「最久未使用」淘汰到上限以内。
+// limit 可选：录音写失败时会被要求压到更小的额度（见 utils/recordings.js），
+// 此时不能只看默认上限，否则「压过了但没压够」。
+function trim(limit) {
+  const cap = typeof limit === 'number' && limit >= 0 ? limit : MAX_BYTES
   const idx = loadIndex()
   const keys = Object.keys(idx)
   let total = 0
   keys.forEach(function (k) { total += idx[k].size || 0 })
-  if (total <= MAX_BYTES) return 0
+  if (total <= cap) return 0
   const f = fs()
   const ordered = keys.slice().sort(function (a, b) { return (idx[a].at || 0) - (idx[b].at || 0) })
   let dropped = 0
-  for (let i = 0; i < ordered.length && total > MAX_BYTES; i++) {
+  for (let i = 0; i < ordered.length && total > cap; i++) {
     const k = ordered[i]
     const e = idx[k]
     if (f && e && e.path) { try { f.unlinkSync(e.path) } catch (err) {} }

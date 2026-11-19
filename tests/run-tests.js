@@ -797,7 +797,8 @@ recordings.save('wxfile://tmp_abc.mp3', { label: 'hi' }).then((entry) => {
   return recordings.save('wxfile://tmp_def.mp3', {})
 }).then((entry) => {
   eq(entry, null, 'save resolves null when saveFile fails and nothing can be freed')
-
+  return runExtraTests()
+}).then(() => {
   console.log(`\n单元测试结果：${pass} 通过 / ${fail} 失败`)
   if (fail) {
     failures.forEach(f => console.log('  ✗ ' + f))
@@ -806,3 +807,137 @@ recordings.save('wxfile://tmp_abc.mp3', { label: 'hi' }).then((entry) => {
     console.log('✅ ALL TESTS PASSED')
   }
 })
+
+// ---- 追加用例：文件配额账本 / 录音与缓存互相让位 / 弱网看门狗 / wxml 绑定 ----
+async function runExtraTests() {
+  const budget = require('../utils/file-budget')
+
+  // A. 两个模块共用一份文件配额，额度必须加起来放得下
+  ok(budget.RECORDINGS_BYTES + budget.TTS_BYTES <= budget.USABLE_BYTES,
+    '录音 + 发音缓存额度之和不超过可用配额')
+  ok(budget.USABLE_BYTES < budget.TOTAL_BYTES, '给临时文件留了余量，不把 10MB 用满')
+  eq(recordings.MAX_BYTES, budget.RECORDINGS_BYTES, '录音上限取自共享账本')
+  eq(ttsCache.MAX_BYTES, budget.TTS_BYTES, '发音缓存上限取自共享账本')
+
+  // 重建内存文件系统（前面的用例已经把它还原了）
+  const memFs = {}
+  const origFs = global.wx.getFileSystemManager
+  const origEnv = global.wx.env
+  const origDownload = global.wx.downloadFile
+  const origSave = global.wx.saveFile
+  global.wx.env = { USER_DATA_PATH: 'wxfile://usr' }
+  global.wx.getFileSystemManager = function () {
+    return {
+      accessSync(p) { if (!(p in memFs)) throw new Error('no such file') },
+      mkdirSync() {},
+      copyFileSync(from, to) { memFs[to] = memFs[from] || 'x' },
+      statSync(p) { if (!(p in memFs)) throw new Error('no such file'); return { size: memFs[p].length } },
+      unlinkSync(p) { delete memFs[p] }
+    }
+  }
+  function fillCache(n, bytesEach) {
+    for (let i = 0; i < n; i++) {
+      memFs['wxfile://c' + i + '.mp3'] = 'x'.repeat(bytesEach)
+      ttsCache.store('https://example.com/c' + i + '.mp3', 'wxfile://c' + i + '.mp3')
+    }
+  }
+
+  // B. trim(limit)：录音写不下时会把缓存压到更小的额度（只看默认上限是压不够的）
+  ttsCache.clear()
+  fillCache(6, 200 * 1024)
+  const beforeTrim = ttsCache.totalBytes()
+  const dropped = ttsCache.trim(300 * 1024)
+  ok(dropped > 0, 'trim 能按自定义额度淘汰')
+  ok(ttsCache.totalBytes() <= 300 * 1024,
+    'trim(limit) 压到指定额度以内（' + Math.round(beforeTrim / 1024) + 'KB → ' + Math.round(ttsCache.totalBytes() / 1024) + 'KB）')
+
+  // C. 录音写不下、自己也没得可删时，去压发音缓存再重试一次
+  ttsCache.clear()
+  fillCache(6, 200 * 1024)
+  const beforeReclaim = ttsCache.totalBytes()
+  recordings.clear()
+  let saveAttempts = 0
+  global.wx.saveFile = function (o) {
+    saveAttempts++
+    if (saveAttempts === 1) { o.fail({ errMsg: 'saveFile:fail:exceed max size' }); return }
+    o.success({ savedFilePath: 'wxfile://store_reclaim' })
+  }
+  const reclaimed = await recordings.save('wxfile://tmp_reclaim.mp3', {})
+  ok(!!reclaimed, '腾出缓存空间后录音存下来了')
+  eq(saveAttempts, 2, '压完缓存只重试一次')
+  ok(ttsCache.totalBytes() < beforeReclaim,
+    '缓存被压小了（' + Math.round(beforeReclaim / 1024) + 'KB → ' + Math.round(ttsCache.totalBytes() / 1024) + 'KB）')
+
+  // D. 弱网看门狗：下载迟迟不回调时，到点自动换源，而不是干等 60 秒
+  const origSetTimeout = global.setTimeout
+  const origClearTimeout = global.clearTimeout
+  const timers = []
+  global.setTimeout = function (fn, ms) { timers.push({ fn: fn, ms: ms, cancelled: false }); return timers.length }
+  global.clearTimeout = function (id) { const t = timers[id - 1]; if (t) t.cancelled = true }
+  const dlCalls = []
+  global.wx.downloadFile = function (o) { dlCalls.push(o.url) }   // 永不回调，模拟弱网卡住
+  const loadingLog = []
+  let errored = 0
+  playedSrc = null
+  au.speak('A sentence that never finishes downloading at all', false, {
+    onLoading(on) { loadingLog.push(on) },
+    onError() { errored++ }
+  })
+  eq(loadingLog[0], true, '开始下载就进入加载态（页面能显示「正在加载发音」）')
+  eq(timers.length, 1, '下载时挂了看门狗')
+  eq(timers[0].ms, au.DOWNLOAD_TIMEOUT, '看门狗时长 = DOWNLOAD_TIMEOUT')
+  eq(dlCalls.length, 1, '只发了一次下载请求')
+  timers[0].fn()
+  eq(dlCalls.length, 2, '超时后换下一个发音源继续试')
+  eq(loadingLog[loadingLog.length - 1], true, '换源时仍处于加载态')
+  timers[1].fn()
+  timers[2].fn()
+  eq(errored, 1, '三个源都超时后才会报错一次')
+  eq(loadingLog[loadingLog.length - 1], false, '最终退出加载态（不会一直转圈）')
+
+  // 停止播放要清掉看门狗，否则迟到的回调会把已经停掉的播放又拉起来
+  timers.length = 0
+  playedSrc = null
+  const ctrl = au.speak('Another sentence that hangs forever and ever', false, {})
+  const timerCountBeforeStop = timers.length
+  ctrl.destroy()
+  eq(timers[timerCountBeforeStop - 1].cancelled, true, 'destroy 会取消还没到点的看门狗')
+
+  global.setTimeout = origSetTimeout
+  global.clearTimeout = origClearTimeout
+  global.wx.downloadFile = origDownload
+  global.wx.saveFile = origSave
+  global.wx.getFileSystemManager = origFs
+  global.wx.env = origEnv
+  ttsCache.clear()
+
+  // E. 静态检查：wxml 里 bind/catch 的函数在页面 js 里必须真的存在
+  //    （历史 bug：加了按钮忘了写方法；theme behavior 提供的两个方法要放行）
+  const fs = require('fs')
+  const path = require('path')
+  const ROOT = path.join(__dirname, '..')
+  const app = JSON.parse(fs.readFileSync(path.join(ROOT, 'app.json'), 'utf8'))
+  const pages = app.pages.concat(
+    (app.subpackages || []).flatMap(function (sp) {
+      return sp.pages.map(function (p) { return sp.root + '/' + p })
+    })
+  )
+  const fromBehavior = ['syncTheme', 'onThemeChange']
+  const missing = []
+  pages.forEach(function (p) {
+    const wxml = fs.readFileSync(path.join(ROOT, p + '.wxml'), 'utf8')
+    const js = fs.readFileSync(path.join(ROOT, p + '.js'), 'utf8')
+    const re = /\b(?:bind|catch):?[a-z]+="([A-Za-z_$][\w$]*)"/g
+    const seen = {}
+    let m
+    while ((m = re.exec(wxml))) {
+      const fn = m[1]
+      if (seen[fn]) continue
+      seen[fn] = true
+      if (fromBehavior.indexOf(fn) >= 0) continue
+      if (!new RegExp('(^|[^\\w$])' + fn + '\\s*[(:]', 'm').test(js)) missing.push(p + ' → ' + fn)
+    }
+  })
+  eq(missing.length, 0, '所有 wxml 绑定的处理函数都存在' + (missing.length ? '：' + missing.join(' / ') : ''))
+  ok(pages.length >= 16, '扫到了全部页面（含分包页，共 ' + pages.length + ' 个）')
+}

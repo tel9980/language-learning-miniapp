@@ -32,3 +32,6 @@
 .quick-btns { display: flex; gap: 16rpx; margin-top: 40rpx; }
 .quick-btn { flex: 1; background: #eef2ff; color: #4A6CF7; font-size: 26rpx; padding: 20rpx 0; border-radius: 16rpx; }
 .load-more { text-align: center; color: #4A6CF7; font-size: 26rpx; padding: 26rpx 0 10rpx; }
+
+/* 清单行内的发音按钮：给足点击区（至少 60rpx 高），放在箭头左侧 */
+.item-play { font-size: 32rpx; padding: 0 12rpx; margin-left: auto; }

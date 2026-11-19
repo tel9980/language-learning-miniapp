@@ -4,12 +4,13 @@
 // 容量口径（微信平台限制，与手机剩余空间无关）：
 //   · 本地文件目录（wx.saveFile / wx.env.USER_DATA_PATH）每个小程序每个用户 10MB
 //   · Storage（wx.setStorageSync）每个小程序每个用户 10MB
-// 录音是 16kHz 单声道 mp3，60 秒约 200KB；30 条上限 ≈ 6MB 封顶，
-// 先撞到的是 MAX_KEEP 而不是 10MB —— 但按「条数 + 体积」双保险更稳：
-// 有人反复录满 60 秒时，体积会先到线。
+// 这份 10MB 是和发音缓存（utils/tts-cache.js）共用的一份空间，额度分配见 utils/file-budget.js。
+// 录音是 16kHz 单声道 mp3，60 秒约 200KB；30 条上限 ≈ 6MB，正好等于分到的 6MB 额度，
+// 通常是先撞条数而不是体积 —— 但两条线都留着更稳：有人反复录满 60 秒时体积会先到线。
 const KEY = 'lp_recordings_v1'
 const MAX_KEEP = 30
-const MAX_BYTES = 8 * 1024 * 1024 // 10MB 配额留 2MB 余量给临时文件/其它写入
+const budget = require('./file-budget')
+const MAX_BYTES = budget.RECORDINGS_BYTES
 const profile = require('./profile')
 
 function read() {
@@ -54,8 +55,9 @@ function removeFiles(list) {
 
 // 保存一条录音：tempFilePath 是 RecorderManager.onStop 给的临时路径
 // meta: { itemId, label, cn, kind, score?, recognized?, q? }
-// retried：内部用，表示已经为腾空间重试过一次
-function save(tempFilePath, meta, retried) {
+// retried：内部用，表示已经删掉最旧一条并重试过
+// freed：内部用，表示已经压过发音缓存（不再重复压）
+function save(tempFilePath, meta, retried, freed) {
   if (!tempFilePath) return Promise.resolve(null)
   const entry = Object.assign({
     id: 'r_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
@@ -78,14 +80,24 @@ function save(tempFilePath, meta, retried) {
       },
       fail(err) {
         // wx.saveFile 会「移动」临时文件；失败时临时文件还在，但随时会被回收。
-        // 空间满时先删最旧一条腾地方，再试一次；还失败就如实返回 null。
+        // 腾空间的顺序是「先删自己最旧的一条录音，再压发音缓存，最后放弃」：
+        // 录音是用户自己录的资产，发音缓存随时能重新下载，所以先牺牲后者。
+        // 两个模块共用一个 10MB 文件配额，额度分配见 utils/file-budget.js。
         const list = read()
         const oldest = list[list.length - 1]
         if (!retried && oldest && oldest.filePath) {
           console.warn('[recordings] 落盘失败，删最旧一条后重试', oldest.id, err && err.errMsg)
           wx.removeSavedFile({ filePath: oldest.filePath, fail() {} })
           write(list.slice(0, -1))
-          resolve(save(tempFilePath, meta, true))
+          resolve(save(tempFilePath, meta, true, freed))
+          return
+        }
+        if (!freed) {
+          // 录音那边已经腾过了（或者本来就没有可删的），去压发音缓存：只保留四分之一额度。
+          let dropped = 0
+          try { dropped = require('./tts-cache').trim(budget.TTS_BYTES >> 2) } catch (e) {}
+          console.warn('[recordings] 落盘失败，清理发音缓存 ' + dropped + ' 条后重试', err && err.errMsg)
+          resolve(save(tempFilePath, meta, true, true))
           return
         }
         console.error('[recordings] 落盘失败，录音未保存', tempFilePath, err)
