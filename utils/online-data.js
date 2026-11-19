@@ -67,10 +67,4 @@ function checkUpdate(cb) {
 }
 
 // 清缓存，回到内置词库
-function clearCache() {
-  _cacheLoaded = true
-  _cacheVal = null
-  try { wx.removeStorageSync(STORAGE_KEY) } catch (e) {}
-}
-
-module.exports = { DATA_URL, configured, getOverride, checkUpdate, clearCache, getCache }
+module.exports = { DATA_URL, configured, getOverride, checkUpdate, getCache }

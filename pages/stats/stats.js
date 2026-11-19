@@ -99,13 +99,27 @@ Page({
       feedbackEnabled: settings.feedbackEnabled !== false
     }, () => { this.drawChart(); this.drawFluencyChart() })
   },
+  // 设备像素比只取一次：wx.getSystemInfoSync 已废弃，且每次重画都调一次是浪费。
+  // 新版基础库有 wx.getWindowInfo / wx.getDeviceInfo，老版本回退到 getSystemInfoSync。
+  dpr() {
+    if (this._dpr) return this._dpr
+    let v = 2
+    try {
+      if (wx.getWindowInfo) v = wx.getWindowInfo().pixelRatio || 2
+      else if (wx.getDeviceInfo) v = wx.getDeviceInfo().pixelRatio || 2
+      else v = wx.getSystemInfoSync().pixelRatio || 2
+    } catch (e) { v = 2 }
+    this._dpr = v
+    return v
+  },
+
   drawFluencyChart() {
     const query = wx.createSelectorQuery()
     query.select('#fluencyChart').fields({ node: true, size: true }).exec((res) => {
       if (!res || !res[0] || !res[0].node) return
       const canvas = res[0].node
       const ctx = canvas.getContext('2d')
-      const dpr = wx.getSystemInfoSync().pixelRatio || 2
+      const dpr = this.dpr()
       const W = res[0].width, H = res[0].height
       canvas.width = W * dpr
       canvas.height = H * dpr
@@ -164,7 +178,7 @@ Page({
       if (!res || !res[0] || !res[0].node) return
       const canvas = res[0].node
       const ctx = canvas.getContext('2d')
-      const dpr = wx.getSystemInfoSync().pixelRatio || 2
+      const dpr = this.dpr()
       const W = res[0].width, H = res[0].height
       canvas.width = W * dpr
       canvas.height = H * dpr

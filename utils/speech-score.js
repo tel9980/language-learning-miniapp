@@ -11,8 +11,7 @@
 // 绝不阻断练习。
 
 // ---------- 智聆口语评测 ----------
-const EVAL_PLUGIN = 'ihearing-eval'
-const EVAL_PROVIDER = 'wx63d6102e26f0a3f8'
+const EVAL_PLUGIN = 'ihearing-eval'   // 提供方 appid wx63d6102e26f0a3f8，见 app.json 的 plugins
 const MAX_CONTENT_WORDS = 15 // 插件限制：content 不超过 15 个词
 const DEFAULT_SCORE_COEFF = 1.5 // [1.0, 4.0]，1.0 最宽松；对学习者偏宽松一点更友好
 
@@ -271,7 +270,6 @@ function tts(text, lang, cb) {
 
 module.exports = {
   EVAL_PLUGIN,
-  EVAL_PROVIDER,
   MAX_CONTENT_WORDS,
   isSupported,
   canEvaluate,

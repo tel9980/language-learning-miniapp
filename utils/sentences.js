@@ -331,11 +331,6 @@ function getDialogues(lang, level) {
   return level ? list.filter(function (d) { return d.level === level }) : list
 }
 function getLevels() { return LEVELS.slice() }
-function getScenes(lang) {
-  const set = {}
-  getSentences(lang).forEach(s => { if (s.scene) set[s.scene] = true })
-  return Object.keys(set)
-}
 // 把一条台词/句子转成可跟读的统一对象（id 带前缀避免与单词 id 冲突）
 function toItem(raw, prefix) {
   return {
@@ -361,5 +356,5 @@ function getAllItems(lang) {
 
 module.exports = {
   SENTENCES, DIALOGUES, LEVELS,
-  getSentences, getDialogues, getLevels, getScenes, getAllItems, toItem
+  getSentences, getDialogues, getLevels, getAllItems, toItem
 }

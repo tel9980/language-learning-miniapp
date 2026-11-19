@@ -143,12 +143,6 @@ function getFocusWords(lang) {
   return getFocusItems(getWords(lang))
 }
 
-// 把某条从重点清单移除
-function clearFocus(itemId) {
-  const focus = getFocus()
-  delete focus[itemId]
-  write(KEY_FOCUS, focus)
-}
 
 // 统计汇总（words 之外的句子条目数由页面传入 allItems）
 function getSummary(lang, allItems) {
@@ -182,5 +176,5 @@ function importData(data) {
 
 module.exports = {
   record, getRecords, getFocus, getDaily, getToday, getFocusItems, getFocusWords,
-  clearFocus, getSummary, exportData, importData, invalidate, flush
+  getSummary, exportData, importData, invalidate, flush
 }

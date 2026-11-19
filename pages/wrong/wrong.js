@@ -20,8 +20,7 @@ Page({
     showAnswer: false,
     current: null,
     doneCount: 0,
-    hasMore: false,
-    _audio: null
+    hasMore: false
   },
 
   // 完整错词表留在实例上，setData 只传当前片段
@@ -31,7 +30,7 @@ Page({
   onLoad() {
     const lang = storage.getCurrentLang()
     this.setData({ lang: lang, langName: getLangMeta(lang).name })
-    this.refresh()
+    // 不在 onLoad 里 refresh：首次进入 onShow 紧跟其后，原来错词表要扫两遍
   },
 
   onShow() {

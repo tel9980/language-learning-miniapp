@@ -40,7 +40,8 @@ Page({
     const lang = storage.getCurrentLang()
     this._applyLang(lang)
     this.refreshMeta()
-    this.doSearch(true)
+    // 不在这里 doSearch：首次进入 onLoad 之后紧接着就会 onShow（里面会搜），
+    // 两处都搜等于白做一次 30 条结果的渲染。
   },
 
   onShow() {
@@ -61,17 +62,31 @@ Page({
     })
   },
 
+  // 输入防抖：以前每按一个键就全量 filter + setData 30 条结果（4.7KB），
+  // 打一个 6 字母的词就是 6 次完整列表渲染，低端机上打字会掉帧。
   onInput(e) {
-    this.setData({ keyword: e.detail.value }, () => this.doSearch(true))
+    this.setData({ keyword: e.detail.value })
+    this.searchSoon()
+  },
+
+  searchSoon() {
+    const that = this
+    if (this._debounce) clearTimeout(this._debounce)
+    this._debounce = setTimeout(function () {
+      that._debounce = null
+      that.doSearch(true)
+    }, 200)
   },
 
   // 按搜索键才记历史，而不是每敲一个字都写 Storage
   onConfirm() {
+    if (this._debounce) { clearTimeout(this._debounce); this._debounce = null }
     const kw = (this.data.keyword || '').trim()
     if (kw) {
       favorites.pushHistory(this.data.lang, kw)
       this.setData({ historyList: favorites.history(this.data.lang) })
     }
+    this.doSearch(true)
   },
 
   clearKeyword() {
@@ -99,8 +114,11 @@ Page({
   toggleFav(e) {
     const id = e.currentTarget.dataset.id
     favorites.toggle(this.data.lang, id)
-    this.refreshMeta()
-    this.doSearch(true)
+    // 「只看收藏」模式下取消收藏必须重建列表（这条要消失）；
+    // 其他模式下只更新星星状态——原来无条件 doSearch(true) 会把已加载的条数
+    // 缩回 30、把展开的详情收起，收藏一个词像是把页面刷新了一遍。
+    if (this.data.showMode === 'fav') { this.doSearch(true); return }
+    this.setData({ favIds: favorites.list(this.data.lang) })
   },
 
   // reset=true 表示新查询（从头显示 30 条）；false 表示加载更多
@@ -123,8 +141,9 @@ Page({
     })
     const count = reset === false ? this.data.visibleCount : 30
     const shown = list.slice(0, count)
+    // 不再清 expandedId：加载更多、换关键词都不该把用户正在看的详情收起来
     this.setData({
-      results: shown, resultCount: list.length, expandedId: '',
+      results: shown, resultCount: list.length,
       favIds: favorites.list(lang),
       visibleCount: count, hasMore: list.length > count
     })
@@ -148,6 +167,7 @@ Page({
   },
 
   onUnload() {
+    if (this._debounce) { clearTimeout(this._debounce); this._debounce = null }
     if (this._player) { this._player.destroy(); this._player = null }
   }
 })
