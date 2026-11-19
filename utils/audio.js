@@ -150,9 +150,10 @@ function speak(text, slow, handlers) {
         onPlay() { if (handlers.onPlay) handlers.onPlay() },
         onEnded: handlers.onEnded,
         onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
-        onError() {
+        onError(err) {
           if (fellBack) return
           fellBack = true
+          console.error('[audio] 本地音频播放失败，改用在线链', localPath, err && (err.errMsg || err))
           if (lp) lp.destroy()
           const p = runNetwork()
           keep.push(p)
@@ -252,6 +253,7 @@ function speak(text, slow, handlers) {
         }
         return
       }
+      console.error('[audio] 所有发音源都失败', { text: raw.slice(0, 40), id: handlers.id || '', ja: jaText, words: words })
       if (handlers.onError) handlers.onError()
     }
 
@@ -281,9 +283,8 @@ function speak(text, slow, handlers) {
         dlTimer = null
         if (done || token !== dlToken) return
         done = true
-        console.warn('[audio] 下载超时（' + DOWNLOAD_TIMEOUT + 'ms），降级到下一个源', s.id)
-        setLoading(false)
-        next()
+        console.warn('[audio] 下载超时（' + DOWNLOAD_TIMEOUT + 'ms），先直连试试这个源', s.id)
+        directThenNext(s)
       }, DOWNLOAD_TIMEOUT)
       function settle(res) {
         if (done || token !== dlToken) return
@@ -293,7 +294,7 @@ function speak(text, slow, handlers) {
         if (res && res.statusCode === 200 && res.tempFilePath) {
           player.play(res.tempFilePath)
           ttsCache.store(s.url, res.tempFilePath)
-        } else { next() }
+        } else { directThenNext(s) }
       }
       try {
         wx.downloadFile({
@@ -307,8 +308,26 @@ function speak(text, slow, handlers) {
         done = true
         clearDownloadTimer()
         setLoading(false)
+        s._direct = true
         player.play(s.url)
       }
+    }
+
+    // 下载这条路走不通时，直接把这个 URL 交给播放器流播一次。
+    // 为什么需要：wx.downloadFile 受「downloadFile 合法域名」白名单限制，
+    // 而 InnerAudioContext 播网络音频不校验域名。以前（没做缓存时）一直是直连，
+    // 加了缓存以后一旦白名单没配全，就会出现「明明能上网却读不出这句」。
+    // 每个源最多直连试一次，失败再由 player.onError → next() 换下一个源。
+    function directThenNext(s) {
+      if (s && !s._direct) {
+        s._direct = true
+        curCached = ''
+        setLoading(false)
+        console.warn('[audio] 下载失败/超时，改为直接流播', s.id)
+        player.play(s.url)
+        return
+      }
+      next()
     }
 
     next()

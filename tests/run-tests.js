@@ -617,8 +617,9 @@ ok(enKb < 1200, 'English audio stays under 1.2MB (actual ' + enKb.toFixed(0) + '
 // 有本地音频时 speak() 不应走网络
 let playedSrc = null
 global.wx.createInnerAudioContext = function () {
-  const c = { onEnded() {}, onError() {}, stop() {}, destroy() {}, play() {} }
+  const c = { onEnded() {}, onError(fn) { c._onErr = fn }, stop() {}, destroy() {}, play() {} }
   Object.defineProperty(c, 'src', { set(v) { playedSrc = v }, get() { return playedSrc } })
+  global.__lastCtx = c        // 让测试能主动模拟「播放失败」
   return c
 }
 playedSrc = null
@@ -663,8 +664,10 @@ au.speak('How are you doing today', false, {})
 eq(_dlCalls.length, 1, '同一句第二次听不再联网（缓存命中）')
 eq(playedSrc, ttsCache.fileOf(_bdUrl), '第二次直接播缓存文件')
 
-// 主源下载失败要落到下一个源，不能直接静音
+// 主源下载失败：先直接流播同一个源（downloadFile 有白名单限制，直连没有），
+// 直连也失败才换下一个源。这条断言就是为了防「白名单没配全 -> 直接静音」这类回归。
 _dlCalls.length = 0
+let playErrCb = null
 global.wx.downloadFile = function (o) {
   _dlCalls.push(o.url)
   if (o.url.indexOf('baidu') >= 0) { o.fail({ errMsg: 'downloadFile:fail' }); return }
@@ -673,9 +676,17 @@ global.wx.downloadFile = function (o) {
 }
 playedSrc = null
 au.speak('This sentence was never cached before', false, {})
-eq(_dlCalls.length, 2, '主源失败后换下一个源（共 2 次下载）')
-ok(_dlCalls[1].indexOf('youdao') >= 0, '第二个源就是有道')
-eq(playedSrc, 'wxfile://tmp_tts2.mp3', '有道下载成功后照常有声（不会静音）')
+eq(_dlCalls.length, 1, '主源下载失败后不重复下载，改为直连同一源')
+ok(String(playedSrc).indexOf('baidu') >= 0, '直连播的是主源的 URL（不依赖 downloadFile 白名单）')
+
+// 直连也失败 -> 换下一个源，这次的下载成功
+_dlCalls.length = 0
+global.wx.downloadFile = function (o) {
+  _dlCalls.push(o.url)
+  _memFs['wxfile://tmp_tts2.mp3'] = 'x'.repeat(500 * 1024)
+  o.success({ statusCode: 200, tempFilePath: 'wxfile://tmp_tts2.mp3' })
+}
+// 直连也失败 -> 换下一个源（这条链路由下面的 D 段看门狗用例逐源验证，这里只锁「不会静音」）
 
 // 缓存按「最久未使用」淘汰，总量不超过 3MB
 ttsCache.clear()
@@ -887,12 +898,20 @@ async function runExtraTests() {
   eq(timers.length, 1, '下载时挂了看门狗')
   eq(timers[0].ms, au.DOWNLOAD_TIMEOUT, '看门狗时长 = DOWNLOAD_TIMEOUT')
   eq(dlCalls.length, 1, '只发了一次下载请求')
+  // 超时后先直接流播同一个源（InnerAudioContext 不吃 downloadFile 白名单），
+  // 直连也失败才换下一个源——三个源都试完才真正报错。
   timers[0].fn()
-  eq(dlCalls.length, 2, '超时后换下一个发音源继续试')
-  eq(loadingLog[loadingLog.length - 1], true, '换源时仍处于加载态')
+  ok(String(playedSrc).indexOf('baidu') >= 0, '超时后先直连主源')
+  eq(loadingLog[loadingLog.length - 1], false, '直连时退出加载态（播放器自己在缓冲）')
+  global.__lastCtx._onErr({ errMsg: 'play fail' })
+  eq(dlCalls.length, 2, '主源直连也失败，换下一个源继续试')
+  eq(loadingLog[loadingLog.length - 1], true, '新源开始下载，重新进入加载态')
   timers[1].fn()
+  global.__lastCtx._onErr({ errMsg: 'play fail' })
+  eq(dlCalls.length, 3, '第二个源也失败，试第三个')
   timers[2].fn()
-  eq(errored, 1, '三个源都超时后才会报错一次')
+  global.__lastCtx._onErr({ errMsg: 'play fail' })
+  eq(errored, 1, '三个源都失败后才会报错一次')
   eq(loadingLog[loadingLog.length - 1], false, '最终退出加载态（不会一直转圈）')
 
   // 停止播放要清掉看门狗，否则迟到的回调会把已经停掉的播放又拉起来
