@@ -374,6 +374,40 @@ ok(freshDaily.length > 0 && freshDaily.length <= 5, 'filtered new words respects
 ok(freshDaily.every(w => w.category === '日常'), 'filtered new words are all in that category')
 eq(storageMod.getNewWords('en', 5, '不存在的分类').length, 0, 'unknown category returns empty')
 
+// ---- 词频优先：新词按常用度排序，而不是词库数组顺序（≈字母序） ----
+// 不排序时新用户第一天拿到的是 abandon/adjust/accommodate 这类低频难词；
+// 排序后第一个应该是 keep（COCA 156）这种真正的高频词。
+const wordRank = require('../utils/word-rank')
+ok(wordRank.size > 400, 'word rank table covers most english words')
+eq(wordRank.rankOf('en_211'), 156, 'rank of "keep" comes from ECDICT frq')
+eq(wordRank.rankOf('ja_001'), Infinity, 'japanese words have no rank (sort last)')
+const sortedFresh = storageMod.getNewWords('en', 8)
+eq(sortedFresh[0].word, 'keep', 'first new word is the most frequent one')
+let rankAscending = true
+for (let i = 1; i < sortedFresh.length; i++) {
+  if (wordRank.rankOf(sortedFresh[i - 1].id) > wordRank.rankOf(sortedFresh[i].id)) rankAscending = false
+}
+ok(rankAscending, 'new words are sorted from frequent to rare')
+const jaFresh = storageMod.getNewWords('ja', 3)
+eq(jaFresh[0].word, 'こんにちは', 'japanese keeps the original word order')
+
+// ---- karaoke：日语要按形态切分，否则整句只有一个 token，高亮等于失效 ----
+eq(karaoke.tokenize('Hello   world  !').length, 3, 'english still splits on whitespace')
+ok(karaoke.tokenize('私は中国から来ました。').length >= 5, 'japanese sentence is segmented into words')
+ok(karaoke.isJapaneseish('こんにちは'), 'hiragana detected as japanese')
+ok(!karaoke.isJapaneseish('hello world'), 'plain english is not japanese')
+const jaView = karaoke.toView(karaoke.tokenize('今日はいい天気ですね。'), 0)
+ok(jaView[0].text.indexOf(' ') === -1, 'japanese tokens carry no trailing space')
+const enView = karaoke.toView(['hello', 'world'], 0)
+eq(enView[0].text, 'hello ', 'english tokens carry a trailing space')
+ok(karaoke.weightOf('中国') > karaoke.weightOf('は'), 'japanese weight follows character count')
+// retime：拿到真实音频时长后，时间表要跟着改，而且总长度等于新时长
+const hl = karaoke.createHighlighter({ tokens: ['a', 'bbbb'], durationMs: 1000, onWord() {} })
+hl.retime(4000)
+hl.destroy()
+const rt = karaoke.wordTimings(['a', 'bbbb'], 4000)
+ok(rt[rt.length - 1].end > 2000, 'retimed schedule follows the real duration')
+
 // ---- recordings：wx.saveFile 会把临时文件「移走」，必须拿到 permanent 路径 ----
 // 锁死 speak.js 回放修复的前提：save() 返回的 entry.filePath 不能等于传进去的临时路径。
 const recordings = require('../utils/recordings')

@@ -68,6 +68,19 @@ function createPlayer(opts) {
     if (opts.rate && opts.rate !== 1) {
       try { ctx.playbackRate = opts.rate } catch (e) {}
     }
+    // 真实时长：逐词高亮按它对齐，比按字数估算准得多。
+    // duration 在部分机型上要 canplay 之后才可读，所以延后一拍取。
+    // 变速播放时实际耗时是 duration/rate，这里一并换算成「播放实际耗时」。
+    if (opts.onDuration && typeof ctx.onCanplay === 'function') {
+      ctx.onCanplay(function () {
+        setTimeout(function () {
+          const cur = ctx
+          if (!cur || !(cur.duration > 0)) return
+          const rate = opts.rate && opts.rate > 0 ? opts.rate : 1
+          try { opts.onDuration(cur.duration * 1000 / rate) } catch (e) {}
+        }, 200)
+      })
+    }
     ctx.play()
   }
   function stop() {
@@ -114,6 +127,7 @@ function speak(text, slow, handlers) {
       lp = createPlayer({
         rate: slow ? 0.75 : 1,
         onEnded: handlers.onEnded,
+        onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
         onError() {
           if (fellBack) return
           fellBack = true
@@ -156,6 +170,7 @@ function speak(text, slow, handlers) {
 
     const player = createPlayer({
       onEnded() { if (handlers.onEnded) handlers.onEnded() },
+      onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
       onError() { next() }
     })
 

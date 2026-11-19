@@ -71,8 +71,39 @@ python3 tools/gen-ja-audio.py --items /tmp/ja_items.json --out assets/audio/ja
 ```
 
 脚本会跳过已存在的文件，只补新的；`--force` 可全部重生成。
-代码包体积：主包上限 2MB，当前约 1.31MB（音频 1MB + 代码 0.3MB），
+代码包体积：主包上限 2MB，当前约 1.34MB（音频 1MB + 代码 0.3MB），
 `project.config.json` 的 `packOptions.ignore` 已把 `.md`、`tools/`、`tests/`、`deploy/` 排除出包。
+
+## 学新词的顺序（为什么先学 keep 而不是 abandon）
+
+词库数组是字母序，原实现直接 `filter(未学).slice(0, 5)`，等于**按字母表发词**：
+新用户第一天的五个词是 `abandon`(COCA 2182) / `ability`(783) / `accept`(766) /
+`access`(1113) / `accommodate`(3717)，第五个词在英语语料里排三千名开外。
+
+现在改成**高频优先**：`utils/word-rank.js` 内置 439 个英语词的词频排名（数字越小越常用），
+`storage.getNewWords()` 按排名升序取词。改完之后首日五个词是
+`keep`(156) / `different`(237) / `book`(241) / `continue`(293) / `create`(332)。
+
+- 数据来源：**ECDICT**（https://github.com/skywind3000/ECDICT）的 `frq`（COCA 词频排名）字段，
+  `frq` 为 0 时退回 `bnc`（BNC 排名）；两者都为 0 的超低频词不收录，排序时排在最后。
+- 日语词不进这张表（没有对应的日语语料库排名），保持词库原顺序。
+- 分类筛选（四级/六级/日常…）仍然生效，两个条件叠加：先在分类内过滤，再按词频排序。
+
+## 日语逐词高亮（TinySegmenter + 真实时长对齐）
+
+逐词高亮原来按空格切词，而日语不写空格——整句只会被当成 1 个 token，
+高亮对 62 个日语句子等于失效。两处改动：
+
+- **切词**：`utils/tiny-segmenter.js`（TinySegmenter 0.1，作者 Taku Kudo，New BSD，
+  18KB 纯 JS、无依赖）把日语句子切成 `私 / は / 中国 / から / 来 / まし / た` 这种粒度；
+  英语仍按空格切，行为不变。
+- **对齐**：高亮时间表原本按字数加权估算。现在音频 `canplay` 后读 `InnerAudioContext.duration`
+  真实时长，`highlighter.retime()` 现场重排时间表（慢速播放会按 `playbackRate` 换算成实际耗时），
+  高亮不会越走越偏。
+- 日语的 token 之间不补空格（`toView()` 按语种决定），英语 token 自带一个尾随空格。
+
+第三方代码只有这一个：`utils/tiny-segmenter.js`，文件头保留了原作者与许可信息，可随时替换回上游版本；
+本地只改了两处（`regexp.compile` 换成标准 `new RegExp`、末尾补 `module.exports`）。
 
 ## 性能与流畅度
 
@@ -120,6 +151,7 @@ python3 tools/gen-ja-audio.py --items /tmp/ja_items.json --out assets/audio/ja
 ├── sitemap.json
 ├── utils/
 │   ├── words.js                      词库 + 考试分类 + 语种元数据
+│   ├── word-rank.js                  英语词频排名表（ECDICT frq/bnc，新词高频优先）
 │   ├── sentences.js                  句子库(英112/日62句) + 情景对话(英8/日6组) + CEFR分级
 │   ├── profile.js                    多档案隔离（命名空间 + 老数据迁移 + 儿童/长辈模式）+ 当前档案缓存 + 失效入口
 │   ├── storage.js                    本地存储 + 读写缓存 + FSRS 复习调度 + 备份迁移 + 自建素材/主题
@@ -128,7 +160,8 @@ python3 tools/gen-ja-audio.py --items /tmp/ja_items.json --out assets/audio/ja
 │   ├── local-audio.js                日语离线音频清单（自动生成，id → /assets/audio/ja/*.mp3）
 │   ├── favorites.js                  生词收藏夹 + 搜索历史（按档案隔离）
 │   ├── nav.js                        统一跳转（tabBar走switchTab + 跨tab意图传参）
-│   ├── karaoke.js                    逐词高亮（K歌字幕）+ 词级时间估算
+│   ├── karaoke.js                    逐词高亮（K歌字幕）+ 词级时间估算 + 真实时长重排
+│   ├── tiny-segmenter.js             日语分词（TinySegmenter 0.1，第三方，New BSD）
 │   ├── feedback.js                   触感反馈（震动）
 │   ├── theme.js                      无障碍主题（字号/深色）页面 Behavior
 │   ├── speech-score.js               智聆评测(主) / 同声传译识别(备) → 发音评分

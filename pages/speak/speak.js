@@ -198,7 +198,11 @@ Page({
     this.stopAudio()
     const that = this
     const tokens = karaoke.tokenize(text)
-    const duration = Math.max(2200, tokens.length * 480)
+    // 日语一句的字符数远少于英语词数，用同一套估算会明显偏长；
+    // 这里只是「音频还没报时长」之前的第一版估算，真实时长一到就用 retime 覆盖。
+    const duration = karaoke.isJapaneseish(text)
+      ? Math.max(1200, String(text).replace(/\s/g, '').length * 190)
+      : Math.max(2200, tokens.length * 480)
     this._audioPlayer = audio.speak(text, slow, {
       id: id,
       lang: storage.getCurrentLang() === 'ja' ? 'ja_JP' : 'en_US',
@@ -217,6 +221,10 @@ Page({
           icon: 'none'
         })
         that.stopHighlight()
+      },
+      onDuration(ms) {
+        // 拿到真实音频时长后重排高亮时间表（估算 → 实测）
+        if (that._highlighter && ms > 0) that._highlighter.retime(ms)
       },
       onEnded() {
         that.stopHighlight()

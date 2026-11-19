@@ -1,5 +1,6 @@
 // 本地存储 + 复习调度（SM-2 风格动态间隔，见 utils/fsrs.js）
 const { getWords } = require('./words')
+const wordRank = require('./word-rank')
 const fsrs = require('./fsrs')
 const profile = require('./profile')
 
@@ -168,6 +169,10 @@ function getNewWords(lang, limit, category) {
   const prog = getProgress()
   const words = getWords(lang)
   const fresh = words.filter(w => !prog[w.id] && (!category || w.category === category))
+  // 高频优先：词库数组是字母序，直接 slice 会让新用户第一天撞上 abandon / accommodate
+  // 这种低频难词。按 ECDICT 词频排名升序（数字越小越常用），表里没有的（日语词、
+  // 超低频词）rankOf 返回 Infinity，稳定排序后仍保持词库原顺序。
+  fresh.sort((a, b) => wordRank.rankOf(a.id) - wordRank.rankOf(b.id))
   return limit ? fresh.slice(0, limit) : fresh
 }
 

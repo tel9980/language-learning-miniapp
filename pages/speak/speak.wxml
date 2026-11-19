@@ -86,7 +86,7 @@
     <!-- 逐词高亮（K歌字幕） -->
     <view class="stage-word {{track==='sentence'||track==='dialogue'||track==='custom'?'sentence':''}} {{karaokeOn?'karaoke':''}}">
       <block wx:if="{{karaokeOn && karaokeTokens.length}}">
-        <text wx:for="{{karaokeTokens}}" wx:key="index" wx:for-index="idx" class="k-token {{item.active?'active':''}}">{{item.text}} </text>
+        <text wx:for="{{karaokeTokens}}" wx:key="index" wx:for-index="idx" class="k-token {{item.active?'active':''}}">{{item.text}}</text>
       </block>
       <block wx:else>
         <text wx:if="{{rolePlay && track==='dialogue' && !revealed}}">（想想你要说什么…）</text>
