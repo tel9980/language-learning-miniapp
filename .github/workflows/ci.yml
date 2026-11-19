@@ -4,6 +4,7 @@ on:
   push:
     branches: [master]
   pull_request:
+  workflow_dispatch:   # 也可以在网页/Actions 页面手动点一下
 
 jobs:
   check:
