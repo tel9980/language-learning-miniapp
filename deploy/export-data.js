@@ -7,7 +7,7 @@ const words = require('../utils/words')
 const sentences = require('../utils/sentences')
 
 const payload = {
-  version: new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14), // 每次导出自动更新版本号
+  version: '', // 下面用「内容指纹」填：内容没变就不变，用户不会白拉 134KB
   generatedAt: new Date().toISOString(),
   words: {
     en: words.WORDS.en,
@@ -22,6 +22,18 @@ const payload = {
     ja: sentences.DIALOGUES.ja
   }
 }
+
+// 版本号 = 内容指纹：只有真的改了词库/句子才会变
+// （以前用时间戳，每次部署版本都变，所有用户都要重下 134KB —— 哪怕一个字都没改）
+;(function stampVersion() {
+  const crypto = require('crypto')
+  const body = JSON.stringify({
+    words: payload.words,
+    sentences: payload.sentences,
+    dialogues: payload.dialogues
+  })
+  payload.version = 'c' + crypto.createHash('sha1').update(body).digest('hex').slice(0, 13)
+})()
 
 const json = JSON.stringify(payload)
 const out = path.join(__dirname, 'data.json')

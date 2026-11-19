@@ -258,13 +258,14 @@ node tests/run-tests.js
 ## 在线词库更新（已启用，走备案域名）
 
 词库默认内置在包里，但**在线更新通道已经开好**：素材放到
-**<https://yb.qy663.de5.net/data.json>**（Cloudflare Worker + 已备案域名 `yb.qy663.de5.net`），
+**<https://yb.qy663.de5.net/data.json>**（Cloudflare Pages + 已备案域名 `yb.qy663.de5.net`），
 改词加句**不用重新提交小程序版本**，用户下次启动自动拉到新素材。
 
 - 客户端逻辑在 `utils/online-data.js`：`DATA_URLS` 按顺序试（主源挂了换下一个），
   全挂就静默用本地缓存或内置词库，**绝不阻断练习**。
-- 更新素材：改 `utils/words.js` / `utils/sentences.js` → `node deploy/export-data.js`
-  → `node deploy/cf/build-worker.js` → `node deploy/cf/push-worker.js`。
+- 更新素材：改 `utils/words.js` / `utils/sentences.js` → **`bash deploy/cf/deploy.sh`**
+  （一条命令：重导出 → 发布 → 自己拉一次线上做校验）。
+- 版本号是**内容指纹**：词库没改就不变版本，用户不会白拉一份同样的 134KB。
 - 部署与域名细节见 **[deploy/cf/README.md](deploy/cf/README.md)**；
   想换回阿里云 OSS 做主源见 **[在线词库部署-OSS.md](在线词库部署-OSS.md)**（把地址加进 `DATA_URLS` 即可）。
 

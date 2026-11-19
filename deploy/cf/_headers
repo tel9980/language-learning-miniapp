@@ -1,9 +1,6 @@
-# Cloudflare Pages 响应头（仅对这个目录里的静态文件生效）
+# Cloudflare Pages 响应头设置（Pages 自动处理 Content-Type 与缓存，这里只补跨域）
 /data.json
-  Content-Type: application/json; charset=utf-8
   Access-Control-Allow-Origin: *
-  Cache-Control: public, max-age=60
 
-/*
-  Access-Control-Allow-Origin: *
-  Cache-Control: public, max-age=300
+# 注意：Pages 对静态资源默认 Cache-Control: public, max-age=300（5 分钟）。
+# 词库靠「版本号变了才重写」来更新，所以最多滞后 5 分钟，不影响正确性。

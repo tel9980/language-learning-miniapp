@@ -1109,6 +1109,21 @@ async function runExtraTests() {
   eq(o8 && o8.updated, true, '空覆盖层版本也能更新')
   eq(words.getWords('en').length, 440, '空覆盖层回落到内置词库')
 
+  // 线上发布包本身的自洽性：版本号是内容指纹（同一份内容重跑导出必须一样）
+  const crypto = require('crypto')
+  const shipped = require('../deploy/data.json')
+  ok(/^c[0-9a-f]{13}$/.test(shipped.version), 'deploy/data.json 的版本号是内容指纹（c + sha1 前 13 位）')
+  const fp = 'c' + crypto.createHash('sha1').update(JSON.stringify({
+    words: shipped.words, sentences: shipped.sentences, dialogues: shipped.dialogues
+  })).digest('hex').slice(0, 13)
+  eq(fp, shipped.version, '指纹与内容一致（改词库才变版本，重复部署不会让用户白拉）')
+  eq(shipped.words.en.length, 440, '发布包英语 440 词')
+  eq(shipped.words.ja.length, 100, '发布包日语 100 词')
+  eq(shipped.sentences.en.length, 112, '发布包英语 112 句')
+  eq(shipped.sentences.ja.length, 100, '发布包日语 100 句')
+  const cfCopy = require('../deploy/cf/data.json')
+  eq(cfCopy.version, shipped.version, '发布目录里的 data.json 与 deploy/data.json 同版本')
+
   od.DATA_URLS.splice(0, od.DATA_URLS.length)
   Array.prototype.push.apply(od.DATA_URLS, shippedSources)
   global.wx.request = origReq

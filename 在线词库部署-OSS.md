@@ -82,24 +82,22 @@ https://data.你的域名.com
 
 ---
 
-## 备用源：Cloudflare（已上线，且是当前主源）
+## 当前主源：Cloudflare Pages（已上线）
 
-**<https://yb.qy663.de5.net/data.json>** —— Cloudflare Worker + 已备案域名，
-实测 200 / `application/json` / 136983 字节 / 与仓库 `deploy/data.json` 逐字节一致。
+**<https://yb.qy663.de5.net/data.json>** —— Cloudflare Pages 项目 `yuban-data` + 已备案域名，
+200 / `application/json` / 与仓库 `deploy/data.json` 逐字节一致。
 
-更新它三条命令：
+更新词库只要一条命令：
 
 ```bash
-node deploy/export-data.js        # 刷新 deploy/data.json 与 deploy/cf/data.json
-node deploy/cf/build-worker.js    # 内联成 worker.js
-node deploy/cf/push-worker.js     # 上传（token 自动读本机 ~/.dsh/cf-token）
+bash deploy/cf/deploy.sh
 ```
 
-域名怎么挂上的：一条 proxied CNAME（`yb` → `yuban-data.tel9980-fb9.workers.dev`）
-**加**一条 Worker 路由（`yb.qy663.de5.net/*` → `yuban-data`）。
-只加 CNAME 不加路由会 522 超时——因为 Cloudflare 会去连 workers.dev 的公网地址。
-这两步已写成幂等脚本：`node deploy/cf/setup-domain.js`。
+（自动重导出 → `wrangler pages deploy` → 拉一次线上校验版本号与条数。）
 
-小程序里 `utils/online-data.js` 的 `DATA_URLS` 填这个地址，并把
-`https://yb.qy663.de5.net` 加进 **request 合法域名**。Alinux OSS 那份可以随时
-作为主源加在数组前面（`DATA_URLS` 支持多源，按顺序降级）。
+- 版本号是**内容指纹**（`c` + sha1 前 13 位）：重复部署不会让已更新的用户白拉 134KB。
+- 缓存 `max-age=0, must-revalidate` + ETag：改完立刻生效，不用等缓存过期。
+- 部署细节、token 权限、旧 Worker 方案见 **[deploy/cf/README.md](deploy/cf/README.md)**。
+
+想把阿里云 OSS 作为主源、Cloudflare 作备源，把两个地址按顺序填进
+`utils/online-data.js` 的 `DATA_URLS` 即可（多源降级已支持）。
