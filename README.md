@@ -260,7 +260,8 @@ node tests/run-tests.js
 默认完全离线、用内置词库。若你有**已备案的 https 域名**，可把词库放上去，以后加词改句**不用重新提交小程序版本**：
 
 1. 按 **[在线词库部署-OSS.md](在线词库部署-OSS.md)** 把 `deploy/data.json` 传到阿里云 OSS 并绑定备案域名。
-2. （可选）按 **[deploy/cf/README.md](deploy/cf/README.md)** 在 Cloudflare Pages 上再放一份**备用源**。
+2. （可选）备用源已经在 Cloudflare 上跑着了：**<https://yuban-data.tel9980-fb9.workers.dev/data.json>**
+   —— 更新方式与细节见 **[deploy/cf/README.md](deploy/cf/README.md)**。
 3. 把地址按优先级填进 `utils/online-data.js` 的 `DATA_URLS`（填 `[]` 即不启用，默认完全离线）。
 4. 小程序后台把用到的域名加进 **request 合法域名**（测试号可先跳过）。
 

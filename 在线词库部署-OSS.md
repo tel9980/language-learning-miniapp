@@ -82,15 +82,23 @@ https://data.你的域名.com
 
 ---
 
-## 备用源：Cloudflare Pages（可选）
+## 备用源：Cloudflare（已上线）
 
-OSS 欠费、被限流、或者临时想替换文件时，可以再放一份到 Cloudflare Pages 当备源，
-小程序会自动降级过去。做法见 **[deploy/cf/README.md](deploy/cf/README.md)**：
+OSS 欠费、被限流、或者临时想替换文件时，小程序会自动降级到 Cloudflare 上的那份：
+
+**<https://yuban-data.tel9980-fb9.workers.dev/data.json>**
+
+更新它只要三条命令（token 自动读本机 `~/.dsh/cf-token`）：
 
 ```bash
 node deploy/export-data.js        # 同时刷新 deploy/data.json 和 deploy/cf/data.json
-bash deploy/cf/deploy.sh          # 需要 CLOUDFLARE_API_TOKEN
+node deploy/cf/build-worker.js    # 内联成 worker.js
+node deploy/cf/push-worker.js     # 上传到 Cloudflare
 ```
 
-把两个地址都填进 `utils/online-data.js` 的 `DATA_URLS`（主源在前），两个域名都要加进
-**request 合法域名**。注意 `*.pages.dev` 无法备案，真机可用仍需你自己的备案域名 CNAME 到 Pages。
+然后把两个地址都填进 `utils/online-data.js` 的 `DATA_URLS`（主源在前），
+两个域名都要加进 **request 合法域名**。
+
+⚠️ `*.workers.dev` / `*.pages.dev` 无法备案，真机上加不进白名单：
+开发者工具里勾掉「校验合法域名」就能用；要真机可用，得在 Cloudflare 上把你的**已备案**
+域名绑成 Custom Domain（详见 [deploy/cf/README.md](deploy/cf/README.md)）。

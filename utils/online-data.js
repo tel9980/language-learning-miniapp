@@ -4,8 +4,8 @@ const STORAGE_KEY = 'lp_online_data_v1'
 
 // ⬇️ 这里填你备案域名的 JSON 地址，按优先级从前往后填，例如：
 // const DATA_URLS = [
-//   'https://你的域名.com/yuban/data.json',        // 主源（如阿里云 OSS）
-//   'https://yuban-data.pages.dev/data.json'       // 备源（Cloudflare Pages）
+//   'https://你的备案域名.com/yuban/data.json',                  // 主源（如阿里云 OSS）
+//   'https://yuban-data.tel9980-fb9.workers.dev/data.json'        // 备源（Cloudflare，已在线上）
 // ]
 // 留空数组 [] 表示不启用在线更新（默认，完全离线）。
 // 主源挂了会自动试下一个，全挂就静默用内置词库，绝不阻断练习。

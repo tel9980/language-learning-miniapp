@@ -16,3 +16,6 @@ Thumbs.db
 # 临时文件
 *.tmp
 *.swp
+
+# 由 deploy/cf/build-worker.js 生成（内联了 data.json，不必进仓库）
+deploy/cf/worker.js
