@@ -1247,4 +1247,19 @@ async function runExtraTests() {
   Array.prototype.push.apply(od.DATA_URLS, shippedSources)
   global.wx.request = origReq
   eq(od.DATA_URLS.length, shippedSources.length, '测试后还原仓库里的配置')
+
+  // 日语句子在分包里：分包没加载好时不能退在线链（日语整句没有可用在线源，
+  // 退过去就是「读不出来」）。必须等分包就绪、再播本地文件。
+  delete require.cache[require.resolve('../utils/audio')]
+  delete require.cache[require.resolve('../utils/local-audio')]
+  const auJa = require('../utils/audio')
+  const laJa = require('../utils/local-audio')
+  eq(laJa.isReady('ja'), false, '重新加载的模块：日语分包初始未就绪')
+  playedSrc = null
+  const ctl = auJa.speak('すみません、駅はどこですか。', false, { id: 'st_js015' })
+  eq(ctl.pending, true, '日语分包未就绪时先挂起，不去撞必然失败的在线源')
+  eq(playedSrc, null, '挂起期间不播放任何音频')
+  await new Promise(function (r) { setTimeout(r, 30) })
+  eq(playedSrc, 'wxfile://usr/pkg-audio/packageJa_ja_js015.mp3', '分包就绪后自动播本地副本（前缀 id 也命中）')
+  ctl.stop()
 }

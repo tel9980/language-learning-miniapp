@@ -137,10 +137,26 @@ function speak(text, slow, handlers) {
   // 随包音频优先：日语素材的 mp3 打在代码包里（见 utils/local-audio.js），
   // 播到就是 0 请求、0 配额、断网可用。真出问题（文件缺失/解码失败）再退回网络链。
   const localPath = handlers.id ? localAudio.pathFor(handlers.id) : ''
-  // 日语音频在分包里：分包还没加载好时 pathFor 返回空串，这里顺手催一下加载，
-  // 用户再点一次就能听到（不会白撞一次必然失败的在线请求）
-  if (handlers.id && !localPath && localAudio.langOf(handlers.id) === 'ja' && !localAudio.isReady('ja')) {
-    localAudio.ensureLoaded('ja')
+  // 日语音频在分包里，分包没加载完时 pathFor 返回空串。日语整句又没有可用的在线源
+  // （有道只支持词、百度 403、同声传译只支持中英文），所以这里不能直接退在线链，
+  // 而是等分包加载完再播本地文件——否则用户看到的就是「日语句子读不出来」。
+  if (handlers.id && !localPath && !handlers._waitedJa &&
+      localAudio.langOf(handlers.id) === 'ja' && !localAudio.isReady('ja')) {
+    if (handlers.onLoading) handlers.onLoading(true)
+    let cancelled = false
+    let inner = null
+    localAudio.ensureLoaded('ja').then(function () {
+      if (cancelled) { if (handlers.onLoading) handlers.onLoading(false); return }
+      const again = Object.assign({}, handlers, { _waitedJa: true })
+      if (handlers.onLoading) handlers.onLoading(false)
+      inner = speak(text, slow, again)
+    })
+    return {
+      pending: true,
+      stop() { cancelled = true; if (inner && inner.stop) inner.stop() },
+      destroy() { cancelled = true; if (inner && inner.destroy) inner.destroy() },
+      retry() { if (inner && inner.retry) inner.retry() }
+    }
   }
   if (localPath) {
     // 代码包内的 mp3 真机播不了（operateAudio:fail:access denied），
