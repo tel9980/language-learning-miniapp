@@ -8,7 +8,7 @@ const sentences = require('../utils/sentences')
 
 const payload = {
   version: '', // 下面用「内容指纹」填：内容没变就不变，用户不会白拉 134KB
-  generatedAt: new Date().toISOString(),
+  // 不写 generatedAt：内容相同时整个文件逐字节不变，git 里就不会有「只有时间戳变了」的假改动
   words: {
     en: words.WORDS.en,
     ja: words.WORDS.ja
