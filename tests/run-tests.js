@@ -616,6 +616,21 @@ eq(typeof localAudio.pathFor, 'undefined', 'pathFor 已移除（代码包里没�
 eq(localAudio.idCandidates('dl_d003_1').join(','), 'dl_d003_1,d003_1', 'id candidates strip the queue prefix')
 eq(localAudio.remoteFor('st_s001'), 'https://yb.qy663.de5.net/audio-en/s001.mp3', 'prefixed sentence id finds the same mp3')
 eq(localAudio.remoteFor('dl_d003_1'), 'https://yb.qy663.de5.net/audio-en/d003_1.mp3', 'prefixed dialogue line id finds the same mp3')
+
+// 对话听写（pages/dictation 的 dlg 模式）按「dl_ + 台词 id」取音频，
+// 每条台词都必须能找到音频，否则真机上那一句必然读不出来。
+;['en', 'ja'].forEach(function (lg) {
+  let lines = 0
+  let missing = []
+  sentences.getDialogues(lg).forEach(function (d) {
+    d.lines.forEach(function (l) {
+      lines++
+      if (!localAudio.remoteFor('dl_' + l.id)) missing.push(lg + '/' + l.id)
+    })
+  })
+  ok(lines >= 20, '对话台词条数合理（' + lg + ': ' + lines + '）')
+  eq(missing.join(','), '', '每条台词都有离线音频（' + lg + '）')
+})
 eq(localAudio.langOf('dl_d003_1'), 'en', 'langOf understands prefixed ids')
 
 const audioIds = []

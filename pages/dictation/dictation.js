@@ -13,7 +13,7 @@ const ROUND = 10
 Page({
   behaviors: [theme],
   data: {
-    mode: 'word',              // word | sent
+    mode: 'word',              // word | sent | dlg
     queue: [], index: 0, total: 0, current: null,
     input: '', revealed: false, isRight: false,
     correctCount: 0, wrongCount: 0, finished: false, accuracy: 0, progress: 0,
@@ -36,7 +36,22 @@ Page({
     const lang = storage.getCurrentLang()
     const now = Date.now()
     let queue = []
-    if (this.data.mode === 'sent') {
+    if (this.data.mode === 'dlg') {
+      // 整段对话逐句听写：把一组对话的台词按顺序排成队列，最多 ROUND 句
+      const ds = sentences.getDialogues(lang)
+      const start = ds.length ? (this._dlgCursor || 0) % ds.length : 0
+      this._dlgCursor = start + 1
+      for (let i = 0; i < ds.length && queue.length < ROUND; i++) {
+        const d = ds[(start + i) % ds.length]
+        d.lines.forEach(function (l) {
+          if (queue.length >= ROUND) return
+          queue.push({
+            id: 'dl_' + l.id, word: l.text, meaning: l.cn, kind: 'dialogue',
+            example: l.text, role: l.role || '', scene: d.scene || ''
+          })
+        })
+      }
+    } else if (this.data.mode === 'sent') {
       const all = sentences.getAllItems(lang)
       const prog = sentenceProgress.all()
       queue = quiz.pickSentences(all, prog, now, ROUND).map(function (it) {
@@ -103,7 +118,7 @@ Page({
     const cur = this.data.current
     if (!cur) return
     // 写出答案就算复习过：单词进 FSRS，句子进句子调度表（同一套口径，见 README）
-    if (cur.kind === 'sentence') {
+    if (cur.kind === 'sentence' || cur.kind === 'dialogue') {
       sentenceProgress.review(cur.id, right ? 5 : 0, 'dictation')
     } else {
       storage.review(cur.id, right ? 2 : 0)

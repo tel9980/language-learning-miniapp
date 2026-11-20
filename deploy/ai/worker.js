@@ -20,6 +20,10 @@
 const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.8-flash']
 const MAX_Q = 40
 const CACHE_TTL = 60 * 60 * 24 * 30   // 30 天
+// 每个 IP 每天真调 Gemini 的次数上限（缓存命中不计数）。
+// 目的是防止有人拿这个公开地址刷额度：小程序是公开的，Worker 地址也一样公开。
+const DAILY_LIMIT = 300
+const LIMIT_TTL = 60 * 60 * 24 * 2
 const UA_OK = ['en', 'ja']
 
 const CORS = {
@@ -36,6 +40,27 @@ function json(body, status, extra) {
       'Cache-Control': 'public, max-age=3600'
     }, CORS, extra || {})
   })
+}
+
+// 每 IP 每天计数：KV 自增做不了原子操作，少量并发会少记几次——
+// 这里只要拦住「刷」，不需要精确账本。
+async function bumpLimit(env, ip) {
+  if (!env.AI_CACHE) return { allowed: true, used: 0 }
+  const day = new Date().toISOString().slice(0, 10)
+  const key = 'rl:' + day + ':' + ip
+  try {
+    const cur = await env.AI_CACHE.get(key)
+    const n = cur ? (parseInt(cur, 10) || 0) : 0
+    if (n >= DAILY_LIMIT) return { allowed: false, used: n }
+    await env.AI_CACHE.put(key, String(n + 1), { expirationTtl: LIMIT_TTL })
+    return { allowed: true, used: n + 1 }
+  } catch (e) {
+    return { allowed: true, used: 0 }   // KV 出错就放行，别把功能弄死
+  }
+}
+
+function clientIp(request) {
+  return request.headers.get('cf-connecting-ip') || request.headers.get('x-real-ip') || 'unknown'
 }
 
 function buildPrompt(q, lang) {
@@ -148,6 +173,15 @@ export default {
         const hit = await env.AI_CACHE.get(cacheKey, 'json')
         if (hit) return json(Object.assign({ cached: true }, hit), 200, { 'Cache-Control': 'public, max-age=86400' })
       } catch (e) { /* 缓存坏了不影响主流程 */ }
+    }
+
+    const limit = await bumpLimit(env, clientIp(request))
+    if (!limit.allowed) {
+      return json({
+        ok: false,
+        error: 'rate-limited',
+        message: '今天的 AI 查词次数用完了（每个网络每天 ' + DAILY_LIMIT + ' 次），明天再来，或者先看词库里有没有。'
+      }, 429, { 'Cache-Control': 'no-store' })
     }
 
     let payload

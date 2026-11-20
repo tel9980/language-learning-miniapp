@@ -175,6 +175,8 @@ Page({
         if (r.reason === 'network') msg = '网络不通，稍后再试'
         else if (r.reason === 'not-configured') msg = 'AI 查词还没配好'
         else if (r.reason === 'upstream') msg = 'AI 暂时没答上来，稍后再试'
+        else if (r.reason === 'rate-limited') msg = '今天的 AI 查词次数用完了，明天再来（先看看词库里有没有）'
+        else if (r.reason === 'query-too-long') msg = '这个词太长了，换个短一点的'
         that.setData({ aiLoading: false, aiError: msg })
         return
       }

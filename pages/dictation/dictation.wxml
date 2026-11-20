@@ -3,6 +3,7 @@
     <view class="mode-tabs">
       <view class="mode-tab {{mode==='word'?'active':''}}" data-mode="word" bindtap="switchMode">单词听写</view>
       <view class="mode-tab {{mode==='sent'?'active':''}}" data-mode="sent" bindtap="switchMode">句子听写</view>
+      <view class="mode-tab {{mode==='dlg'?'active':''}}" data-mode="dlg" bindtap="switchMode">对话听写</view>
     </view>
 
     <view class="card">
@@ -12,6 +13,7 @@
       </view>
       <view class="progress-track"><view class="progress-fill" style="width:{{progress}}%"></view></view>
       <view class="muted hint">听发音，把听到的内容写下来。标点和大小写不计较。</view>
+      <view class="muted dlg-meta" wx:if="{{mode==='dlg'}}">{{current.scene}}<text wx:if="{{current.role}}"> · {{current.role}}</text></view>
 
       <view class="play-row">
         <view class="play-btn {{playing?'playing':''}}" bindtap="play">{{playing?'🔊 播放中':'🔊 播放'}}</view>
@@ -19,7 +21,7 @@
       </view>
 
       <textarea class="write-box" value="{{input}}" bindinput="onInput" disabled="{{revealed}}"
-                placeholder="{{mode==='sent'?'写下整句':'写下这个单词'}}" maxlength="200" auto-height />
+                placeholder="{{mode==='word'?'写下这个单词':'写下这整句'}}" maxlength="200" auto-height />
 
       <view class="feedback {{isRight?'fb-right':'fb-wrong'}}" wx:if="{{revealed}}">
         <view class="fb-title">{{isRight?'✅ 写对了':'❌ 差一点'}}</view>

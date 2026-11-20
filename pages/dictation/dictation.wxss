@@ -36,3 +36,7 @@
 .theme-dark .fb-right { background: #16321F; }
 .theme-dark .fb-wrong { background: #3A1D1D; }
 .theme-dark .fb-answer { color: #E5E9F0; }
+
+/* 对话听写：显示这局是哪个场景、谁在说话 */
+.dlg-meta { margin-top: 4rpx; font-size: 24rpx; }
+.theme-dark .dlg-meta { color: #9AA3B2; }
