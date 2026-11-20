@@ -15,7 +15,9 @@
 // 明确不做的事：不写词库、不落库到 data.json。AI 生成的内容只作为「查词参考」显示在页面上
 // （页面标注「AI 生成，仅供参考」），词库仍然只能通过 git push + CI 测试上线。
 
-const MODEL = 'gemini-2.0-flash'
+// 模型名会被 Google 下线（gemini-2.0-flash 已经 404 了），所以按顺序试：
+// 先便宜的 flash-lite，不行再往上退。改这里就能换模型，不用动逻辑。
+const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.8-flash']
 const MAX_Q = 40
 const CACHE_TTL = 60 * 60 * 24 * 30   // 30 天
 const UA_OK = ['en', 'ja']
@@ -56,6 +58,21 @@ function buildPrompt(q, lang) {
 }
 
 async function askGemini(env, q, lang) {
+  let lastErr = null
+  for (let i = 0; i < MODELS.length; i++) {
+    try {
+      return await askModel(env, MODELS[i], q, lang)
+    } catch (e) {
+      lastErr = e
+      // 换模型有用的情况：模型下线(404)、临时过载(503)、本模型配额用完(429)；
+      // 参数错(400)、鉴权错(403) 换哪个都一样，直接抛。
+      if (!/ 404| 429| 503|NOT_FOUND|overloaded/.test(String(e && e.message))) throw e
+    }
+  }
+  throw lastErr || new Error('gemini unavailable')
+}
+
+async function askModel(env, MODEL, q, lang) {
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
     MODEL + ':generateContent?key=' + encodeURIComponent(env.GEMINI_API_KEY)
   const res = await fetch(url, {

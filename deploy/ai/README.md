@@ -18,7 +18,7 @@ Worker 拿 Gemini Key 去问 Google，返回**中文释义 + 2 个例句 + 1 条
 | 文件 | 作用 |
 | --- | --- |
 | `worker.js` | Worker 本体（模块语法）。`GET /lookup?q=<词>&lang=en\|ja` |
-| `push.js` | 一键部署：建 KV 命名空间 → 传脚本 → 设 `GEMINI_API_KEY` → 建 CNAME + Worker 路由 |
+| `push.js` | 一键部署：建 KV 命名空间 → 传脚本 → 设 `GEMINI_API_KEY` → 建 CNAME + Worker 路由（幂等，可反复跑） |
 
 ## 部署
 
@@ -38,6 +38,21 @@ GEMINI_API_KEY=xxxx node deploy/ai/push.js
    和当初挂 `yb.qy663.de5.net` 踩的是同一个坑；
    `POST /workers/domains`（Custom Domain 接口）在这个 token 下报
    405 `Method not allowed for this authentication scheme`，所以走 CNAME + 路由。
+
+## 已经踩过的三个坑（都在 push.js 里处理了）
+
+1. **`cf()` 合并顺序错会把 Authorization 头吃掉**：先 `Object.assign({headers}, opts)` 再摊开 `opts`，
+   `opts.headers` 会把整张表头替换掉 → Cloudflare 回 `9106 Missing X-Auth-Key`。
+   正确写法是先摊开 `opts`，再覆盖 `headers`。
+2. **设 secret 的 REST 接口挑包体**：`PUT .../secrets` 用 multipart 会被本账号一直拒成
+   `10026 Could not parse request body`（加不加 `type: secret_text` 都一样）→ 退回 `npx wrangler@3 secret put`。
+3. **路由重复创建返回 409 / 10020**：脚本第二次跑必然撞上，按成功处理；DNS 与 KV 同理都是「先查再建」。
+
+## 模型名会被 Google 下线
+
+`gemini-2.0-flash` 已经 404（`This model ... is no longer available`），现在 Worker 里是
+`const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.8-flash']`：
+逐个试，只有 404（下线）/ 429（本模型配额）/ 503（过载）才换下一个，400/403 这类换模型也没用就直接抛；换模型不用改逻辑。
 
 ## 自测
 

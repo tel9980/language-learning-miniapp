@@ -36,9 +36,12 @@ function geminiKey() {
 }
 
 async function cf(pathname, opts) {
-  const res = await fetch(API + pathname, Object.assign({
-    headers: Object.assign({ Authorization: 'Bearer ' + token() }, (opts && opts.headers) || {})
-  }, opts || {}))
+  // 注意合并顺序：先摊开 opts，再覆盖 headers —— 反过来写会让 opts.headers
+  // 整个替换掉带 Authorization 的表头，Cloudflare 于是回 9106 "Missing X-Auth-Key"。
+  const o = opts || {}
+  const res = await fetch(API + pathname, Object.assign({}, o, {
+    headers: Object.assign({ Authorization: 'Bearer ' + token() }, o.headers || {})
+  }))
   const body = await res.json().catch(function () { return {} })
   if (!res.ok || body.success === false) {
     const err = JSON.stringify((body && body.errors) || body).slice(0, 400)
@@ -48,6 +51,19 @@ async function cf(pathname, opts) {
 }
 
 async function ensureKv() {
+  try {
+    return await ensureKvUnsafe()
+  } catch (e) {
+    // token 没有 Workers KV Storage 权限时不阻断部署：Worker 没绑 KV 就走「不缓存」分支，
+    // 客户端自己还有 40 条本地缓存。想补上：控制台 → My Profile → API Tokens → 加
+    // Account → Workers KV Storage:Edit → Roll 出新值 → 更新 ~/.dsh/cf-token 后重跑本脚本。
+    console.log('⚠️ 没有 KV 权限，跳过 KV 绑定（Worker 仍可用，只是不共享缓存）')
+    console.log('   ' + String(e && e.message || e).slice(0, 160))
+    return ''
+  }
+}
+
+async function ensureKvUnsafe() {
   const list = await cf('/accounts/' + ACCOUNT + '/storage/kv/namespaces?per_page=100')
   const hit = (list || []).filter(function (n) { return n.title === KV_TITLE })[0]
   if (hit) return hit.id
@@ -62,10 +78,11 @@ async function ensureKv() {
 
 async function upload(kvId) {
   const code = fs.readFileSync(path.join(__dirname, 'worker.js'), 'utf8')
+  const bindings = kvId ? [{ type: 'kv_namespace', name: 'AI_CACHE', namespace_id: kvId }] : []
   const metadata = {
     main_module: 'worker.js',
     compatibility_date: '2026-01-01',
-    bindings: [{ type: 'kv_namespace', name: 'AI_CACHE', namespace_id: kvId }]
+    bindings: bindings
   }
   const fd = new FormData()
   fd.set('metadata', JSON.stringify(metadata))
@@ -84,11 +101,30 @@ async function hasSecret(name) {
 }
 
 async function setSecret(name, value) {
-  const fd = new FormData()
-  fd.set('name', name)
-  fd.set('text', value)
-  await cf('/accounts/' + ACCOUNT + '/workers/scripts/' + SCRIPT + '/secrets', { method: 'PUT', body: fd })
-  console.log('✅ 已设置 secret:', name)
+  // 先试 REST 接口；Cloudflare 这个接口对 multipart 的校验很挑，某些账号会一直报
+  // 10026 "Could not parse request body"（实测本账号就是），此时退回 wrangler ——
+  // 它走的是同一套接口但组包方式不同，实测能成功。
+  try {
+    const fd = new FormData()
+    fd.set('name', name)
+    fd.set('text', value)
+    fd.set('type', 'secret_text')
+    await cf('/accounts/' + ACCOUNT + '/workers/scripts/' + SCRIPT + '/secrets', { method: 'PUT', body: fd })
+    console.log('✅ 已设置 secret:', name)
+    return
+  } catch (e) {
+    console.log('⚠️ REST 设 secret 失败，改用 wrangler:', String(e.message || e).slice(0, 120))
+  }
+  const { execFileSync } = require('child_process')
+  execFileSync('npx', ['--yes', 'wrangler@3', 'secret', 'put', name, '--name', SCRIPT], {
+    cwd: require('os').tmpdir(),
+    input: value,
+    stdio: ['pipe', 'inherit', 'inherit'],
+    env: Object.assign({}, process.env, {
+      CLOUDFLARE_API_TOKEN: token(), CLOUDFLARE_ACCOUNT_ID: ACCOUNT
+    })
+  })
+  console.log('✅ 已设置 secret（wrangler）:', name)
 }
 
 async function ensureRoute(zoneId) {
@@ -98,12 +134,21 @@ async function ensureRoute(zoneId) {
     console.log('✅ Worker 路由已存在:', pattern)
     return
   }
-  await cf('/zones/' + zoneId + '/workers/routes', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pattern: pattern, script: SCRIPT })
-  })
-  console.log('✅ 新建 Worker 路由:', pattern, '→', SCRIPT)
+  try {
+    await cf('/zones/' + zoneId + '/workers/routes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pattern: pattern, script: SCRIPT })
+    })
+    console.log('✅ 新建 Worker 路由:', pattern, '→', SCRIPT)
+  } catch (e) {
+    // 409/10020 = 同一个 pattern 的路由已经存在（重复执行脚本时的正常情况）
+    if (/ 409/.test(String(e && e.message))) {
+      console.log('✅ Worker 路由已存在（409 视为成功）:', pattern)
+      return
+    }
+    throw e
+  }
 }
 
 async function ensureDns(zoneId, target) {
