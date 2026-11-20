@@ -1,6 +1,6 @@
 // 音频工具：统一 TTS 地址生成 + 播放管理 + 发音源降级兜底
 //
-// 日语素材优先播随包发布的离线音频（utils/local-audio.js），不联网也不占配额。
+// 预生成音频（日语全部、英语的句子与台词）走 utils/local-audio.js 里的 CDN 地址，不占智聆配额。
 //
 // 降级链：有道主源 → 有道 type 切换 → 百度翻译 TTS → 微信同声传译本地合成（需插件）
 //
@@ -18,7 +18,6 @@
 // 否则界面切到日语后练英文词（"hello"）会被读成日式口音。
 const localAudio = require('./local-audio')
 const ttsCache = require('./tts-cache')
-const pkgAudio = require('./pkg-audio')
 
 // 单次下载的看门狗时长：wx.downloadFile 没有 timeout 参数，默认要等 60 秒才失败，
 // 弱网下用户看到的就是「点了没反应」。8 秒还没下完就放弃这个源、换下一个（有道↔百度）。
@@ -161,56 +160,26 @@ function speak(text, slow, handlers) {
   const ydBackup = { id: 'youdao-backup', url: ttsUrl(text, !slow, jaText ? 'ja_JP' : lang) }
   const bd = { id: 'baidu', url: baiduUrl(text, slow, lang) }
 
-  // 随包音频（日语/英语的句子、台词、日语单词）：见 utils/local-audio.js。
-  // 顺序 = ①流播 CDN 上的同一批 mp3（InnerAudioContext 播 URL 不受域名白名单限制）
-  //       → ②分包里的文件复制到用户目录再播（真离线路径）
-  //       → ③在线 TTS 链。
-  // 为什么不再优先读包：真机实测 FileSystemManager 读分包内的文件会直接失败
-  // （日志「[pkg-audio] 读不到代码包内的音频 /packageJa/ja/js001.mp3」），
-  // 原来的顺序导致每条都掉进在线链——日语整句没有在线源，等于没声音。
+  // 预生成音频（日语/英语的句子、台词、日语单词）：见 utils/local-audio.js。
+  // 唯一可用路径 = 流播 CDN 上的同一批 mp3（InnerAudioContext 播 URL 不受域名白名单限制）。
+  // 为什么不打进代码包：真机实测 FileSystemManager 读不到分包内的文件（日志
+  // 「[pkg-audio] 读不到代码包内的音频 /packageJa/ja/js001.mp3」），InnerAudioContext 也不允许
+  // 直接播包内 mp3（operateAudio:fail:access denied）——打进包既播不了，又白占 3.8MB 上传体积
+  // 和用户下载流量，所以 mp3 放在仓库 audio-src/ 由 CI 发到 CDN，代码包里一条都不留。
   const region = handlers.id ? localAudio.langOf(handlers.id) : ''
   if (handlers.id && region) {
     const remoteUrl = localAudio.remoteFor(handlers.id)
-    let stage = 'remote'
     let cur = null
     let net = null
     let destroyed = false
 
-    function toPackage(err) {
+    function toNetwork() {
       if (destroyed) return
-      stage = 'pkg'
-      if (handlers.onLoading) handlers.onLoading(true)
-      localAudio.ensureLoaded(region).then(function () {
-        if (handlers.onLoading) handlers.onLoading(false)
-        if (destroyed) return
-        const p = localAudio.pathFor(handlers.id)
-        const playable = p ? pkgAudio.ensure(p) : ''
-        if (!playable) {
-          console.warn('[audio] 离线音频不可用，改用在线链', handlers.id)
-          return toNetwork(err)
-        }
-        cur = createPlayer({
-          rate: slow ? 0.75 : 1,
-          onPlay() { if (handlers.onPlay) handlers.onPlay() },
-          onEnded: handlers.onEnded,
-          onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
-          onError(e) {
-            console.error('[audio] 本地音频播放失败，改用在线链', playable, e && (e.errMsg || e))
-            toNetwork(e)
-          }
-        })
-        cur.play(playable)
-      })
-    }
-
-    function toNetwork(err) {
-      if (destroyed) return
-      stage = 'network'
       net = runNetwork()
     }
 
-    if (remoteUrl) cur = playRemote(remoteUrl, slow, handlers, toPackage)
-    else toPackage()
+    if (remoteUrl) cur = playRemote(remoteUrl, slow, handlers, toNetwork)
+    else toNetwork()
 
     return {
       bundled: true,
@@ -218,7 +187,7 @@ function speak(text, slow, handlers) {
       destroy() { destroyed = true; if (cur && cur.destroy) cur.destroy(); if (net && net.destroy) net.destroy() },
       retry() {
         if (handlers.onLoading) handlers.onLoading(false)
-        if (stage === 'network' && net && net.retry) return net.retry()
+        if (net && net.retry) return net.retry()
         if (cur && cur.retry) return cur.retry()
       }
     }

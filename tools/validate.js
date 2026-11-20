@@ -69,7 +69,7 @@ if (!tab.length) bad.push('tabBar 为空')
   })
 })
 
-// 6 体积：主包排除 tools/tests/deploy、*.md、以及分包目录
+// 6 体积：主包排除 tools/tests/deploy、*.md、audio-src（音频源文件，发 CDN 不进包）、以及分包目录
 const subRoots = subs.map(function (s) { return s.root.replace(/\/$/, '') + '/' })
 function inSub(r) { return subRoots.some(function (s) { return r.indexOf(s) === 0 }) }
 // 体积要算上 mp3 等二进制资源，所以单独走全量文件列表（files 只收四类文本）
@@ -93,7 +93,7 @@ function kb(limitFilter) {
   return size / 1024
 }
 const mainKb = kb(function (r) {
-  if (/^(tools|tests|deploy)\//.test(r)) return false
+  if (/^(tools|tests|deploy|audio-src)\//.test(r)) return false
   if (r.endsWith('.md')) return false
   if (inSub(r)) return false
   return true

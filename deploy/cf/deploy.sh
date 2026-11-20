@@ -25,10 +25,10 @@ export CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-fb907fe08010a1b319f68be56
 echo "→ 先刷新词库 JSON（deploy/data.json 与 deploy/cf/data.json）"
 ( cd .. && node export-data.js )
 
-echo "→ 把日语离线音频铺到 CDN（分包加载失败时的兜底源）"
+echo "→ 把预生成音频铺到 CDN（代码包里不再放 mp3，这里就是用户听到的那一份）"
 rm -rf audio audio-en && mkdir -p audio audio-en
-cp ../packageJa/ja/*.mp3 audio/
-cp ../packageEn/en/*.mp3 audio-en/
+cp ../audio-src/ja/*.mp3 audio/
+cp ../audio-src/en/*.mp3 audio-en/
 echo "   日语 $(ls audio | wc -l | tr -d ' ') 个 mp3，$(du -sh audio | cut -f1)"
 echo "   英语 $(ls audio-en | wc -l | tr -d ' ') 个 mp3，$(du -sh audio-en | cut -f1)"
 

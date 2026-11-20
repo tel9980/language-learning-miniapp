@@ -3,8 +3,7 @@
 // 微信给的本地文件空间是「每个小程序 × 每个微信账号」一份，合计 10MB，不能扩容：
 //   · wx.saveFile 落盘的录音            → utils/recordings.js
 //   · USER_DATA_PATH 里的发音缓存       → utils/tts-cache.js
-//   · 从代码包复制出来的离线音频        → utils/pkg-audio.js
-// 三者共用同一份空间。
+// 两者共用同一份空间（预生成音频不落这份空间：它只在 CDN 上，见 utils/local-audio.js）。
 //
 // 以前各模块各自按「整份 10MB 都归我」来算（录音 8MB + 缓存 3MB = 11MB），
 // 超出的那部分谁后写谁失败，而且失败是静默的 —— 用户只会看到「录音存不下来」
@@ -16,8 +15,7 @@
 const TOTAL_BYTES = 10 * 1024 * 1024        // 平台硬上限
 const RESERVE_BYTES = 1.5 * 1024 * 1024     // 留给临时文件与系统回收的余量
 const USABLE_BYTES = TOTAL_BYTES - RESERVE_BYTES
-const RECORDINGS_BYTES = 5 * 1024 * 1024    // 录音：用户资产，给大头
-const PKG_AUDIO_BYTES = 2 * 1024 * 1024     // 代码包音频的副本：可重建
-const TTS_BYTES = USABLE_BYTES - RECORDINGS_BYTES - PKG_AUDIO_BYTES   // 在线发音缓存：1.5MB
+const RECORDINGS_BYTES = 6 * 1024 * 1024    // 录音：用户资产，给大头
+const TTS_BYTES = USABLE_BYTES - RECORDINGS_BYTES   // 在线发音缓存：2.5MB
 
-module.exports = { TOTAL_BYTES, RESERVE_BYTES, USABLE_BYTES, RECORDINGS_BYTES, PKG_AUDIO_BYTES, TTS_BYTES }
+module.exports = { TOTAL_BYTES, RESERVE_BYTES, USABLE_BYTES, RECORDINGS_BYTES, TTS_BYTES }

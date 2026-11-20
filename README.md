@@ -44,7 +44,7 @@
 
 所有学习进度、口语记录、录音都存在微信本地 `Storage` / 本地文件，无需登录、不上传任何数据。
 
-## 离线音频与分包（为什么日语必须离线、英语也随包）
+## 离线音频与 CDN（为什么日语必须预生成、为什么 mp3 不进包）
 
 日语整句找不到可靠的免费合成源，实测结论：
 
@@ -60,45 +60,48 @@
 - 音频用 [edge-tts](https://github.com/rany2/edge-tts)（微软 Edge 朗读通道，免费、无需密钥）合成，
   日语 `ja-JP-NanamiNeural`、英语 `en-US-JennyNeural`
 - 再用 ffmpeg 压到 16kHz / 16kbps 单声道，单条约 5–7KB
-- 播放时 `audio.speak()` 优先用 `utils/local-audio.js` 里的路径，**0 请求、0 配额、断网可用**；
-  没有对应音频的条目（自建素材、日语在线兜底）照旧走在线降级链
+- 播放时 `audio.speak()` 先查 `utils/local-audio.js` 里有没有这个 id 的预生成音频，
+  有就流播 CDN 上那一份（**不占智聆配额、不受有道 500 影响**）；
+  没有对应音频的条目（自建素材、英语单词）照旧走在线降级链
 - 慢速按钮对本地文件用 `playbackRate = 0.75` 变速，不额外占空间
 
-### 体积与分包（2MB 主包红线）
+### 音频不进代码包（为什么，以及用户听到的是哪一份）
 
 | 位置 | 内容 | 体积 |
 | --- | --- | --- |
-| 主包 | 只有代码（wxml/wxss/js/json） | 约 **474KB / 2048KB** |
-| 分包 `packageJa` | 日语朗读 353 条（100 句 + 33 行台词 + 110 词 + 110 条例句） | 约 **1872KB / 2048KB** |
-| 分包 `packageEn` | 英语朗读 148 条（120 句 + 28 行台词） | 约 **949KB / 2048KB** |
+| 主包 | 只有代码（wxml/wxss/js/json） | 约 **467KB / 2048KB** |
+| Cloudflare Pages | 日语朗读 353 条（100 句 + 33 行台词 + 110 词 + 110 条例句） | 约 1.8MB（不进包） |
+| Cloudflare Pages | 英语朗读 148 条（120 句 + 28 行台词） | 约 0.95MB（不进包） |
 
-**播放顺序**：CDN 上的同一批 mp3（`https://yb.qy663.de5.net/audio/…`、`/audio-en/…`，发布时由 CI 从分包复制过去）
-→ 分包里的文件（复制到用户目录再播，真离线）
-→ 在线 TTS 链。第一级就是 CDN，是因为真机上 `FileSystemManager` **读不到分包里的文件**
-（日志实录：`[pkg-audio] 读不到代码包内的音频 /packageJa/ja/js001.mp3`），
-原来的「先读包」顺序会让每条音频都掉进在线链，而日语整句根本没有可用在线源 → 用户听到的是「读不出来」。
+**mp3 一条都不在代码包里**：它们放在仓库的 `audio-src/ja`、`audio-src/en`（`project.config.json`
+的 `packOptions.ignore` 与 `tools/validate.js` 都已排除），由 CI 发布时铺到
+`https://yb.qy663.de5.net/audio/<id>.mp3`、`/audio-en/<id>.mp3`。
 
-音频一律不进主包：日语 1.8MB、英语 0.95MB，任何一个都能把主包撑到「代码质量」扫描不过线，
-更实际的是拖慢冷启动（用户第一次打开要先下完这些）。所以日语放 `packageJa`、英语放 `packageEn`，
-**启动时不预载、页面也不预载**：分包只在 CDN 那一级失败后才会 `wx.loadSubpackage`，平时不花这 1–3MB 流量。分包必须至少有一个页面，
-于是各自带了一个「离线发音包」页（统计 → 使用设置 → 离线发音包，当前语种进对应分包），能试听、能看到加载状态。
-`app.js` 启动时就用 `wx.loadSubpackage({ name: 'jaAudio' })` 预载；分包没加载好之前
-`localAudio.pathFor()` 返回空串，播放会退回在线链，不会给出一个必然失败的路径。
+为什么连分包也不放：真机上两条路都被堵死了 ——
 
-英语朗读原本放主包（学英语是主场景，随包＝零下载延迟），后来还是移进分包：
-断网也不会突然没声音；剩下的 727KB 余量足够再放一门外语的句子。
+1. `InnerAudioContext` 不能直接播代码包内的 mp3：日志 `operateAudio:fail:access denied`；
+2. 换成 `FileSystemManager.readFileSync` 读分包文件再复制到用户目录，真机同样读不到：
+   日志 `[pkg-audio] 读不到代码包内的音频 /packageJa/ja/js001.mp3`（带不带前导斜杠都试过）。
+
+结论：打进包既播不出来，又白占 3.8MB **上传体积**和用户**首次下载流量**（微信规定主包+分包要一起下载）。
+所以现在只有一条链路：**流播 CDN → （失败）在线 TTS 链**。
+`InnerAudioContext` 播网络地址不校验 `downloadFile` 白名单，因此不需要用户额外配置域名；
+想让它「听过的句子断网也能听」，把 `https://yb.qy663.de5.net` 加进 **downloadFile 合法域名**即可（可选）。
+
+代价要说清楚：**完全依赖 CDN 可达性**。CDN 挂了时，英语能退到有道/百度在线 TTS，
+日语整句没有免费在线源（见上表），会提示「日语整句暂无合成发音，可点单词单独听」。
 
 素材改动后重新生成（需要 `pip install --break-system-packages edge-tts imageio-ffmpeg`）：
 
 ```bash
 node tools/dump-items.js ja /tmp/ja_items.json
-python3 tools/gen-audio.py --lang ja --items /tmp/ja_items.json --out packageJa/ja
+python3 tools/gen-audio.py --lang ja --items /tmp/ja_items.json --out audio-src/ja
 
 node tools/dump-items.js en /tmp/en_items.json --no-words   # 英语不预生成单词，见下
-python3 tools/gen-audio.py --lang en --items /tmp/en_items.json --out packageEn/en
+python3 tools/gen-audio.py --lang en --items /tmp/en_items.json --out audio-src/en
 
-node tools/gen-local-audio.js    # 扫磁盘重新生成 utils/local-audio.js 清单
-node tools/validate.js           # 主包/分包体积、页面四件套、JSON/JS 语法
+node tools/gen-local-audio.js    # 扫磁盘重新生成 utils/local-audio.js 清单（id → CDN 地址）
+node tools/validate.js           # 主包体积、页面四件套、JSON/JS 语法
 ```
 
 合成脚本会跳过已存在的文件，只补新的；`--force` 可全部重生成。
@@ -142,9 +145,9 @@ node tools/validate.js           # 主包/分包体积、页面四件套、JSON/
 
 针对小程序"同步 Storage 慢、setData 大列表卡"两个主要卡顿源做了优化，纯内部改动，**用法完全不变**：
 
-- **日语分包加载失败有兜底**：日语音频 1.8MB 只能放分包，个别真机上 `wx.loadSubpackage` 会失败/超时，此时没有可用在线源（日语整句无免费 TTS），用户就是「点了没声音」。现在分包没起来时，改为流播 CDN 上的同一批文件（`https://yb.qy663.de5.net/audio/<id>.mp3`，发布时由 CI 从 `packageJa/ja/` 复制过去），代价是需要联网，但至少能出声。
-- **队列 id 带前缀，音频文件名用原始 id**：跟读队列里的是 `st_s001`（句子）、`dl_d003_1`（对话台词）、`sp_xxx`（自建素材），而 mp3 文件名是 `s001.mp3`、`d003_1.mp3`。`utils/local-audio.js` 的 `pathFor()` 会把 `st_`/`dl_`/`sp_` 前缀剥掉再查一次，两个都认——早期只认原始 id，导致「情景对话」整段走在线链、真机上听不出声。
-- **随包音频的真实可用路径是 CDN，不是包内文件**：真机上 `InnerAudioContext` 播代码包内的 mp3 报 `operateAudio:fail:access denied`，改用 `FileSystemManager.readFileSync` 读分包里的文件又直接读不到（两种路径写法都试过）。所以现在是 CDN 流播优先，分包只做离线兜底（读到就先写进 `USER_DATA_PATH/pkg-audio` 再播，单条 5–6KB，上限 2MB）。要让「听过的一句断网也能听」，把 `https://yb.qy663.de5.net` 加进 **downloadFile 合法域名**，就会走下载缓存那条链。
+- **音频只能走 CDN**：真机读不到代码包内的 mp3（`operateAudio:fail:access denied`、`[pkg-audio] 读不到代码包内的音频`），所以 mp3 不进包，统一由 Cloudflare Pages 提供（`https://yb.qy663.de5.net/audio/…`）。代价是需要联网；英语失败还能退到在线 TTS，日语整句没有免费在线源。
+- **队列 id 带前缀，音频文件名用原始 id**：跟读队列里的是 `st_s001`（句子）、`dl_d003_1`（对话台词）、`sp_xxx`（自建素材），而 mp3 文件名是 `s001.mp3`、`d003_1.mp3`。`utils/local-audio.js` 的 `remoteFor()` 会把 `st_`/`dl_`/`sp_` 前缀剥掉再查一次，两个都认——早期只认原始 id，导致「情景对话」整段走在线链、真机上听不出声。
+- **随包音频的真实可用路径只有 CDN**：见上一节。`https://yb.qy663.de5.net` 加进 **downloadFile 合法域名**后，发音缓存（2.5MB LRU）会把听过的句子存成本地文件，断网也能重听。
 - **发音缓存**：每次听句子都要联网下载 mp3，而练一句通常是「标准音 → 慢速 → AB 复读」3~4 次，弱网下每次要等 200~400ms。现在第一次下载后复制进 `USER_DATA_PATH/tts`，之后同句直接放本地文件（0 请求），按「最久未使用」淘汰；缓存的本地文件坏了会自动删掉并退回在线重试。
 - **弱网不空等**：`wx.downloadFile` 没有 timeout 参数，默认要等 60 秒才失败，期间用户看到的是「点了没反应」。现在每次下载挂 8 秒看门狗，超时就放弃当前源、降级到下一个（有道↔百度），同时把「正在加载」传给页面显示；停止/切词会取消看门狗，迟到的回调不会把已经停掉的播放又拉起来。
 - **数据读取缓存**：档案信息、进度/统计/设置、口语记录、在线词库缓存都加了进程内缓存，同步读次数从上百次降到个位数（实测首页一轮刷新从约 20+ 次同步读降到 2 次）；写入即时刷新、导入/切档案自动失效，不会读到脏数据。
@@ -187,8 +190,9 @@ node tools/validate.js           # 主包/分包体积、页面四件套、JSON/
 
 ```
 语言学习小程序/
-├── packageJa/                        日语离线音频分包（353 条 mp3 约 1.9MB + 「离线发音包」页）
-├── packageEn/                        英语离线音频分包（148 条 mp3 约 0.95MB + 「离线发音包」页）
+├── audio-src/                        音频源文件（不进代码包，由 CI 发布到 Cloudflare Pages）
+│   ├── ja/                           日语朗读 353 条 mp3
+│   └── en/                           英语朗读 148 条 mp3
 ├── tools/                            素材工具（导出素材 / 批量合成音频 / 再生清单 / 全量校验，不打包）
 ├── app.js / app.json / app.wxss      全局逻辑、配置、样式
 ├── project.config.json               开发者工具项目配置
@@ -205,7 +209,8 @@ node tools/validate.js           # 主包/分包体积、页面四件套、JSON/
 │   ├── pkg-audio.js                  代码包音频→用户目录副本（真机不允许直接播包内 mp3，按需复制）
 │   ├── file-budget.js                本地文件配额账本：录音/发音缓存共用 10MB 的分配规则
 │   ├── quiz.js                       测验组题：优先到期词、干扰项去重、标记是否学过
-│   ├── local-audio.js                离线音频清单（自动生成，id → 分包 mp3 路径 + CDN 兜底地址 + 分包预载）
+│   ├── local-audio.js                预生成音频清单（自动生成，素材 id → CDN 地址）
+│   ├── lang.js                       语言元信息（名称/国旗/语种码；不含词库，首页只载这个）
 │   ├── custom-items.js               自建素材归一化（{text,cn} → 练习页的 {word,meaning}）
 │   ├── favorites.js                  生词收藏夹 + 搜索历史（按档案隔离）
 │   ├── nav.js                        统一跳转（tabBar走switchTab + 跨tab意图传参）
@@ -295,9 +300,9 @@ node tests/run-tests.js
 
 1. **测验里的句子题**：单词测验已经接上复习计划了（见「功能说明」里的测验一行），但句子还不行——句子和对话台词没有 FSRS 记录、也没有到期时间。直接把句子塞进 10 题测验，会变成「不影响复习计划的题」——做完对「明天该练什么」毫无影响，只是看着丰富。**正确顺序是先给句子加一套调度（数据模型改动 + 老数据迁移测试），再扩题型**，不要反过来。
 2. **统计页 canvas 脏检查**：统计页每次 `onShow` 都重画两张图（约 53 处 `ctx.` 调用）。加「数据指纹没变就跳过重绘」能省一次重绘，但统计页不是热路径（切 tab 时一次几十毫秒），而脏检查写错的后果是「数据变了没重画」——比省下的那点时间更糟。
-3. **分包余量**：`packageJa` 现在约 1872KB / 2048KB（只剩约 176KB，约 30 条句子音频），`packageEn` 约 949KB（还有约 1MB）。再加日语素材前，得先把码率从 16kbps 降到 12kbps（约省 25%）或再拆一个分包。
+3. **音频体积是流量成本，不是包体积了**：mp3 已全部移出代码包（`audio-src/` + CDN），主包只剩代码 467KB。加素材只需注意别让用户首次听一句等太久——单条 5–7KB，16kbps 已是压过的码率。
 
-4. **主包已瘦身到 474KB**：英语音频进分包后，主包只剩代码，冷启动只需要下 ~470KB。「代码质量」扫描的四项（主包 <1.5M、组件按需注入、音频资源 <200K、无未使用插件）都已处理：`app.json` 加了 `"lazyCodeLoading": "requiredComponents"`，`requirePlugin('ihearing-eval')` 改成字面量（扫描器只认字面量）。
+4. **主包已瘦身到 467KB**：英语音频进分包后，主包只剩代码，冷启动只需要下 ~470KB。「代码质量」扫描的四项（主包 <1.5M、组件按需注入、音频资源 <200K、无未使用插件）都已处理：`app.json` 加了 `"lazyCodeLoading": "requiredComponents"`，`requirePlugin('ihearing-eval')` 改成字面量（扫描器只认字面量）。
 4. **语言码收敛**：`getLangMeta()` 已有 `voice`（`en_US`/`ja_JP`，给音频链用）和 `tts`（`en-US`，给同声传译插件用），但还有 3 处页面仍手写 `lang === 'ja' ? 'ja_JP' : 'en_US'`。纯写法问题，不影响功能，下次动这几个页面时顺手换掉即可。
 
 ## 上线前

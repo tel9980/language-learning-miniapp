@@ -64,21 +64,5 @@
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json",
-  "lazyCodeLoading": "requiredComponents",
-  "subpackages": [
-    {
-      "root": "packageJa",
-      "name": "jaAudio",
-      "pages": [
-        "pages/offline/offline"
-      ]
-    },
-    {
-      "root": "packageEn",
-      "name": "enAudio",
-      "pages": [
-        "pages/offline/offline"
-      ]
-    }
-  ]
+  "lazyCodeLoading": "requiredComponents"
 }

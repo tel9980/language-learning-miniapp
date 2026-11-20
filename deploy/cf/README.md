@@ -75,9 +75,9 @@ https://yb.qy663.de5.net
 
 ## 顺带托管的日语音频
 
-发布时 `deploy.sh` / CI 会把 `packageJa/ja/*.mp3`（353 条、约 1.8MB）复制到 `deploy/cf/audio/`、把 `packageEn/en/*.mp3`（148 条、约 0.95MB）复制到 `deploy/cf/audio-en/` 一起发布，线上地址形如
+发布时 `deploy.sh` / CI 会把 `audio-src/ja/*.mp3`（353 条、约 1.8MB）复制到 `deploy/cf/audio/`、把 `audio-src/en/*.mp3`（148 条、约 0.95MB）复制到 `deploy/cf/audio-en/` 一起发布，线上地址形如
 `https://yb.qy663.de5.net/audio/js015.mp3`。
 
-用途：小程序里日语音频在 `packageJa` 分包，个别真机上 `wx.loadSubpackage` 会失败；这时客户端改流播这份 CDN 副本
+用途：小程序代码包里**一条 mp3 都不放**（真机上播不了包内文件），用户听到的预生成音频就是这份 CDN 副本
 （`utils/local-audio.js` 的 `remoteFor()`），避免「点了没声音」。`deploy/cf/audio/` 不进仓库（见 `.gitignore`），
-每次发布由脚本从分包目录现铺。
+每次发布由脚本从 `audio-src/` 现铺。

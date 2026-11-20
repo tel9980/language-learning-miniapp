@@ -118,10 +118,6 @@
       <view class="setting-label">🔊 发音缓存</view>
       <view class="setting-value">{{ttsCacheKb>0?(ttsCacheKb+'KB · 清理'):'空'}} ›</view>
     </view>
-    <view class="setting-row" bindtap="openOfflineAudio">
-      <view class="setting-label">🗣 离线发音包</view>
-      <view class="setting-value">查看 ›</view>
-    </view>
     <view class="setting-row" bindtap="checkOnline">
       <view class="setting-label">🔄 在线词库</view>
       <view class="setting-value">立即检查 ›</view>

@@ -4,7 +4,7 @@ const storage = require('../../utils/storage')
 const speaking = require('../../utils/speaking')
 const profile = require('../../utils/profile')
 const family = require('../../utils/family')
-const { getLangMeta } = require('../../utils/words')
+const { getLangMeta } = require('../../utils/lang')
 
 const app = getApp()
 

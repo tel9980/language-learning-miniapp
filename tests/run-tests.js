@@ -584,27 +584,23 @@ const fs = require('fs')
 const pathMod = require('path')
 const localAudio = require('../utils/local-audio')
 
-// 日语在 packageJa 分包里（1.8MB，主包放不下）：分包没加载好之前不能给路径，
-// 否则播放必然失败、还会白弹一次错误提示。
-eq(localAudio.pathFor('js015'), '', 'no path for subpackaged audio before the subpackage loads')
-eq(localAudio.isReady('ja'), false, 'Japanese audio region starts as not-ready')
-localAudio.ensureLoaded('ja')   // 测试环境没有 wx.loadSubpackage → 同步标为可用
-eq(localAudio.isReady('ja'), true, 'ensureLoaded marks the region ready when loadSubpackage is unavailable')
-eq(localAudio.pathFor('js015'), '/packageJa/ja/js015.mp3', 'Japanese audio lives in the subpackage')
-eq(localAudio.isReady('en'), false, 'English audio region also starts as not-ready')
-localAudio.ensureLoaded('en')
-eq(localAudio.isReady('en'), true, 'ensureLoaded marks the english region ready too')
-eq(localAudio.pathFor('s001'), '/packageEn/en/s001.mp3', 'English audio lives in its own subpackage')
+// mp3 不再随代码包发布：真机上 FileSystemManager 读不到包内文件、InnerAudioContext
+// 也不允许直接播包内 mp3，所以音频只放仓库 audio-src/ 下，由 CI 铺到 Cloudflare Pages。
+// 这里钉死两件事：① 每个 id 都能算出 CDN 地址 ② 地址对应的 mp3 真在磁盘上（否则 CI 传不上去）
+eq(localAudio.remoteFor('js015'), 'https://yb.qy663.de5.net/audio/js015.mp3', '日语素材指向 CDN')
+eq(localAudio.remoteFor('s001'), 'https://yb.qy663.de5.net/audio-en/s001.mp3', '英语素材指向 CDN 的另一个目录')
+eq(localAudio.remoteFor('nope'), '', 'unknown id has no audio')
+eq(localAudio.has('js015'), true, 'has() 认得日语素材')
 eq(localAudio.langOf('js015'), 'ja', 'langOf maps a Japanese id to its region')
 eq(localAudio.langOf('s001'), 'en', 'langOf maps an English id to its region')
 eq(localAudio.langOf('nope'), '', 'langOf returns empty for unknown ids')
-eq(localAudio.pathFor('nope'), '', 'unknown id has no audio')
+eq(typeof localAudio.pathFor, 'undefined', 'pathFor 已移除（代码包里没有 mp3 了）')
 
 // 跟读队列里的 id 带前缀（句子 st_ / 对话台词 dl_），而 mp3 文件名用原始 id。
-// 两种都得认，否则对话台词永远命中不了离线音频、只能走在线链。
+// 两种都得认，否则对话台词永远命中不了音频、只能走在线链。
 eq(localAudio.idCandidates('dl_d003_1').join(','), 'dl_d003_1,d003_1', 'id candidates strip the queue prefix')
-eq(localAudio.pathFor('st_s001'), '/packageEn/en/s001.mp3', 'prefixed sentence id finds the same mp3')
-eq(localAudio.pathFor('dl_d003_1'), '/packageEn/en/d003_1.mp3', 'prefixed dialogue line id finds the same mp3')
+eq(localAudio.remoteFor('st_s001'), 'https://yb.qy663.de5.net/audio-en/s001.mp3', 'prefixed sentence id finds the same mp3')
+eq(localAudio.remoteFor('dl_d003_1'), 'https://yb.qy663.de5.net/audio-en/d003_1.mp3', 'prefixed dialogue line id finds the same mp3')
 eq(localAudio.langOf('dl_d003_1'), 'en', 'langOf understands prefixed ids')
 
 const audioIds = []
@@ -617,24 +613,36 @@ words.getWords('ja').forEach(function (w) {
 const noAudio = audioIds.filter(function (id) { return !localAudio.has(id) })
 eq(noAudio.length, 0, 'every Japanese item has bundled audio (missing: ' + noAudio.slice(0, 5).join(',') + ')')
 
+// 素材 id → 仓库里的音频文件（audio-src/<语种>/<原始id>.mp3）
+const AUDIO_DIR = { ja: 'audio-src/ja', en: 'audio-src/en' }
+function audioFile(id) {
+  const lang = localAudio.langOf(id)
+  if (!lang) return ''
+  const cands = localAudio.idCandidates(id)
+  for (let i = 0; i < cands.length; i++) {
+    if (localAudio.has(cands[i])) return pathMod.join(__dirname, '..', AUDIO_DIR[lang], cands[i] + '.mp3')
+  }
+  return ''
+}
+
 // mp3 特征：ID3 标签或帧同步 0xFFE
 function badMp3(ids) {
   return ids.filter(function (id) {
-    const f = pathMod.join(__dirname, '..', localAudio.pathFor(id))
-    if (!fs.existsSync(f)) return true
+    const f = audioFile(id)
+    if (!f || !fs.existsSync(f)) return true
     const head = fs.readFileSync(f).slice(0, 3)
     return !(head.toString('latin1') === 'ID3' || (head[0] === 0xff && (head[1] & 0xe0) === 0xe0))
   })
 }
 function kbOf(ids) {
   return ids.reduce(function (sum, id) {
-    return sum + fs.statSync(pathMod.join(__dirname, '..', localAudio.pathFor(id))).size
+    return sum + fs.statSync(audioFile(id)).size
   }, 0) / 1024
 }
 const badAudio = badMp3(audioIds)
 eq(badAudio.length, 0, 'bundled audio files are real mp3 (bad: ' + badAudio.slice(0, 5).join(',') + ')')
 const audioKb = kbOf(audioIds)
-ok(audioKb < 1900, 'Japanese audio stays under 1.9MB (actual ' + audioKb.toFixed(0) + 'KB, 分包上限 2MB)')
+ok(audioKb < 1900, 'Japanese audio stays under 1.9MB (actual ' + audioKb.toFixed(0) + 'KB, 用户下载流量要克制)')
 ok(localAudio.countOf('ja') === audioIds.length,
   'local-audio index covers exactly the current Japanese items (' + localAudio.countOf('ja') + ' vs ' + audioIds.length + ')')
 
@@ -646,11 +654,11 @@ const enMissing = enAudioIds.filter(function (id) { return !localAudio.has(id) }
 eq(enMissing.length, 0, 'every English sentence has bundled audio (missing: ' + enMissing.slice(0, 5).join(',') + ')')
 eq(badMp3(enAudioIds).length, 0, 'English audio files are real mp3')
 const enKb = kbOf(enAudioIds)
-ok(enKb < 1200, 'English audio stays under 1.2MB (actual ' + enKb.toFixed(0) + 'KB, 分包上限 2MB)')
+ok(enKb < 1200, 'English audio stays under 1.2MB (actual ' + enKb.toFixed(0) + 'KB)')
 
 // 代码包内的 mp3 真机播不了 —— 实录报错：
 //   [InnerAudio] operateAudio fail: errMsg="operateAudio:fail:access denied, appId=wx..."
-// 所以必须先复制到 USER_DATA_PATH 再播。这段锁死「复制一次、之后复用」的契约。
+// 所以代码包里不放 mp3，预生成音频一律流播 CDN。这里的桩只负责「记录这次播的是哪个地址」。
 let playedSrc = null
 global.wx.createInnerAudioContext = function () {
   const c = { onEnded() {}, onError(fn) { c._onErr = fn }, stop() {}, destroy() {}, play() {} }
@@ -699,17 +707,10 @@ playedSrc = null
 au.speak('Hi, I do not think we have met.', false, { id: 'dl_d003_1' })
 eq(playedSrc, 'https://yb.qy663.de5.net/audio-en/d003_1.mp3', '对话台词命中随包音频（队列 id 带 dl_ 前缀，CDN 同样用原始 id）')
 
-// pkg-audio：路径扁平化 / 复制后再复制不重复写 / 读不到包内文件时返回空串
-const pkgAudio = require('../utils/pkg-audio')
-eq(pkgAudio.nameOf('/packageJa/ja/js015.mp3'), 'packageJa_ja_js015.mp3', '包内路径压成扁平文件名')
-eq(pkgAudio.ensure('/packageJa/ja/js015.mp3'), 'wxfile://usr/pkg-audio/packageJa_ja_js015.mp3', 'ensure 返回可播路径')
-eq(pkgAudio.ensure('/packageEn/en/nope.mp3'), 'wxfile://usr/pkg-audio/packageEn_en_nope.mp3', '任意包内路径都能复制')
-const _fsNoMp3 = global.wx.getFileSystemManager
-global.wx.getFileSystemManager = function () {
-  return { readFileSync() { throw new Error('denied') }, statSync() { throw new Error('none') }, mkdirSync() {}, writeFileSync() {}, readdirSync() { return [] }, unlinkSync() {} }
-}
-eq(pkgAudio.ensure('/packageJa/ja/blocked.mp3'), '', '读不到包内文件时返回空串（调用方退回在线链）')
-global.wx.getFileSystemManager = _fsNoMp3
+// 代码包里不再留 mp3：这些目录已经不存在，防止有人又把 3.8MB 塞回包里
+ok(!fs.existsSync(pathMod.join(__dirname, '..', 'packageJa')), 'packageJa 分包已删除（音频改走 CDN）')
+ok(!fs.existsSync(pathMod.join(__dirname, '..', 'packageEn')), 'packageEn 分包已删除（音频改走 CDN）')
+ok(!fs.existsSync(pathMod.join(__dirname, '..', 'utils', 'pkg-audio.js')), 'pkg-audio.js 已删除（不再复制包内文件）')
 
 // ---- 发音缓存：同一句第二次听不再联网 ----
 const ttsCache = require('../utils/tts-cache')
@@ -1040,7 +1041,7 @@ async function runExtraTests() {
     }
   })
   eq(missing.length, 0, '所有 wxml 绑定的处理函数都存在' + (missing.length ? '：' + missing.join(' / ') : ''))
-  ok(pages.length >= 16, '扫到了全部页面（含分包页，共 ' + pages.length + ' 个）')
+  ok(pages.length >= 15, '扫到了全部页面（共 ' + pages.length + ' 个；音频改走 CDN 后已无分包页）')
 
   // F. 测验组题：优先「今天到期的词」，新词垫底；题目要带 id 与 learned 标记
   //    （历史问题：buildQuiz() 从全库随机抽 10 个，学过的和没见过的混在一起，
@@ -1276,40 +1277,28 @@ async function runExtraTests() {
   global.wx.request = origReq
   eq(od.DATA_URLS.length, shippedSources.length, '测试后还原仓库里的配置')
 
-  // 日语句子在分包里：分包没加载好时不能退在线链（日语整句没有可用在线源，
-  // 退过去就是「读不出来」）。必须等分包就绪、再播本地文件。
+  // 预生成音频只有一条可用路径：流播 CDN 上的 mp3（真机读不到包内文件，也不允许直接播）。
   delete require.cache[require.resolve('../utils/audio')]
   delete require.cache[require.resolve('../utils/local-audio')]
   const auJa = require('../utils/audio')
   const laJa = require('../utils/local-audio')
-  eq(laJa.isReady('ja'), false, '重新加载的模块：日语分包初始未就绪')
   playedSrc = null
   const ctl = auJa.speak('すみません、駅はどこですか。', false, { id: 'st_js015' })
-  eq(playedSrc, 'https://yb.qy663.de5.net/audio/js015.mp3', '第一级：流播 CDN（前缀 id 也认）')
-  // CDN 也播不出来时（没网/文件丢了）→ 读分包里的文件、复制到用户目录再播
+  eq(playedSrc, 'https://yb.qy663.de5.net/audio/js015.mp3', '第一级：流播 CDN（队列 st_ 前缀也认）')
+  eq(ctl.bundled, true, '有预生成音频时返回 bundled 控制器')
   global.__lastCtx._onErr({ errMsg: 'operateAudio:fail' })
   await new Promise(function (r) { setTimeout(r, 30) })
-  eq(playedSrc, 'wxfile://usr/pkg-audio/packageJa_ja_js015.mp3', '第二级：CDN 失败 → 分包副本（真离线）')
+  ok(!/pkg-audio|packageJa|packageEn/.test(playedSrc || ''), 'CDN 失败后不再去找包内文件（真机读不到，白等一次）')
+  ok(playedSrc === null || /^https:\/\//.test(playedSrc), '日语整句没有在线源时不乱撞请求')
   ctl.stop()
 
-  // 分包真加载失败时：同一批 mp3 在 CDN 上也有一份，改成流播，别让用户听到静默。
-  eq(laJa.remoteFor('st_js015'), 'https://yb.qy663.de5.net/audio/js015.mp3', '日语素材有 CDN 兜底地址（前缀 id 也认）')
-  eq(laJa.remoteFor('s001'), 'https://yb.qy663.de5.net/audio-en/s001.mp3', '英语同样有 CDN 兜底地址（与分包同源发布）')
-  delete require.cache[require.resolve('../utils/audio')]
-  delete require.cache[require.resolve('../utils/local-audio')]
-  const savedLoad = global.wx.loadSubpackage
-  global.wx.loadSubpackage = function (o) { setTimeout(function () { if (o.fail) o.fail({ errMsg: 'loadSubpackage:fail' }) }, 0) }
-  const auCdn = require('../utils/audio')
-  const laCdn = require('../utils/local-audio')
-  eq(laCdn.isReady('ja'), false, '分包加载失败后仍未就绪')
+  // 英语有在线源：CDN 播不出来还能退到在线 TTS，不会彻底没声音
   playedSrc = null
-  const ctl2 = auCdn.speak('すみません、駅はどこですか。', false, { id: 'st_js015' })
-  eq(playedSrc, 'https://yb.qy663.de5.net/audio/js015.mp3', '分包加载失败第一级仍是 CDN')
-  global.__lastCtx._onErr({ errMsg: 'operateAudio:fail' })
-  await new Promise(function (r) { setTimeout(r, 40) })
-  eq(laCdn.isReady('ja'), false, '分包确实没起来')
-  ok(/^https:\/\/(dict\.youdao|fanyi\.baidu)/.test(playedSrc || '') || playedSrc === 'https://yb.qy663.de5.net/audio/js015.mp3',
-    '第二级也拿不到时退回在线链（不会静默停住）')
-  ctl2.stop()
-  global.wx.loadSubpackage = savedLoad
+  const ctlEn = auJa.speak('Nice to meet you.', false, { id: 'st_s001' })
+  eq(playedSrc, 'https://yb.qy663.de5.net/audio-en/s001.mp3', '英语句子同样先走 CDN')
+  ctlEn.stop()
+
+  eq(typeof laJa.ensureLoaded, 'undefined', 'ensureLoaded 已移除（不再加载分包）')
+  eq(laJa.remoteFor('st_js015'), 'https://yb.qy663.de5.net/audio/js015.mp3', '日语素材有 CDN 地址（前缀 id 也认）')
+  eq(laJa.remoteFor('s001'), 'https://yb.qy663.de5.net/audio-en/s001.mp3', '英语素材有 CDN 地址')
 }

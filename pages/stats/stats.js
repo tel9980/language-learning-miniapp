@@ -291,12 +291,6 @@ Page({
   },
 
   // 清掉发音缓存：听力靠它提速，但占本地文件配额，空间紧张时用户得能自己清
-  // 离线发音包分两个分包（日语 packageJa / 英语 packageEn），进当前语种那个
-  openOfflineAudio() {
-    const lang = storage.getCurrentLang() === 'ja' ? 'ja' : 'en'
-    wx.navigateTo({ url: '/package' + (lang === 'ja' ? 'Ja' : 'En') + '/pages/offline/offline' })
-  },
-
   // 平时启动后 6 小时内不再联网查词库（省掉每次启动白拉 134KB），想马上更新点这里
   checkOnline() {
     if (!onlineData.configured()) {

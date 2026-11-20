@@ -17,6 +17,10 @@
       {
         "type": "suffix",
         "value": ".md"
+      },
+      {
+        "type": "folder",
+        "value": "audio-src"
       }
     ]
   },
