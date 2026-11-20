@@ -127,15 +127,34 @@ function scoreOf(result, mode) {
 // tag: 0 匹配 / 1 插入 / 2 删除 / 3 替代 / 4 oov / 5 unknown
 const TAG_TEXT = { 1: '多读', 2: '漏读', 3: '读错', 4: '生词', 5: '未识别' }
 
+// 音素低于这个分就点名（智聆 phone_info 里每个音素都有独立 pron_accuracy）。
+// 60 分是「明显没读对」的体感线：再高会把正常口音也标成错，用户就不看了。
+const LOW_PHONE = 60
+const MAX_PHONES = 3
+
+// 从 words[].phone_info[] 里挑出读得最差的几个音素。
+// 智聆的 phone 是音素符号（θ、s、r 这种），不是字母，页面直接显示即可。
+function badPhonesOf(w) {
+  const list = Array.isArray(w && w.phone_info) ? w.phone_info : []
+  return list
+    .filter(p => p && p.phone && num(p.pron_accuracy) < LOW_PHONE)
+    .map(p => ({ phone: String(p.phone), accuracy: Math.round(num(p.pron_accuracy)) }))
+    .sort((a, b) => a.accuracy - b.accuracy)
+    .slice(0, MAX_PHONES)
+}
+
+// 需要练的词：tag 非 0（多读/漏读/读错/生词）的词，外加「单词整体分低」的词。
+// 两项都带上最差音素，页面就能说清「是哪个音没读对」，而不是只说这个词有问题。
 function wrongWordsOf(result) {
   const words = Array.isArray(result && result.words) ? result.words : []
   return words
-    .filter(w => w && Number(w.tag) !== 0)
+    .filter(w => w && (Number(w.tag) !== 0 || num(w.pron_accuracy) < LOW_PHONE))
     .map(w => ({
       word: w.word || '',
       tag: Number(w.tag),
-      tagText: TAG_TEXT[Number(w.tag)] || '',
-      accuracy: Math.round(num(w.pron_accuracy))
+      tagText: TAG_TEXT[Number(w.tag)] || '音不准',
+      accuracy: Math.round(num(w.pron_accuracy)),
+      phones: badPhonesOf(w)
     }))
 }
 
@@ -280,6 +299,7 @@ module.exports = {
   similarity,
   scoreOf,
   wrongWordsOf,
+  LOW_PHONE,
   createEvaluator,
   createRecognizer,
   canTts,

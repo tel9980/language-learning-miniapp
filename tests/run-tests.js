@@ -214,6 +214,30 @@ eq(ww[0].tagText, '读错', 'tag 3 = 读错')
 eq(ww[1].tagText, '多读', 'tag 1 = 多读')
 eq(sc.wrongWordsOf(null).length, 0, 'null result = no wrong words')
 
+// 音素级提示：智聆的 words[].phone_info[] 每个音素都有独立准确度，
+// 以前只用 tag，现在把「到底哪个音没读对」也带出来（页面显示「think（读错 · θ 34 分）」）。
+eq(sc.LOW_PHONE, 60, '音素及格线 60 分')
+const wwPhone = sc.wrongWordsOf({ words: [
+  {
+    word: 'think', tag: 3, pron_accuracy: 45,
+    phone_info: [
+      { phone: 'θ', pron_accuracy: 34 }, { phone: 'ɪ', pron_accuracy: 88 },
+      { phone: 'ŋ', pron_accuracy: 52 }, { phone: 'k', pron_accuracy: 40 }
+    ]
+  },
+  // 整词没读准、但 tag=0（识别器认为词对得上）也要算需要练
+  { word: 'cat', tag: 0, pron_accuracy: 42, phone_info: [{ phone: 'æ', pron_accuracy: 30 }] },
+  // 整词分高就别来凑热闹
+  { word: 'fine', tag: 0, pron_accuracy: 92, phone_info: [{ phone: 'aɪ', pron_accuracy: 20 }] }
+] })
+eq(wwPhone.length, 2, '整词分低（tag=0）也算需要练的词')
+eq(wwPhone[0].phones.map(function (p) { return p.phone }).join(','), 'θ,k,ŋ', '音素按分数升序，只留不及格的，最多 3 个')
+eq(wwPhone[0].phones[0].accuracy, 34, '音素分原样带出')
+eq(wwPhone[1].tagText, '音不准', 'tag=0 但分低的词也有说明文案')
+eq(wwPhone[1].phones[0].phone, 'æ', '低分词也带音素')
+eq(sc.wrongWordsOf({ words: [{ word: 'weak', tag: 3, pron_accuracy: 40 }] })[0].phones.length, 0,
+  '没有 phone_info 时不报错，phones 为空数组')
+
 // ---- pager（大列表增量渲染） ----
 const pager = require('../utils/pager')
 const pg = pager.create(30)

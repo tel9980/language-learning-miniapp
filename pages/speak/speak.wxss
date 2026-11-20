@@ -135,4 +135,8 @@
   color: #d9822b;
 }
 .wrong-words .wrong-title { color: #8a8f99; }
-.wrong-words .wrong-word { margin-right: 12rpx; }
+.wrong-words .wrong-word {
+  display: inline-block;
+  margin-right: 12rpx;
+  line-height: 1.6;
+}

@@ -415,7 +415,14 @@ Page({
             hasRecording: !!res.filePath,
             score: res.score,
             scoreDetail: { accuracy: res.accuracy, fluency: res.fluency, completion: res.completion },
-            wrongWords: (res.wrongWords || []).slice(0, 6)
+            // 把音素分排成一行人话：「θ 34 分 / ð 52 分」，页面就不用写复杂表达式
+            wrongWords: (res.wrongWords || []).slice(0, 6).map(function (w) {
+              return {
+                word: w.word,
+                tagText: w.tagText,
+                phoneText: (w.phones || []).map(function (p) { return p.phone + ' ' + p.accuracy + ' 分' }).join(' / ')
+              }
+            })
           })
           if (res.filePath) wx.showToast({ title: '录好了，点「听我的」对比', icon: 'none' })
         },

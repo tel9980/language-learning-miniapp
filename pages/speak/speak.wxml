@@ -135,7 +135,7 @@
           <view class="score-recognized" wx:if="{{recognized}}">识别到：{{recognized}}</view>
           <view class="wrong-words" wx:if="{{wrongWords.length}}">
             <text class="wrong-title">需要练的词：</text>
-            <text class="wrong-word" wx:for="{{wrongWords}}" wx:key="word">{{item.word}}（{{item.tagText}}）</text>
+            <text class="wrong-word" wx:for="{{wrongWords}}" wx:key="word">{{item.word}}（{{item.tagText}}{{item.phoneText ? ' · ' + item.phoneText : ''}}）</text>
           </view>
           <view class="muted">客观参考分，结合自评一起看</view>
         </block>
