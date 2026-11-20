@@ -5,6 +5,7 @@ const {
   getWords, getLangMeta, getExamCategories, getWordsByCategory
 } = require('../../utils/words')
 const audio = require('../../utils/audio')
+const aiLookup = require('../../utils/ai-lookup')
 
 Page({
   behaviors: [theme],
@@ -22,7 +23,10 @@ Page({
     historyList: [],
     favIds: [],
     visibleCount: 30,       // 增量渲染：先显示 30 条，下滑加载更多
-    hasMore: false
+    hasMore: false,
+    aiLoading: false,       // 词库查不到时用 AI 现查一次（见 utils/ai-lookup.js）
+    aiResult: null,
+    aiError: ''
   },
 
   _applyLang(lang) {
@@ -141,12 +145,53 @@ Page({
     })
     const count = reset === false ? this.data.visibleCount : 30
     const shown = list.slice(0, count)
-    // 不再清 expandedId：加载更多、换关键词都不该把用户正在看的详情收起来
-    this.setData({
+    const patch = {
       results: shown, resultCount: list.length,
       favIds: favorites.list(lang),
       visibleCount: count, hasMore: list.length > count
+    }
+    // 换关键词/切分类时把上一次的 AI 结果收掉，免得新查询下面还挂着旧词的释义
+    if (reset !== false && (this.data.aiResult || this.data.aiError)) {
+      patch.aiResult = null
+      patch.aiError = ''
+    }
+    // 不再清 expandedId：加载更多、换关键词都不该把用户正在看的详情收起来
+    this.setData(patch)
+  },
+
+  // 词库里没有的词：让 Worker 现查一次（Worker 拿着 Gemini Key 去问，Key 不在客户端）。
+  // 结果只显示、不写词库——机器生成的释义必须有人看过才能进素材。
+  askAi() {
+    const kw = (this.data.keyword || '').trim()
+    if (!kw) { wx.showToast({ title: '先输入一个词', icon: 'none' }); return }
+    if (!aiLookup.configured()) { wx.showToast({ title: '这一版没配 AI 查词', icon: 'none' }); return }
+    const that = this
+    this.setData({ aiLoading: true, aiResult: null, aiError: '' })
+    aiLookup.lookup(kw, this.data.lang, function (r) {
+      if (!r.ok) {
+        let msg = 'AI 查词失败，稍后再试'
+        if (r.reason === 'network') msg = '网络不通，稍后再试'
+        else if (r.reason === 'not-configured') msg = 'AI 查词还没配好'
+        else if (r.reason === 'upstream') msg = 'AI 暂时没答上来，稍后再试'
+        that.setData({ aiLoading: false, aiError: msg })
+        return
+      }
+      if (!r.found) {
+        that.setData({ aiLoading: false, aiError: 'AI 也没把握这个词，检查一下拼写' })
+        return
+      }
+      that.setData({ aiLoading: false, aiResult: r })
     })
+  },
+
+  playAi() {
+    const r = this.data.aiResult
+    if (!r) return
+    audio.speak(r.word || this.data.keyword, false, { lang: getLangMeta(this.data.lang).voice })
+  },
+
+  closeAi() {
+    this.setData({ aiResult: null, aiError: '' })
   },
 
   loadMore() {

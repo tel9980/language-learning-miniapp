@@ -198,7 +198,9 @@ node tools/validate.js           # 主包体积、页面四件套、JSON/JS 语�
 ├── project.config.json               开发者工具项目配置
 ├── sitemap.json
 ├── utils/
-│   ├── words.js                      词库(英480/日110) + 分类 + 语种元数据
+│   ├── words.js                      词库入口（按语种懒加载 words.en / words.ja）+ 分类
+│   ├── words.en.js                   英语词库 480 条（数据文件）
+│   ├── words.ja.js                   日语词库 110 条（数据文件）
 │   ├── word-rank.js                  英语词频排名表（ECDICT frq/bnc，新词高频优先）
 │   ├── sentences.js                  句子库(英112/日100句) + 情景对话(英8/日8组) + CEFR分级
 │   ├── profile.js                    多档案隔离（命名空间 + 老数据迁移 + 儿童/长辈模式）+ 当前档案缓存 + 失效入口
@@ -206,7 +208,6 @@ node tools/validate.js           # 主包体积、页面四件套、JSON/JS 语�
 │   ├── speaking.js                   口语记录 + 重点清单 + 每日打卡（带缓存）
 │   ├── audio.js                      TTS 地址 + 播放器 + 发音源降级(有道→百度→同传) + 本地音频优先 + 下载即缓存
 │   ├── tts-cache.js                  网络发音缓存：同句第二次听 0 请求（LRU，走 USER_DATA_PATH）
-│   ├── pkg-audio.js                  代码包音频→用户目录副本（真机不允许直接播包内 mp3，按需复制）
 │   ├── file-budget.js                本地文件配额账本：录音/发音缓存共用 10MB 的分配规则
 │   ├── quiz.js                       测验组题：优先到期词、干扰项去重、标记是否学过
 │   ├── local-audio.js                预生成音频清单（自动生成，素材 id → CDN 地址）
@@ -225,10 +226,13 @@ node tools/validate.js           # 主包体积、页面四件套、JSON/JS 语�
 │   ├── family.js                     家庭聚合（排行榜 + 跨档案录音 + 点评 + 未读红点）
 │   ├── family-backup.js              全家包导出/导入（合并/覆盖）
 │   ├── online-data.js                在线词库拉取 + 缓存 + 静默降级（可选）
+│   ├── ai-lookup.js                  AI 补查词（问 Worker，不存 Key；本地缓存 40 条）
 │   └── pager.js                      大列表增量渲染（首屏 30 条 + 加载更多）
 ├── deploy/
-│   ├── data.json                     导出的词库 JSON（上传到 OSS 用）
-│   └── export-data.js                重新导出脚本
+│   ├── data.json                     导出的词库 JSON（发 CDN / 上传 OSS 用）
+│   ├── export-data.js                重新导出脚本
+│   ├── cf/                           Cloudflare Pages 发布目录（data.json + 站点说明页 + 部署脚本）
+│   └── ai/                           AI 补查词 Worker（worker.js + 一键部署 push.js）
 ├── tests/
 │   └── run-tests.js                  纯函数单元测试（node tests/run-tests.js）
 ├── 上线合规清单.md                    发布前后台配置步骤
@@ -293,6 +297,23 @@ node tests/run-tests.js
 ⚠️ **必须做的一步**：微信公众平台 → 开发管理 → 开发设置 → 服务器域名 → **request 合法域名**
 里加上 `https://yb.qy663.de5.net`。没加的话真机上拉不到（会静默回退到内置词库，功能不受影响，但更新不生效）。
 开发者工具里可以先勾掉「校验合法域名」自测。
+
+## 按需查词增强（AI 补查，可选）
+
+词库里没有的词，查词页会多出一个「🤖 用 AI 查这个」的按钮：请求打到
+**<https://ai.qy663.de5.net/lookup>**（Cloudflare Worker），Worker 拿 Google Gemini 的 Key
+现生成「中文释义 + 2 个例句 + 1 条用法提示」，页面上标「AI 生成，仅供参考」。
+
+- **Key 不在小程序里**：Gemini Key 存在 Worker secret 中。前端包会被反编译，Key 放进客户端
+  等于把额度送给别人刷——这是本项目唯一必须经过服务端的东西，所以只做了这一个极小的 Worker。
+- **不写词库**：AI 结果只显示在页面上。词库仍然只能改文件 + `git push`，CI 跑完测试才发布；
+  机器生成的释义必须有人看过才能进素材。
+- **缓存两层**：客户端留 40 条（`utils/ai-lookup.js`），Worker 侧 KV 缓存 30 天 → 同一个词
+  只会消耗一次 Gemini 额度；拼错的词不缓存，改对了立刻能查到。
+- 部署与额度说明：**[deploy/ai/README.md](deploy/ai/README.md)**（`node deploy/ai/push.js` 一条命令）。
+
+⚠️ **必须做的一步**：上面说的 **request 合法域名**里还要加上 `https://ai.qy663.de5.net`。
+没加时点按钮会提示「网络不通」，其余功能不受影响。
 
 ## 后续可选项（以及为什么现在没做）
 

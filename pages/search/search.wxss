@@ -97,3 +97,36 @@
 .history-chips { display: flex; flex-wrap: wrap; gap: 14rpx; margin-top: 16rpx; }
 .history-chip { font-size: 25rpx; color: #4A6CF7; background: #eef2ff; padding: 10rpx 20rpx; border-radius: 999rpx; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .load-more { text-align: center; color: #4A6CF7; font-size: 26rpx; padding: 26rpx 0; background: #fff; border-radius: 20rpx; margin-top: 16rpx; }
+
+/* AI 补查（词库没有的词，由 Worker 现问 Gemini） */
+.ai-btn {
+  margin-top: 28rpx;
+  display: inline-block;
+  padding: 16rpx 32rpx;
+  border-radius: 999rpx;
+  background: #2b6cff;
+  color: #fff;
+  font-size: 27rpx;
+}
+.ai-err { margin-top: 24rpx; font-size: 25rpx; color: #9aa4b2; }
+.ai-card {
+  margin-top: 28rpx;
+  padding: 26rpx;
+  text-align: left;
+  border-radius: 20rpx;
+  background: rgba(43, 108, 255, 0.06);
+  border: 1rpx solid rgba(43, 108, 255, 0.18);
+}
+.ai-head { display: flex; align-items: baseline; gap: 14rpx; }
+.ai-word { font-size: 34rpx; font-weight: 600; }
+.ai-phonetic { font-size: 25rpx; color: #8a94a6; }
+.ai-close { margin-left: auto; padding: 0 8rpx; color: #9aa4b2; font-size: 28rpx; }
+.ai-meaning { margin-top: 12rpx; font-size: 28rpx; color: #2f3742; }
+.ai-ex { margin-top: 16rpx; }
+.ai-ex-en { font-size: 27rpx; color: #2f3742; }
+.ai-ex-cn { font-size: 24rpx; color: #8a94a6; }
+.ai-tip { margin-top: 16rpx; font-size: 25rpx; color: #b06a00; }
+.ai-note { margin-top: 18rpx; font-size: 22rpx; color: #9aa4b2; }
+.theme-dark .ai-card { background: rgba(120, 160, 255, 0.12); border-color: rgba(120, 160, 255, 0.25); }
+.theme-dark .ai-meaning, .theme-dark .ai-ex-en { color: #dfe5ee; }
+.theme-dark .ai-err, .theme-dark .ai-note { color: #7d8798; }

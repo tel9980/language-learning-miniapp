@@ -1301,4 +1301,67 @@ async function runExtraTests() {
   eq(typeof laJa.ensureLoaded, 'undefined', 'ensureLoaded 已移除（不再加载分包）')
   eq(laJa.remoteFor('st_js015'), 'https://yb.qy663.de5.net/audio/js015.mp3', '日语素材有 CDN 地址（前缀 id 也认）')
   eq(laJa.remoteFor('s001'), 'https://yb.qy663.de5.net/audio-en/s001.mp3', '英语素材有 CDN 地址')
+
+  // ---- AI 补查：词库没有的词问 Worker（Key 在 Worker 里，客户端只认识域名）----
+  const ai = require('../utils/ai-lookup')
+  eq(ai.configured(), true, 'AI 查词已配置（客户端认识 https 地址）')
+  ok(/^https:\/\//.test(ai.AI_URLS[0] || ''), 'AI 地址必须走 https（小程序只允许 https 请求）')
+  ok(ai.AI_URLS[0].indexOf('gemini') < 0 && ai.AI_URLS[0].indexOf('google') < 0, '客户端不直连 Google（Key 不能进前端）')
+
+  const origAiReq = global.wx.request
+  const aiReqs = []
+  ai.clearCache()
+  global.wx.request = function (o) {
+    aiReqs.push(o.url)
+    const q = decodeURIComponent((o.url.match(/q=([^&]*)/) || [])[1] || '')
+    setTimeout(function () {
+      o.success({
+        statusCode: 200,
+        data: { ok: true, found: true, q: q, lang: 'en', word: q,
+          phonetic: '/test/', meaning: 'n. 测试释义', examples: [{ text: 'Test it.', cn: '测一下。' }], tip: '别硬译' }
+      })
+    }, 0)
+  }
+  let aiRes = null
+  ai.lookup('invoice', 'en', function (r) { aiRes = r })
+  await new Promise(function (r) { setTimeout(r, 10) })
+  eq(aiRes && aiRes.found, true, 'AI 查到词就返回 found')
+  eq(aiRes && aiRes.meaning, 'n. 测试释义', 'AI 释义原样透出给页面')
+  eq(aiReqs.length, 1, '第一次查要发请求')
+  aiRes = null
+  ai.lookup('invoice', 'en', function (r) { aiRes = r })
+  await new Promise(function (r) { setTimeout(r, 10) })
+  eq(aiRes && aiRes.cached, true, '同一个词第二次走本地缓存')
+  eq(aiReqs.length, 1, '缓存命中时一个请求都不发')
+
+  // 网络挂了：给页面一个能说人话的原因，而不是静默
+  global.wx.request = function (o) { setTimeout(function () { o.fail({ errMsg: 'request:fail timeout' }) }, 0) }
+  let aiFail = null
+  ai.lookup('refundable', 'en', function (r) { aiFail = r })
+  await new Promise(function (r) { setTimeout(r, 10) })
+  eq(aiFail && aiFail.ok, false, '网络失败时 ok=false')
+  eq(aiFail && aiFail.reason, 'network', '网络失败有明确 reason')
+
+  // AI 说没这个词：不写缓存（否则拼错的词永远查不到）
+  global.wx.request = function (o) {
+    setTimeout(function () { o.success({ statusCode: 200, data: { ok: true, found: false, q: 'zzzz' } }) }, 0)
+  }
+  let aiNo = null
+  ai.lookup('zzzz', 'en', function (r) { aiNo = r })
+  await new Promise(function (r) { setTimeout(r, 10) })
+  eq(aiNo && aiNo.found, false, '查不到就如实返回 found=false')
+  ai.clearCache()
+  let aiAgain = null
+  global.wx.request = function (o) {
+    aiReqs.push(o.url)
+    setTimeout(function () { o.success({ statusCode: 200, data: { ok: true, found: false, q: 'zzzz' } }) }, 0)
+  }
+  ai.lookup('zzzz', 'en', function (r) { aiAgain = r })
+  await new Promise(function (r) { setTimeout(r, 10) })
+  eq(aiAgain && aiAgain.found, false, '否定结果不缓存（会重新问一次）')
+
+  // 缓存上限：只留最近 40 条，别让 AI 缓存吃掉 Storage 的 10MB
+  eq(ai.MAX_CACHE, 40, '本地 AI 缓存上限 40 条')
+  ai.clearCache()
+  global.wx.request = origAiReq
 }
