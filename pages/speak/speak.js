@@ -511,7 +511,7 @@ Page({
   _reviewByScore(id, score) {
     if (!id || typeof score !== 'number' || score <= 0) return
     const q = score >= 80 ? 5 : (score >= 60 ? 3 : 0)
-    if (/^(st_|dl_|cu_)/.test(id)) sentenceProgress.review(id, q, 'speak')
+    if (/^(st_|dl_|cu_)/.test(id)) sentenceProgress.review(id, q, 'speak-score')
     else storage.review(id, q)
   },
 

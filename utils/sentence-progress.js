@@ -63,13 +63,26 @@ function get(id) {
 
 function all() { return clone(load()) }
 
+// 评分来源的可信度：写出来 / 选对了是硬信号，机评有识别误差，纯自评最宽松。
+// 权重只影响间隔缩放（见 utils/fsrs.js 的 opts.weight），不改「记什么档位」。
+const SOURCE_WEIGHT = { quiz: 1, dictation: 1, manual: 1, 'speak-score': 0.85, speak: 0.7 }
+
+function sameDay(a, b) {
+  const x = new Date(a)
+  const y = new Date(b)
+  return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate()
+}
+
 // quality: 0 忘了 / 1 勉强 / 2 顺利（和 fsrs.normalize 的口径一致）
-// from: 'speak' 口语评测 / 'quiz' 测验 / 'manual' 手动
+// from: 'speak' 自评 / 'speak-score' 机评 / 'quiz' 测验 / 'dictation' 听写 / 'manual' 手动
 function review(id, quality, from) {
   if (!id) return null
   const map = load()
-  const old = map[id] || { level: 0, reps: 0, lapses: 0, ef: 2.5, dueAt: Date.now() }
-  const sched = fsrs.schedule(old, quality)
+  const now = Date.now()
+  const old = map[id] || { level: 0, reps: 0, lapses: 0, ef: 2.5, dueAt: now }
+  const weight = SOURCE_WEIGHT[from] == null ? 1 : SOURCE_WEIGHT[from]
+  // 同一天重复练不晋级：连着点「很流利」不该把间隔从 1 天推到 30 天
+  const sched = fsrs.schedule(old, quality, { weight: weight, sameDay: !!(old.at && sameDay(old.at, now)) })
   const p = {
     level: sched.level,
     ef: sched.ef,
@@ -79,7 +92,7 @@ function review(id, quality, from) {
     dueAt: fsrs.dueAt(sched.intervalDays),
     lastQ: sched.quality,
     lastFrom: from || 'manual',
-    at: Date.now()
+    at: now
   }
   map[id] = p
   schedule()
@@ -124,6 +137,6 @@ function invalidate() {
 
 module.exports = {
   KEY: KEY, FLUSH_DELAY: FLUSH_DELAY,
-  review: review, get: get, all: all, dueIds: dueIds, summary: summary,
+  review: review, SOURCE_WEIGHT: SOURCE_WEIGHT, get: get, all: all, dueIds: dueIds, summary: summary,
   flush: flush, invalidate: invalidate
 }

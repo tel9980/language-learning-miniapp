@@ -52,7 +52,8 @@ Page({
 
     // 2) 句子到期复习（句子/台词有自己的调度表，见 utils/sentence-progress.js）
     //    只把「练过且到点」的句子放进来，没练过的句子不刷屏；
-    //    清单里最多 10 条，剩下的点进口语页慢慢练。
+    //    清单里最多 10 条，超出的补一条「还有 N 条」，点进去按整队列练完
+    //    （以前超出的部分直接在界面上消失，用户不知道还有多少没复习）。
     const sentItems = sentences.getAllItems(lang)
     const sentProg = sentenceProgress.all()
     const sentDue = []
@@ -69,6 +70,12 @@ Page({
         type: 'sent', typeName: '句子', target: 'due'
       })
     })
+    if (sentDue.length > 10) {
+      items.push({
+        id: 's_more', say: '', sayId: '', label: '还有 ' + (sentDue.length - 10) + ' 条到期句子',
+        sub: '点这里按顺序练完', type: 'sentmore', typeName: '句子', target: 'due'
+      })
+    }
 
     // 3) 口语重点项（词 + 句 + 对话台词）
     const allItems = words.concat(sentItems)
@@ -129,7 +136,7 @@ Page({
     const type = e.currentTarget.dataset.type
     if (type === 'due') return this.goLearn()
     if (type === 'focus') return this.goSpeak()
-    if (type === 'sent') return this.goSpeakDue()
+    if (type === 'sent' || type === 'sentmore') return this.goSpeakDue()
     nav.go('/pages/wrong/wrong')
   },
   goLearn() { nav.go('/pages/learn/learn', { mode: 'due' }) },

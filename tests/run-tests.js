@@ -30,6 +30,20 @@ ok(fsrs.schedule({ ef: 9 }, 5).ef <= 2.5, 'ef clamped to <=2.5')
 ok(fsrs.dueAt(0) > Date.now(), 'dueAt(0) is in the future')
 ok(fsrs.dueAt(1) - Date.now() >= fsrs.DAY - 1000, 'dueAt(1) ~ 1 day')
 
+// 来源权重：低权重只缩间隔，不改档位；同一天重复练不晋级
+const baseRec = { reps: 2, level: 2, ef: 2.5, intervalDays: 6 }
+const fullW = fsrs.schedule(Object.assign({}, baseRec), 5, { weight: 1 })
+const lowW = fsrs.schedule(Object.assign({}, baseRec), 5, { weight: 0.7 })
+eq(fullW.level, lowW.level, '权重不改变晋级档位')
+ok(lowW.intervalDays < fullW.intervalDays, '权重越低间隔越短（自评只算八成）')
+eq(fsrs.schedule({ reps: 2, level: 2, ef: 2.5, intervalDays: 6 }, 5).intervalDays, fullW.intervalDays,
+  '不传 opts 与 weight=1 等价（单词行为不变）')
+const same = fsrs.schedule({ reps: 5, level: 3, ef: 2.3, intervalDays: 12 }, 5, { sameDay: true })
+eq(same.level, 3, '同一天重复练不晋级')
+eq(same.intervalDays, 14, '同一天重复练只按 1.2 倍前移（12 → 14）')
+eq(fsrs.schedule({ reps: 5, level: 3, ef: 2.3, intervalDays: 12 }, 0, { sameDay: true }).level, 0,
+  '答错时 sameDay 照样清零')
+
 // ---- karaoke ----
 const karaoke = require('../utils/karaoke')
 eq(karaoke.tokenize('Hello   world  !').length, 3, 'tokenize splits on whitespace')
@@ -1365,6 +1379,17 @@ async function runExtraTests() {
     eq(storage.getProgress()['st_s001'], undefined, '句子 id 不进单词进度表')
 
     // 答错 → lapses 增加、间隔回退
+    // 来源权重：自评比测验低；同一天再练一次不晋级
+    eq(sp.SOURCE_WEIGHT.quiz, 1, '测验是满权重')
+    eq(sp.SOURCE_WEIGHT.dictation, 1, '听写是满权重')
+    ok(sp.SOURCE_WEIGHT['speak-score'] < 1, '机评权重 < 1')
+    ok(sp.SOURCE_WEIGHT.speak < sp.SOURCE_WEIGHT['speak-score'], '自评比机评更低')
+    const again = sp.review('st_s900', 5, 'speak')
+    const again2 = sp.review('st_s900', 5, 'speak')
+    eq(again.level, 1, '第一次顺利晋级')
+    eq(again2.level, 1, '同一天再评一次不晋级')
+    ok(again2.intervalDays >= 1, '同一天再评也有间隔（至少 1 天）')
+
     const p2 = sp.review('st_s001', 0, 'quiz')
     eq(p2.lapses, 1, '答错累计 lapses')
     eq(p2.lastFrom, 'quiz', '来源跟着更新')
