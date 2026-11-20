@@ -69,6 +69,11 @@
         <view class="badge-progress">{{item.unlocked?'已解锁':item.progress}}</view>
       </view>
     </view>
+    <view class="share-row">
+      <button class="share-btn" open-type="share">分享我的成就</button>
+      <view class="share-copy" bindtap="copyShare">复制文案</view>
+    </view>
+    <view class="muted share-tip">{{shareTitle || '还没有记录，先练几句再来分享'}}</view>
   </view>
 
   <view class="card levels-card">

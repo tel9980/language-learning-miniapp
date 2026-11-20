@@ -16,7 +16,7 @@ Page({
   data: {
     stats: {}, mastered: 0, accuracy: 0, dailyGoal: 20,
     levels: [], days: [], speak: {},
-    calendar: [], unlockedCount: 0, badges: [],
+    calendar: [], unlockedCount: 0, badges: [], shareTitle: '',
     feedbackEnabled: true, fontScale: 1, darkMode: false, ttsCacheKb: 0
   },
   onShow() {
@@ -94,10 +94,16 @@ Page({
       recordings: recordings.list().length
     })
     const unlockedCount = badges.filter(b => b.unlocked).length
+    // 分享文案用真实数据拼，不做假徽章（没有记录就退化成邀请文案）
+    const streakDays = stats.streak || 0
+    const shareTitle = (streakDays || mastered)
+      ? '我在「语伴」连续打卡 ' + streakDays + ' 天，掌握了 ' + mastered + ' 个词' +
+        (unlockedCount ? '，解锁 ' + unlockedCount + ' 枚徽章' : '') + '，一起来练英语口语吧'
+      : '来和我一起练英语口语｜语伴'
 
     this.setData({
       stats, accuracy, levels, days, speak, fluency,
-      calendar: cal, badges, unlockedCount,
+      calendar: cal, badges, unlockedCount, shareTitle: shareTitle,
       mastered: mastered,
       dailyGoal: settings.dailyGoal || 20,
       feedbackEnabled: settings.feedbackEnabled !== false
@@ -239,6 +245,25 @@ Page({
       })
     })
   },
+  // ---------- 分享 ----------
+  // 分享卡片带真实数据（连续打卡 / 掌握词数 / 徽章数），别人点进来直接到首页。
+  onShareAppMessage() {
+    return {
+      title: this.data.shareTitle || '来和我一起练英语口语｜语伴',
+      path: '/pages/index/index'
+    }
+  },
+  onShareTimeline() {
+    return { title: this.data.shareTitle || '来和我一起练英语口语｜语伴' }
+  },
+  copyShare() {
+    const that = this
+    wx.setClipboardData({
+      data: (that.data.shareTitle || '来和我一起练英语口语｜语伴') + '（微信小程序「语伴」）',
+      success() { wx.showToast({ title: '分享文案已复制', icon: 'success' }) }
+    })
+  },
+
   editGoal() {
     const that = this
     wx.showModal({
