@@ -116,7 +116,10 @@ function num(v) {
 }
 
 // 单词模式看准确度；句子模式再掺入完整度和流畅度（漏词、卡顿都该扣分）
+// result 可能为空（插件回调前出错误、或插件没装），一律当 0 分而不是抛异常——
+// 这个函数在页面渲染路径上，抛一次就是白屏。
 function scoreOf(result, mode) {
+  if (!result || typeof result !== 'object') return 0
   const acc = num(result.pron_accuracy)
   if (mode === 'word') return Math.round(acc)
   const comp = num(result.pron_completion)

@@ -203,6 +203,26 @@ eq(au.isJapaneseText(''), false, 'empty not japanese')
 eq(sc.canEvaluateText('Good morning'), false, 'english text still needs plugin (absent here)')
 eq(sc.canEvaluateText('おはよう'), false, 'japanese text never evaluable')
 
+// 审核可能要求移除插件（个人主体用不了「IT科技-软件服务提供商」类目插件）。
+// 移除后 requirePlugin 会抛错——模块加载与各项判断必须扛得住，不能一进页面就崩。
+;(function () {
+  const saved = global.requirePlugin
+  global.requirePlugin = function () { throw new Error('plugin not declared') }
+  try {
+    const deps = require.resolve('../utils/speech-score')
+    delete require.cache[deps]
+    const bare = require('../utils/speech-score')
+    eq(bare.canEvaluateText('Good morning'), false, '插件缺失时英文也不评测')
+    eq(bare.canEvaluate('en'), false, '插件缺失时按语种判断为不可用')
+    eq(bare.canTts(), false, '插件缺失时没有插件 TTS')
+    ok(bare.scoreOf(null) === 0 || bare.scoreOf(null) == null, '没有结果时不抛错')
+    ok(bare.wrongWordsOf(null).length === 0, '没有结果时错词列表为空')
+  } finally {
+    global.requirePlugin = saved
+    delete require.cache[require.resolve('../utils/speech-score')]
+  }
+})()
+
 // ---- speech-score 智聆评测（无插件环境下应全部安全降级） ----
 eq(sc.countWords('hello'), 1, 'countWords single word')
 eq(sc.countWords('How are you doing today'), 5, 'countWords counts words')
