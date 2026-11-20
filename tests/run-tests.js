@@ -1413,6 +1413,22 @@ async function runExtraTests() {
     eq(q2.learned, true, '练过的句子标 learned=true（答完写回调度表）')
   }
 
+  // ---- 听写：文本归一化与判定 ----
+  {
+    const d = require('../utils/dictation')
+    eq(d.normalizeAnswer('Could you help me, please?'), 'could you help me please', '归一化：小写 + 去标点 + 收空格')
+    eq(d.normalizeAnswer('  Hello   World  '), 'hello world', '归一化：首尾与多空格')
+    eq(d.normalizeAnswer("Don't worry."), "don't worry", '归一化：保留撇号')
+    eq(d.normalizeAnswer(null), '', '归一化：null 当空串')
+
+    ok(d.isAnswerRight('hello world', 'Hello, World!'), '标点大小写不计较')
+    ok(d.isAnswerRight('dont worry', "Don't worry"), '漏撇号也算对')
+    ok(d.isAnswerRight('Could you help me please', 'Could you help me, please?'), '整句漏逗号算对')
+    ok(!d.isAnswerRight('hello', 'hello world'), '少词算错')
+    ok(!d.isAnswerRight('', 'hello'), '空输入算错')
+    ok(!d.isAnswerRight('hellp', 'hello'), '拼错算错')
+  }
+
   // ---- AI 补查：词库没有的词问 Worker（Key 在 Worker 里，客户端只认识域名）----
   const ai = require('../utils/ai-lookup')
   eq(ai.configured(), true, 'AI 查词已配置（客户端认识 https 地址）')

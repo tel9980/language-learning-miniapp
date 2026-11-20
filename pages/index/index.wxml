@@ -77,6 +77,14 @@
       </view>
       <view class="arrow">›</view>
     </view>
+    <view class="entry card" bindtap="goDictation">
+      <view class="entry-icon dictation">🎧</view>
+      <view class="entry-body">
+        <view class="entry-title">听写练习</view>
+        <view class="muted">听发音写单词/句子，写错的进复习</view>
+      </view>
+      <view class="arrow">›</view>
+    </view>
     <view class="entry card" bindtap="goStats">
       <view class="entry-icon stats">📊</view>
       <view class="entry-body">

@@ -1,0 +1,48 @@
+<view class="container {{themeClass}}">
+  <block wx:if="{{!finished && current}}">
+    <view class="mode-tabs">
+      <view class="mode-tab {{mode==='word'?'active':''}}" data-mode="word" bindtap="switchMode">单词听写</view>
+      <view class="mode-tab {{mode==='sent'?'active':''}}" data-mode="sent" bindtap="switchMode">句子听写</view>
+    </view>
+
+    <view class="card">
+      <view class="row between">
+        <view class="title">听写练习</view>
+        <view class="muted">{{index+1}} / {{total}}</view>
+      </view>
+      <view class="progress-track"><view class="progress-fill" style="width:{{progress}}%"></view></view>
+      <view class="muted hint">听发音，把听到的内容写下来。标点和大小写不计较。</view>
+
+      <view class="play-row">
+        <view class="play-btn {{playing?'playing':''}}" bindtap="play">{{playing?'🔊 播放中':'🔊 播放'}}</view>
+        <view class="muted">听不清可以多点几次</view>
+      </view>
+
+      <textarea class="write-box" value="{{input}}" bindinput="onInput" disabled="{{revealed}}"
+                placeholder="{{mode==='sent'?'写下整句':'写下这个单词'}}" maxlength="200" auto-height />
+
+      <view class="feedback {{isRight?'fb-right':'fb-wrong'}}" wx:if="{{revealed}}">
+        <view class="fb-title">{{isRight?'✅ 写对了':'❌ 差一点'}}</view>
+        <view class="fb-answer">正确答案：{{current.word}}</view>
+        <view class="fb-example" wx:if="{{current.meaning}}">{{current.meaning}}</view>
+      </view>
+
+      <view class="btn-row">
+        <button class="btn-ghost" wx:if="{{!revealed}}" bindtap="showAnswer">看答案</button>
+        <button class="btn-primary" wx:if="{{!revealed}}" bindtap="submit">提交</button>
+        <button class="btn-primary" wx:if="{{revealed}}" bindtap="next">{{index===total-1?'查看结果':'下一题 ›'}}</button>
+      </view>
+    </view>
+  </block>
+
+  <view class="card result" wx:if="{{finished}}">
+    <view class="result-emoji">{{accuracy>=80?'🎉':(accuracy>=60?'👍':'💪')}}</view>
+    <view class="result-title">听写完成</view>
+    <view class="result-accuracy">{{accuracy}}%</view>
+    <view class="result-sub">正确率</view>
+    <view class="result-detail">写对 {{correctCount}} 题 · 共 {{total}} 题</view>
+    <view class="result-detail">写错的已经按「忘了」记进复习计划，明天会更早出现</view>
+    <button class="btn-primary result-btn" bindtap="restart">再来一轮</button>
+    <button class="btn-ghost result-btn" bindtap="goLearn">去学新词</button>
+  </view>
+</view>

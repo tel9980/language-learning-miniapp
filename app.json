@@ -4,6 +4,7 @@
     "pages/speak/speak",
     "pages/learn/learn",
     "pages/quiz/quiz",
+    "pages/dictation/dictation",
     "pages/stats/stats",
     "pages/search/search",
     "pages/wrong/wrong",

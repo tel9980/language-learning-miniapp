@@ -51,6 +51,7 @@ Page({
   goToday() { nav.go('/pages/today/today') },
   goLearn() { nav.go('/pages/learn/learn') },
   goQuiz()  { nav.go('/pages/quiz/quiz') },
+  goDictation() { nav.go('/pages/dictation/dictation') },
   goStats() { nav.go('/pages/stats/stats') },
   goSearch() { nav.go('/pages/search/search') },
   goWrong() { nav.go('/pages/wrong/wrong') },
