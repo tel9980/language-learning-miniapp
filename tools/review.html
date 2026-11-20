@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 查词审核台 · 语伴</title>
+<style>
+  :root { --bg:#F5F7FB; --card:#fff; --line:#E3E8F0; --text:#1F2937; --muted:#6B7280; --blue:#3B82F6; --green:#10B981; --red:#EF4444; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); }
+  h1 { font-size:20px; margin:0 0 8px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:20px; line-height:1.7; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:20px; }
+  textarea { width:100%; min-height:96px; padding:10px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:ui-monospace,Menlo,monospace; }
+  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+  button { border:none; border-radius:999px; padding:10px 20px; font-size:14px; cursor:pointer; }
+  button.primary { background:var(--blue); color:#fff; }
+  button.ghost { background:#EEF2F8; color:#4B5563; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  select { padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:#fff; font-size:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:12px; }
+  .card.kept { border-color:var(--green); background:#F2FDF8; }
+  .card.dropped { opacity:.45; }
+  .word { font-size:18px; font-weight:600; }
+  .phon { color:var(--muted); font-size:13px; margin-left:8px; }
+  .meaning { margin-top:6px; font-size:15px; line-height:1.6; }
+  .example { margin-top:6px; font-size:13px; color:#374151; }
+  .tip { margin-top:6px; font-size:12px; color:var(--muted); }
+  .acts { display:flex; gap:8px; margin-top:12px; }
+  .acts button { padding:6px 16px; font-size:13px; }
+  .keep { background:var(--green); color:#fff; }
+  .drop { background:#FEE2E2; color:#B91C1C; }
+  .status { font-size:13px; color:var(--muted); }
+  .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; background:#FFF4E5; color:#B45309; margin-left:8px; }
+  code { background:#F1F4F9; padding:2px 6px; border-radius:4px; font-size:12px; }
+</style>
+</head>
+<body>
+  <h1>AI 查词审核台</h1>
+  <div class="sub">
+    流程：粘一批词 → 点「问 AI」→ 逐条看 <b>词形 / 音标 / 释义 / 例句</b> 对不对 → 点「收录」或「丢弃」→「导出收录的词」把 JSON 存下来，交给我合并进 <code>utils/words.en.js</code>，<code>git push</code> 后 CI 自动发布。<br>
+    AI 只当草稿纸：<b>没点收录的词不会进任何地方</b>，也不会进用户手机。
+  </div>
+
+  <div class="panel">
+    <textarea id="words" placeholder="每行一个词，例如：&#10;invoice&#10;reimbursement&#10;installment"></textarea>
+    <div class="row">
+      <select id="lang">
+        <option value="en">英语</option>
+        <option value="ja">日语</option>
+      </select>
+      <button class="primary" id="ask">问 AI</button>
+      <button class="ghost" id="clear">清空</button>
+      <span class="status" id="status"></span>
+    </div>
+  </div>
+
+  <div id="list"></div>
+
+  <div class="row">
+    <button class="primary" id="export" disabled>导出收录的词（JSON）</button>
+    <button class="ghost" id="copy">复制 JSON</button>
+    <span class="status" id="count"></span>
+  </div>
+
+<script>
+const AI_URL = 'https://ai.qy663.de5.net/lookup'
+const state = { items: [], decided: {} }
+
+function $(id) { return document.getElementById(id) }
+
+function setStatus(t) { $('status').textContent = t }
+
+// 逐条问，串行：免费额度下并发没有意义，串行还能看清进度
+async function askOne(word, lang) {
+  const url = AI_URL + '?q=' + encodeURIComponent(word) + '&lang=' + lang
+  const r = await fetch(url, { headers: { 'Accept': 'application/json' } })
+  if (!r.ok) throw new Error('HTTP ' + r.status)
+  const j = await r.json()
+  if (!j || !j.ok) throw new Error((j && j.reason) || 'bad response')
+  if (!j.found) return null
+  return {
+    word: j.word || word,
+    phonetic: j.phonetic || '',
+    meaning: j.meaning || '',
+    examples: j.examples || [],
+    tip: j.tip || '',
+    lang: lang,
+    source: 'ai',
+    checkedAt: new Date().toISOString()
+  }
+}
+
+function render() {
+  const list = $('list')
+  list.innerHTML = ''
+  state.items.forEach(function (it, i) {
+    const d = state.decided[i]
+    const card = document.createElement('div')
+    card.className = 'card' + (d === 'keep' ? ' kept' : d === 'drop' ? ' dropped' : '')
+    card.innerHTML =
+      '<div><span class="word">' + esc(it.word) + '</span>' +
+      (it.phonetic ? '<span class="phon">' + esc(it.phonetic) + '</span>' : '') +
+      '<span class="badge">AI 生成 · 待审</span></div>' +
+      '<div class="meaning">' + esc(it.meaning) + '</div>' +
+      (it.examples || []).map(function (ex) {
+        return '<div class="example">' + esc(ex.en || ex.text || '') + (ex.cn ? ' — ' + esc(ex.cn) : '') + '</div>'
+      }).join('') +
+      (it.tip ? '<div class="tip">💡 ' + esc(it.tip) + '</div>' : '') +
+      '<div class="acts"><button class="keep" data-i="' + i + '" data-act="keep">收录</button>' +
+      '<button class="drop" data-i="' + i + '" data-act="drop">丢弃</button></div>'
+    list.appendChild(card)
+  })
+  const kept = Object.keys(state.decided).filter(k => state.decided[k] === 'keep').length
+  $('count').textContent = '共 ' + state.items.length + ' 条，已收录 ' + kept + ' 条'
+  $('export').disabled = kept === 0
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]
+  })
+}
+
+$('list').addEventListener('click', function (e) {
+  const btn = e.target.closest('button[data-act]')
+  if (!btn) return
+  state.decided[Number(btn.dataset.i)] = btn.dataset.act
+  render()
+})
+
+$('ask').addEventListener('click', async function () {
+  const raw = $('words').value.split('\n').map(s => s.trim()).filter(Boolean)
+  if (!raw.length) { setStatus('先粘几个词'); return }
+  const lang = $('lang').value
+  $('ask').disabled = true
+  state.items = []
+  state.decided = {}
+  const fails = []
+  for (let i = 0; i < raw.length; i++) {
+    setStatus('查询中 ' + (i + 1) + '/' + raw.length + '：' + raw[i])
+    try {
+      const r = await askOne(raw[i], lang)
+      if (r) state.items.push(r)
+      else fails.push(raw[i] + '（AI 说不是词）')
+    } catch (err) {
+      fails.push(raw[i] + '（' + err.message + '）')
+    }
+    render()
+  }
+  setStatus('完成：拿到 ' + state.items.length + ' 条' + (fails.length ? '，失败 ' + fails.length + ' 条（' + fails.join('；') + '）' : ''))
+  $('ask').disabled = false
+})
+
+$('clear').addEventListener('click', function () {
+  $('words').value = ''
+  state.items = []
+  state.decided = {}
+  setStatus('')
+  render()
+})
+
+function keptJson() {
+  const out = state.items.filter(function (_, i) { return state.decided[i] === 'keep' })
+  return JSON.stringify(out, null, 2)
+}
+
+$('export').addEventListener('click', function () {
+  const blob = new Blob([keptJson()], { type: 'application/json' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = 'ai-words-reviewed.json'
+  a.click()
+  URL.revokeObjectURL(a.href)
+})
+
+$('copy').addEventListener('click', async function () {
+  try {
+    await navigator.clipboard.writeText(keptJson())
+    setStatus('JSON 已复制，粘给 Claude 就能合并进词库')
+  } catch (e) {
+    setStatus('复制失败，请用「导出」下载文件')
+  }
+})
+
+render()
+</script>
+</body>
+</html>

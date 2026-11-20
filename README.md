@@ -273,6 +273,31 @@ tabBar 五项：首页 / 口语 / 学习 / 测验 / 统计。
 - **不写代码加素材**：口语页 →「📥 导入素材」，每行一句 `英文|中文`，保存后切到「✏️ 自建」跟读。
 - **加语种**：在 `WORDS`、`SENTENCES`、`DIALOGUES` 下各加语种键，并在 `getLangMeta()` 补语种名和 TTS 代码；首页 `pages/index/index.js` 的 `langs` 数组同步加上。示例日语词库已内置。
 
+## AI 查词的审核流程（三步，全程不用服务器）
+
+AI 只当草稿纸：**小程序里的 AI 查词是「当场答、不落库」**，机器生成的释义永远不会自己进用户手机。
+想把它变成正式词条，走这三步：
+
+```bash
+# 1. 打开审核台（本地双击即可，纯静态页，不需要部署）
+open tools/review.html          # macOS
+xdg-open tools/review.html      # Linux
+#    粘一串词 → 「问 AI」→ 逐条看词形/音标/释义/例句 → 点「收录」/「丢弃」→「导出收录的词」
+
+# 2. 合并进词库（自动查重、自动编号、拒绝空字段）
+node tools/merge-ai-words.js ai-words-reviewed.json --category 财务 --dry   # 先看要收哪几条
+node tools/merge-ai-words.js ai-words-reviewed.json --category 财务
+
+# 3. 校验后推送（CI 跑测试 + 自动发布在线词库，约 40 秒）
+node tools/validate.js && node tests/run-tests.js && git push
+```
+
+- **审核台**（`tools/review.html`）直接调 Worker 的 `/lookup`，逐条展示 AI 结果，点「收录」才进导出 JSON；页面自己不做任何持久化。
+- **合并脚本**（`tools/merge-ai-words.js`）做四件守门：词形/释义非空、长度合理、不含 HTML 角括号、**和现有词库去重（词形不分大小写；释义重复也拒——选择题里两个同义选项等于两个正确答案）**。
+- 合并完自己看一眼 `git diff`，词条错了改掉再推；音频不在这里生成（英语单词走在线发音，日语新词要 `node tools/gen-audio.py --lang ja`）。
+
+**为什么不自动收录**：AI 偶尔会把近义词、词性、搭配写错，而且错得很像对的。词库是产品的底座，错了就是「教会用户一个错的用法」，比没有更糟。
+
 ## 运行单元测试
 
 纯函数（FSRS/高亮/徽章/相似度/素材数据）有 Node 单元测试：
