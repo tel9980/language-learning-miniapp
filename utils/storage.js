@@ -179,6 +179,7 @@ function flush() {
 function invalidate() {
   // 换档案 / 导入 / 删档案前先把脏数据落盘，否则缓存清掉就永久丢失
   flush()
+  try { require('./sentence-progress').invalidate() } catch (e) {}
   Object.keys(_cache).forEach(function (k) { delete _cache[k] })
   _progress = null      // 分片的合并视图一并作废，下次读会重新加载
   _initedFor = ''
@@ -432,6 +433,8 @@ function getMasteredCount(lang) {
 function flushAll() {
   flush()
   try { require('./speaking').flush() } catch (e) {}
+  // 句子进度是独立模块（utils/sentence-progress.js），一并落盘
+  try { require('./sentence-progress').flush() } catch (e) {}
 }
 
 // 导出全部学习数据：返回可序列化的普通对象（v2 含口语数据）

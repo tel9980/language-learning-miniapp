@@ -121,7 +121,7 @@ function remove(id) {
   const baseKeys = ['lp_progress_v1'].concat(require('./progress-keys').shardKeys()).concat([
     'lp_stats_v1', 'lp_settings_v1', 'lp_daily_v1',
     'lp_custom_items_v1', 'lp_theme_v1', 'lp_speak_records_v1', 'lp_speak_focus_v1',
-    'lp_speak_daily_v1', 'lp_recordings_v1'])
+    'lp_speak_daily_v1', 'lp_recordings_v1', 'lp_sent_progress_v1'])
   baseKeys.forEach(function (k) {
     try { wx.removeStorageSync(nsKey(k, id)) } catch (e) {}
   })

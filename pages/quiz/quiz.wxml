@@ -6,7 +6,7 @@
         <view class="muted">{{index+1}} / {{total}}</view>
       </view>
       <view class="progress-track"><view class="progress-fill" style="width:{{progress}}%"></view></view>
-      <view class="muted quiz-hint">优先考今天该复习的词，凑不够才用新词</view>
+      <view class="muted quiz-hint">优先考今天该复习的词和句子，凑不够才用新内容</view>
       <view class="score-row">
         <view class="score-chip correct">✅ 正确 {{correctCount}}</view>
         <view class="score-chip wrong">❌ 错误 {{wrongCount}}</view>
@@ -14,13 +14,14 @@
     </view>
 
     <view class="card question-card">
-      <view class="q-type">{{current.type==='choice'?'选择题':'拼写题'}}</view>
+      <view class="q-type">{{current.type==='choice'?'选择题':(current.type==='sent'?'句子题':'拼写题')}}</view>
       <view class="q-prompt" wx:if="{{current.type==='choice'}}">“{{current.question}}” 的意思是？</view>
+      <view class="q-prompt" wx:elif="{{current.type==='sent'}}">选出「{{current.question}}」对应的英文</view>
       <view class="q-prompt" wx:else>根据释义拼写单词</view>
       <view class="q-hint" wx:if="{{current.type==='spell'}}">{{current.question}}</view>
 
       <!-- 选择题 -->
-      <view class="options" wx:if="{{current.type==='choice'}}">
+      <view class="options" wx:if="{{current.type==='choice'||current.type==='sent'}}">
         <view wx:for="{{current.options}}" wx:key="*this" wx:for-index="oi"
               class="option {{selected===item?'selected':''}} {{revealed?(item===current.answer?'right':(selected===item?'wrong':'')):''}}"
               bindtap="choose" data-val="{{item}}">
@@ -40,7 +41,7 @@
         <view class="fb-example">{{current.example}}</view>
       </view>
 
-      <button class="btn-primary action-btn" wx:if="{{current.type==='choice' && selected && !revealed}}" bindtap="submitChoice">提交答案</button>
+      <button class="btn-primary action-btn" wx:if="{{(current.type==='choice'||current.type==='sent') && selected && !revealed}}" bindtap="submitChoice">提交答案</button>
       <button class="btn-primary action-btn" wx:if="{{current.type==='spell' && !revealed}}" bindtap="submitSpell">提交答案</button>
       <button class="btn-primary action-btn" wx:if="{{revealed}}" bindtap="nextQuestion">{{index===total-1?'查看结果':'下一题 ›'}}</button>
     </view>
@@ -53,7 +54,7 @@
     <view class="result-accuracy">{{accuracy}}%</view>
     <view class="result-sub">正确率</view>
     <view class="result-detail">答对 {{correctCount}} 题 · 共 {{total}} 题</view>
-    <view class="result-detail" wx:if="{{learnedCount>0}}">{{learnedCount}} 题考的是学过的词，已按答题结果调整下次复习时间{{wrongCount>0?'，答错的会进错词本':''}}</view>
+    <view class="result-detail" wx:if="{{learnedCount>0}}">{{learnedCount}} 题考的是学过的内容，已按答题结果调整下次复习时间{{wrongCount>0?'，答错的会进错词本':''}}</view>
     <button class="btn-primary result-btn" bindtap="restart">再来一组</button>
     <button class="btn-ghost result-btn" bindtap="goStats">查看统计</button>
   </view>

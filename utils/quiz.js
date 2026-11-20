@@ -83,4 +83,54 @@ function buildItems(words, all, prog, rnd) {
   })
 }
 
-module.exports = { pickWords, buildItems, shuffle, CHOICE_RATE }
+// ---------- 句子题 ----------
+// 句子/台词原来完全进不了测验（只有单词在 FSRS 里），练过的句子永远不会被考。
+// 抽题顺序和单词一致：到期的 → 练过没到期的 → 没练过的（垫底，避免一上来就考没见过的）。
+
+// items: [{ id, word, meaning, kind }]（sentences.getAllItems 的形状：word 是英文、meaning 是中文）
+// prog: { [itemId]: { dueAt } }（utils/sentence-progress 的 all()）
+function pickSentences(items, prog, now, n, rnd) {
+  const p = prog || {}
+  const t = typeof now === 'number' ? now : Date.now()
+  const due = []
+  const later = []
+  const fresh = []
+  ;(items || []).forEach(function (it) {
+    if (!it || !it.id || !it.word || !it.meaning) return
+    const rec = p[it.id]
+    if (!rec) { fresh.push(it); return }
+    if ((rec.dueAt || 0) <= t) due.push(it)
+    else later.push(it)
+  })
+  return shuffle(due, rnd)
+    .concat(shuffle(later, rnd), shuffle(fresh, rnd))
+    .slice(0, typeof n === 'number' ? n : 3)
+}
+
+// 句子题：给中文，从 4 句英文里选对的那句。
+// 干扰项必须换掉文本不同的句子（同一句中文可能对应多句英文，排除掉会和答案一样的中文）。
+function buildSentenceItems(picked, pool, prog, rnd) {
+  const r = typeof rnd === 'function' ? rnd : Math.random
+  const p = prog || {}
+  const all = pool || []
+  return (picked || []).map(function (it) {
+    // 干扰项：排除同一句英文、也排除中文释义相同的（否则会出现两个「对」的选项）
+    const distractors = shuffle(all.filter(function (x) {
+      return x.id !== it.id && x.word !== it.word && x.meaning !== it.meaning
+    }), r).slice(0, 3).map(function (x) { return x.word })
+    return {
+      id: it.id,
+      kind: 'sentence',
+      learned: !!p[it.id],
+      type: 'sent',
+      question: it.meaning,
+      answer: it.word,
+      options: shuffle([it.word].concat(distractors), r),
+      example: it.word
+    }
+  })
+}
+
+module.exports = {
+  pickWords, buildItems, pickSentences, buildSentenceItems, shuffle, CHOICE_RATE
+}

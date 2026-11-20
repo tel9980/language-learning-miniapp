@@ -1342,6 +1342,77 @@ async function runExtraTests() {
     }
   }
 
+  // ---- 句子进 FSRS：句子/台词有自己的调度表，不再混进单词进度 ----
+  {
+    const sp = require('../utils/sentence-progress')
+    sp.invalidate()
+    storage.invalidate()
+
+    // 没练过 → 查不到记录
+    eq(sp.get('st_s001'), null, '没练过的句子没有调度记录')
+
+    const p1 = sp.review('st_s001', 5, 'speak')
+    ok(p1 && p1.level === 1, '第一次顺利 → level 1')
+    ok(p1.dueAt > Date.now(), '答对后到期时间在未来')
+    eq(p1.lastFrom, 'speak', '记下了来源（口语/测验）')
+
+    // 读出来的是副本：调用方改它不该污染缓存
+    const got = sp.get('st_s001')
+    got.level = 99
+    eq(sp.get('st_s001').level, 1, 'get 返回副本，改它不影响内部记录')
+
+    // 句子记录不能污染单词进度表（原来 rate() 会把 st_ 前缀的 id 写进 progress）
+    eq(storage.getProgress()['st_s001'], undefined, '句子 id 不进单词进度表')
+
+    // 答错 → lapses 增加、间隔回退
+    const p2 = sp.review('st_s001', 0, 'quiz')
+    eq(p2.lapses, 1, '答错累计 lapses')
+    eq(p2.lastFrom, 'quiz', '来源跟着更新')
+
+    // 到期判断
+    const items = [{ id: 'st_s001' }, { id: 'st_s002' }]
+    const dueNow = sp.dueIds(items, Date.now())
+    ok(dueNow.indexOf('st_s002') >= 0, '到期判断：没练过的算到期（进今日待练）')
+    ok(dueNow.indexOf('st_s001') < 0, '到期判断：刚答过的不到期')
+    ok(sp.dueIds(items, p2.dueAt + 1).indexOf('st_s001') >= 0, '到期判断：时间一到就到期')
+    const sum = sp.summary(items)
+    ok(sum.learned === 1 && sum.total === 2, 'summary 统计学过条数与总数')
+
+    // 落盘：flush 后 Storage 里真的有这一条
+    const saved = sp.flush()
+    ok(saved === 1, 'flush 写了一次')
+    const raw = JSON.parse(global.wx.getStorageSync(profile.nsKey(sp.KEY)))
+    ok(raw && raw.st_s001 && raw.st_s001.level >= 0, '句子进度落到自己的 key 里')
+    eq(sp.flush(), 0, '没有脏数据时 flush 不写')
+
+    // 换档案/导入前 invalidate 要把缓存清掉，下次读从磁盘重建
+    sp.invalidate()
+    const reloaded = sp.get('st_s001')
+    ok(reloaded && reloaded.lapses === 1, 'invalidate 后从磁盘重新读回记录（不丢数据）')
+
+    // ---- 句子题 ----
+    const quizMod = require('../utils/quiz')
+    const sentItems = sentences.getAllItems('en')
+    ok(sentItems.length > 10, '英语句子素材可用作题目池')
+
+    // 抽题顺序：到期的排最前
+    const progStub = {}
+    progStub[sentItems[3].id] = { dueAt: Date.now() - 1000 }
+    progStub[sentItems[5].id] = { dueAt: Date.now() + 86400000 }
+    const picked = quizMod.pickSentences(sentItems, progStub, Date.now(), 3, function () { return 0.5 })
+    eq(picked[0].id, sentItems[3].id, '到期句子排在最前')
+
+    const q1 = quizMod.buildSentenceItems([sentItems[0]], sentItems, progStub, function () { return 0.5 })[0]
+    eq(q1.type, 'sent', '句子题类型是 sent')
+    eq(q1.kind, 'sentence', '句子题带 kind（页面据此写句子调度表）')
+    eq(q1.options.length, 4, '句子题 4 个选项')
+    ok(q1.options.indexOf(q1.answer) >= 0, '选项里必有正确答案')
+    eq(new Set(q1.options).size, 4, '4 个选项文本互不相同')
+    eq(q1.learned, false, '没练过的句子标 learned=false（答了不写调度）')
+    const q2 = quizMod.buildSentenceItems([sentItems[0]], sentItems, (function () { const o = {}; o[sentItems[0].id] = { dueAt: 1 }; return o })(), function () { return 0.5 })[0]
+    eq(q2.learned, true, '练过的句子标 learned=true（答完写回调度表）')
+  }
+
   // ---- AI 补查：词库没有的词问 Worker（Key 在 Worker 里，客户端只认识域名）----
   const ai = require('../utils/ai-lookup')
   eq(ai.configured(), true, 'AI 查词已配置（客户端认识 https 地址）')

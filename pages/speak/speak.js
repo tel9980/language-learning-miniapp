@@ -12,6 +12,7 @@ const profile = require('../../utils/profile')
 const nav = require('../../utils/nav')
 const { getWords } = require('../../utils/words')
 const { getLangMeta } = require('../../utils/lang')
+const sentenceProgress = require('../../utils/sentence-progress')
 const custom = require('../../utils/custom-items')
 
 // 跟读模式：word=单词 | sentence=句子 | dialogue=情景对话 | custom=自建素材
@@ -75,6 +76,11 @@ Page({
     if (intent && intent.focus) {
       this.refreshScenes()
       this.startFocus()
+      return
+    }
+    if (intent && intent.due) {
+      this.refreshScenes()
+      this.startDue()
       return
     }
     // 同一组队列（语种/等级/场景/模式都没变）就接着上次的位置练：
@@ -425,6 +431,8 @@ Page({
               }
             })
           })
+          // 机评出分就记一次调度（用户再点自评会覆盖成本次的口径）
+          that._reviewByScore(cur.id, res.score)
           if (res.filePath) wx.showToast({ title: '录好了，点「听我的」对比', icon: 'none' })
         },
         onError() {
@@ -463,6 +471,7 @@ Page({
           that._lastScore = res.score
           that._lastRecognized = res.recognized
           that.setData({ scoring: false, score: res.score, recognized: res.recognized })
+          that._reviewByScore(cur.id, res.score)
         },
         onError() { that.setData({ scoring: false }) }
       })
@@ -489,6 +498,23 @@ Page({
     if (this._recognizer) { this._recognizer.stop() }
   },
 
+  // ---------- 复习调度 ----------
+  // 单词进 storage 的 FSRS 表；句子/台词/自建素材进 sentence-progress（两张表分开存，
+  // 因为它们的评分来源不同，混在一张表里以后查不清「这句为什么明天要复习」）。
+  _reviewItem(id, quality) {
+    if (!id) return
+    if (/^(st_|dl_|cu_)/.test(id)) sentenceProgress.review(id, quality, 'speak')
+    else storage.review(id, quality)
+  },
+
+  // 机评出分就直接记一次：不用等用户再点自评（用户点了自评以自评为准）
+  _reviewByScore(id, score) {
+    if (!id || typeof score !== 'number' || score <= 0) return
+    const q = score >= 80 ? 5 : (score >= 60 ? 3 : 0)
+    if (/^(st_|dl_|cu_)/.test(id)) sentenceProgress.review(id, q, 'speak')
+    else storage.review(id, q)
+  },
+
   // ---------- 自评 / 翻页 ----------
   rate(e) {
     const q = Number(e.currentTarget.dataset.q)
@@ -496,7 +522,7 @@ Page({
     const cur = this.data.current
     speaking.record(cur.id, q, this._lastScore)
     const schedQ = q === 0 ? 0 : (q === 1 ? 3 : 5)
-    storage.review(cur.id, schedQ)
+    this._reviewItem(cur.id, schedQ)
     if (q === 0) feedback.warn(); else feedback.success()
 
     const msg = ['已加入重点复练 💪', '不错，继续！', '很流利，赞！'][q] || '已记录'
@@ -522,11 +548,12 @@ Page({
     const i = this.data.index + 1
     if (i < this._queue.length) {
       this.setData({ index: i }, () => this.loadCurrent())
-    } else if (this.data.mode === 'focus') {
+    } else if (this.data.mode === 'focus' || this.data.mode === 'due') {
+      const wasDue = this.data.mode === 'due'
       this.setData({ mode: 'train', sceneIndex: this.data.sceneIndex }, () => {
         this.refreshScenes(); this.buildQueueAndLoad()
       })
-      wx.showToast({ title: '重点复练完成！', icon: 'success' })
+      wx.showToast({ title: wasDue ? '到期句子复习完成！' : '重点复练完成！', icon: 'success' })
     } else {
       wx.showToast({ title: '本组跟读完成！', icon: 'success' })
       this.setData({ index: 0 }, () => this.loadCurrent())
@@ -554,6 +581,27 @@ Page({
       this.loadCurrent()
     })
   },
+  // 句子到期复习：只排「练过且到点」的句子（句子调度见 utils/sentence-progress.js）
+  startDue() {
+    const lang = storage.getCurrentLang()
+    const now = Date.now()
+    const due = this.allItems(lang).filter(function (it) {
+      const p = sentenceProgress.get(it.id)
+      return p && p.dueAt && p.dueAt <= now
+    })
+    if (!due.length) {
+      wx.showToast({ title: '还没有到期的句子，先随口练几句', icon: 'none' })
+      return
+    }
+    this.stopAll()
+    this._queue = due
+    this._memoIndex = 0
+    this.setData(Object.assign({ mode: 'due', queueLen: due.length, index: 0 }, this._progress(0, due.length)), () => {
+      this._queueSig = this._sig()
+      this.loadCurrent()
+    })
+  },
+
   backToTrain() {
     this.stopAll()
     this.setData({ mode: 'train' }, () => this.buildQueueAndLoad())

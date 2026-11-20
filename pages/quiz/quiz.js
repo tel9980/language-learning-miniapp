@@ -2,6 +2,8 @@ const theme = require('../../utils/theme')
 const storage = require('../../utils/storage')
 const { getWords } = require('../../utils/words')
 const quiz = require('../../utils/quiz')
+const sentences = require('../../utils/sentences')
+const sentenceProgress = require('../../utils/sentence-progress')
 
 Page({
   behaviors: [theme],
@@ -24,11 +26,20 @@ Page({
     const lang = storage.getCurrentLang()
     const all = getWords(lang)
     const prog = storage.getProgress()
+    const now = Date.now()
+    // 句子题占 3 题（有句子素材时才出），其余是单词题：
+    // 以前测验只考单词，练过的句子永远不会被考。
+    const sentAll = sentences.getAllItems(lang)
+    const sentProg = sentenceProgress.all()
+    const SENT_Q = sentAll.length >= 4 ? 3 : 0
+    const pickedSent = SENT_Q ? quiz.pickSentences(sentAll, sentProg, now, SENT_Q) : []
+    const sentQueue = quiz.buildSentenceItems(pickedSent, sentAll, sentProg)
     // 优先考「今天到期的词」，其次学过没到期的，最后才是没学过的新词
     // （组题规则在 utils/quiz.js，有单元测试兜着）
-    const picked = quiz.pickWords(all, prog, Date.now(), 10)
-    const queue = quiz.buildItems(picked, all, prog)
-    // 结果页要用：这组题里有多少是「学过的词」（答完会写回复习计划）
+    const picked = quiz.pickWords(all, prog, now, 10 - sentQueue.length)
+    // 句子题混在单词题中间，别让它们全堆在开头或结尾
+    const queue = quiz.shuffle(quiz.buildItems(picked, all, prog).concat(sentQueue))
+    // 结果页要用：这组题里有多少是「学过的内容」（答完会写回复习计划）
     const learnedCount = queue.filter(q => q.learned).length
     this.setData({
       queue, total: queue.length, index: 0, current: queue[0] || null,
@@ -59,8 +70,14 @@ Page({
     // 以前只调 quizAnswer() 加了个总计数器 —— 答错 10 个词，错词本一条都不会多。
     // 没学过的词只记总统计，不替「学新词」把它标成已学，否则今日待练会少一块。
     const cur = this.data.current
-    if (cur && cur.learned && cur.id) storage.review(cur.id, right ? 2 : 0)
-    else storage.quizAnswer(right)
+    if (cur && cur.kind === 'sentence') {
+      // 句子写进句子调度表（utils/sentence-progress.js），不进单词的 FSRS 表
+      if (cur.learned) sentenceProgress.review(cur.id, right ? 5 : 0, 'quiz')
+    } else if (cur && cur.learned && cur.id) {
+      storage.review(cur.id, right ? 2 : 0)
+    } else {
+      storage.quizAnswer(right)
+    }
     this.setData({
       revealed: true, isRight: right,
       correctCount: this.data.correctCount + (right ? 1 : 0),

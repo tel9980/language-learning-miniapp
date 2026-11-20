@@ -7,13 +7,14 @@ const sentences = require('../../utils/sentences')
 const { getWords, getLangMeta } = require('../../utils/words')
 const audio = require('../../utils/audio')
 const pager = require('../../utils/pager')
+const sentenceProgress = require('../../utils/sentence-progress')
 
 Page({
   behaviors: [theme],
   data: {
     lang: 'en', langName: '英语',
     items: [], total: 0,
-    dueCount: 0, focusCount: 0, wrongCount: 0,
+    dueCount: 0, focusCount: 0, wrongCount: 0, sentDueCount: 0,
     allDone: false, hasMore: false
   },
 
@@ -49,14 +50,34 @@ Page({
       }
     })
 
-    // 2) 口语重点项（词 + 句 + 对话台词）
-    const allItems = words.concat(sentences.getAllItems(lang))
+    // 2) 句子到期复习（句子/台词有自己的调度表，见 utils/sentence-progress.js）
+    //    只把「练过且到点」的句子放进来，没练过的句子不刷屏；
+    //    清单里最多 10 条，剩下的点进口语页慢慢练。
+    const sentItems = sentences.getAllItems(lang)
+    const sentProg = sentenceProgress.all()
+    const sentDue = []
+    sentItems.forEach(function (it) {
+      const p = sentProg[it.id]
+      if (p && p.dueAt && p.dueAt <= now) sentDue.push({ item: it, p: p })
+    })
+    const sentDueCount = sentDue.length
+    sentDue.slice(0, 10).forEach(function (x) {
+      const it = x.item
+      items.push({
+        id: 's_' + it.id, say: it.word, sayId: it.id, label: it.word,
+        sub: '句子复习' + (x.p.lapses > 0 ? ' · 错过 ' + x.p.lapses + ' 次' : ''),
+        type: 'sent', typeName: '句子', target: 'due'
+      })
+    })
+
+    // 3) 口语重点项（词 + 句 + 对话台词）
+    const allItems = words.concat(sentItems)
     const focusItems = speaking.getFocusItems(allItems)
     focusItems.forEach(function (it) {
       items.push({ id: 'f_' + it.id, say: it.word, sayId: it.id, label: it.word, sub: '重点复练 ×' + it.focusCount, type: 'focus', typeName: '口语', target: '/pages/speak/speak?focus=1' })
     })
 
-    // 3) 错词本（lapses>0）
+    // 4) 错词本（lapses>0）
     let wrongCount = 0
     words.forEach(function (w) {
       const p = prog[w.id]
@@ -71,6 +92,7 @@ Page({
     this.setData({
       items: this._pager.slice(items), total: items.length, hasMore: this._pager.hasMore,
       dueCount: dueCount, focusCount: focusItems.length, wrongCount: wrongCount,
+      sentDueCount: sentDueCount,
       allDone: items.length === 0
     })
   },
@@ -107,9 +129,11 @@ Page({
     const type = e.currentTarget.dataset.type
     if (type === 'due') return this.goLearn()
     if (type === 'focus') return this.goSpeak()
+    if (type === 'sent') return this.goSpeakDue()
     nav.go('/pages/wrong/wrong')
   },
   goLearn() { nav.go('/pages/learn/learn', { mode: 'due' }) },
   goSpeak() { nav.go('/pages/speak/speak', { focus: 1 }) },
+  goSpeakDue() { nav.go('/pages/speak/speak', { due: 1 }) },
   goWrong() { nav.go('/pages/wrong/wrong') }
 })
