@@ -130,3 +130,19 @@
 .theme-dark .ai-card { background: rgba(120, 160, 255, 0.12); border-color: rgba(120, 160, 255, 0.25); }
 .theme-dark .ai-meaning, .theme-dark .ai-ex-en { color: #dfe5ee; }
 .theme-dark .ai-err, .theme-dark .ai-note { color: #7d8798; }
+
+.ai-actions {
+  margin-top: 16rpx;
+}
+.ai-save {
+  display: inline-block;
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  background: #EEF3FF;
+  color: #2B6CF6;
+  font-size: 26rpx;
+}
+.ai-save.done {
+  background: #EAF7EE;
+  color: #2FA84F;
+}

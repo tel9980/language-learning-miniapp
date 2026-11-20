@@ -11,6 +11,7 @@ const theme = require('../../utils/theme')
 const profile = require('../../utils/profile')
 const nav = require('../../utils/nav')
 const { getWords } = require('../../utils/words')
+const { getLangMeta } = require('../../utils/lang')
 const custom = require('../../utils/custom-items')
 
 // 跟读模式：word=单词 | sentence=句子 | dialogue=情景对话 | custom=自建素材
@@ -250,7 +251,7 @@ Page({
     })
     this._audioPlayer = audio.speak(text, slow, {
       id: id,
-      lang: storage.getCurrentLang() === 'ja' ? 'ja_JP' : 'en_US',
+      lang: getLangMeta(storage.getCurrentLang()).voice,
       // 真正开始出声的那一刻，才是字幕应该起跑的时刻
       onPlay() { if (that._highlighter) that._highlighter.start() },
       // 弱网下下载可能要好几百毫秒甚至触发 8 秒看门狗，页面得让用户看到「在等」
@@ -457,7 +458,7 @@ Page({
     if (cur && speechScore.isSupported(lang)) {
       this._recognizer = speechScore.createRecognizer({
         targetText: cur.word,
-        lang: lang === 'ja' ? 'ja_JP' : 'en_US',
+        lang: getLangMeta(lang).voice,
         onResult(res) {
           that._lastScore = res.score
           that._lastRecognized = res.recognized

@@ -221,6 +221,23 @@ function rawHas(key) {
   try { return !!wx.getStorageSync(profile.nsKey(key)) } catch (e) { return false }
 }
 
+// init() 要连着问 5 个 key「在不在」。以前是 5 次 getStorageSync（跨线程桥调用，
+// 真机每次约 0.05–0.3ms）。wx.getStorageInfoSync 一次就能拿到全部 key 名，
+// 1 次调用换 5 次 —— 名字对了就说明在，不必再读值。
+// 取不到（老基础库 / 测试桩没实现）就退回逐条读。
+function keyChecker() {
+  try {
+    const info = wx.getStorageInfoSync && wx.getStorageInfoSync()
+    const keys = (info && info.keys) || null
+    if (!keys) return rawHas
+    const set = {}
+    keys.forEach(function (k) { set[k] = true })
+    return function (key) { return !!set[profile.nsKey(key)] }
+  } catch (e) {
+    return rawHas
+  }
+}
+
 // init() 会被首页 onShow 反复调用（每次切回首页都会走一遍）。它做的事
 // （扫老 key、补默认值、补设置字段）都是幂等的「第一次才需要」的活，
 // 所以按档案 id 记住是否已初始化，重复调用直接返回，省掉每次十几条同步 Storage 读。
@@ -234,12 +251,13 @@ function init() {
   profile.list() // 确保默认档案存在
   const d = defaults()
   d.stats.firstDay = todayKey()
-  if (!rawHas(KEY_SETTINGS)) write(KEY_SETTINGS, d.settings)
-  if (!rawHas(KEY_STATS)) write(KEY_STATS, d.stats)
-  if (!rawHas(KEY_DAILY)) write(KEY_DAILY, d.daily)
+  const has = keyChecker()
+  if (!has(KEY_SETTINGS)) write(KEY_SETTINGS, d.settings)
+  if (!has(KEY_STATS)) write(KEY_STATS, d.stats)
+  if (!has(KEY_DAILY)) write(KEY_DAILY, d.daily)
   loadProgress()   // 进度表按分片懒加载，老版本单表在这里自动拆片
-  if (!rawHas(KEY_CUSTOM)) write(KEY_CUSTOM, d.custom)
-  if (!rawHas(KEY_THEME)) write(KEY_THEME, d.theme)
+  if (!has(KEY_CUSTOM)) write(KEY_CUSTOM, d.custom)
+  if (!has(KEY_THEME)) write(KEY_THEME, d.theme)
   // 老用户补齐新增设置字段
   const s = getSettings()
   let changed = false
@@ -306,15 +324,34 @@ function getDueWords(lang) {
 // 取新词：未学过的。传 category 时只取该分类（不传 = 全部）
 // 不传分类时严格按词库数组顺序取，考试词会永远排在最前面；
 // 想学「日常」「旅行」这类场景词，必须由页面传分类下来。
-function getNewWords(lang, limit, category) {
-  const prog = getProgress()
-  const words = getWords(lang)
-  const fresh = words.filter(w => !prog[w.id] && (!category || w.category === category))
+// 「新词按词频排序」的排序结果缓存。
+// 以前每次进学习页/首页都对整张词库排一次序（480 条实测 0.61ms）。
+// 词库数组是模块级单例（内置或在线替换后换新数组），所以用「同一个数组对象」
+// 作为缓存键就够了：在线词库一旦替换整个数组，键就不相等，缓存自动失效。
+let _rankCache = { src: null, order: null }
+function rankedWords(words) {
+  if (_rankCache.src === words && _rankCache.order) return _rankCache.order
   // 高频优先：词库数组是字母序，直接 slice 会让新用户第一天撞上 abandon / accommodate
   // 这种低频难词。按 ECDICT 词频排名升序（数字越小越常用），表里没有的（日语词、
   // 超低频词）rankOf 返回 Infinity，稳定排序后仍保持词库原顺序。
-  fresh.sort((a, b) => wordRank.rankOf(a.id) - wordRank.rankOf(b.id))
-  return limit ? fresh.slice(0, limit) : fresh
+  const order = words.slice().sort((a, b) => wordRank.rankOf(a.id) - wordRank.rankOf(b.id))
+  _rankCache = { src: words, order: order }
+  return order
+}
+
+function getNewWords(lang, limit, category) {
+  const prog = getProgress()
+  const words = getWords(lang)
+  const out = []
+  const ordered = rankedWords(words)   // 已按词频排好，这里只是过滤，O(n) 不再排序
+  for (let i = 0; i < ordered.length; i++) {
+    const w = ordered[i]
+    if (prog[w.id]) continue
+    if (category && w.category !== category) continue
+    out.push(w)
+    if (limit && out.length >= limit) break
+  }
+  return out
 }
 
 // 复习打分：quality 0=不记得 3=模糊 5=记得（兼容口语三档 0/1/2）

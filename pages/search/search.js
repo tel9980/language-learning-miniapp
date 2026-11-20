@@ -26,7 +26,8 @@ Page({
     hasMore: false,
     aiLoading: false,       // 词库查不到时用 AI 现查一次（见 utils/ai-lookup.js）
     aiResult: null,
-    aiError: ''
+    aiError: '',
+    aiSaved: false          // 已经存进「我的素材」，按钮变灰防重复点
   },
 
   _applyLang(lang) {
@@ -154,6 +155,7 @@ Page({
     if (reset !== false && (this.data.aiResult || this.data.aiError)) {
       patch.aiResult = null
       patch.aiError = ''
+      patch.aiSaved = false
     }
     // 不再清 expandedId：加载更多、换关键词都不该把用户正在看的详情收起来
     this.setData(patch)
@@ -166,7 +168,7 @@ Page({
     if (!kw) { wx.showToast({ title: '先输入一个词', icon: 'none' }); return }
     if (!aiLookup.configured()) { wx.showToast({ title: '这一版没配 AI 查词', icon: 'none' }); return }
     const that = this
-    this.setData({ aiLoading: true, aiResult: null, aiError: '' })
+    this.setData({ aiLoading: true, aiResult: null, aiError: '', aiSaved: false })
     aiLookup.lookup(kw, this.data.lang, function (r) {
       if (!r.ok) {
         let msg = 'AI 查词失败，稍后再试'
@@ -180,7 +182,7 @@ Page({
         that.setData({ aiLoading: false, aiError: 'AI 也没把握这个词，检查一下拼写' })
         return
       }
-      that.setData({ aiLoading: false, aiResult: r })
+      that.setData({ aiLoading: false, aiResult: r, aiSaved: false })
     })
   },
 
@@ -190,8 +192,29 @@ Page({
     audio.speak(r.word || this.data.keyword, false, { lang: getLangMeta(this.data.lang).voice })
   },
 
+  // AI 查到的东西只能看不能练，等于白查 —— 存成自建素材就能进口语页练、也能在导入页删。
+  // 注意：写的是自建素材（cu_ 前缀），不是词库，所以不会污染 FSRS 的词表。
+  saveAi() {
+    const r = this.data.aiResult
+    if (!r || !r.word) return
+    if (this.data.aiSaved) { wx.showToast({ title: '已经存过啦', icon: 'none' }); return }
+    const ex = (r.examples && r.examples[0]) || null
+    storage.addCustomItems([{
+      text: r.word,
+      cn: r.meaning || '',
+      scene: 'AI 查词',
+      lang: this.data.lang
+    }])
+    if (ex && ex.text) {
+      // 例句也存一条：跟读时有整句比只有单词有用得多
+      storage.addCustomItems([{ text: ex.text, cn: ex.cn || '', scene: 'AI 查词', lang: this.data.lang }])
+    }
+    this.setData({ aiSaved: true })
+    wx.showToast({ title: '已存入「我的素材」', icon: 'success' })
+  },
+
   closeAi() {
-    this.setData({ aiResult: null, aiError: '' })
+    this.setData({ aiResult: null, aiError: '', aiSaved: false })
   },
 
   loadMore() {

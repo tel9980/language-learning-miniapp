@@ -69,7 +69,10 @@
           <view class="ai-ex-cn">{{item.cn}}</view>
         </view>
         <view class="ai-tip" wx:if="{{aiResult.tip}}">💡 {{aiResult.tip}}</view>
-        <view class="ai-note">🤖 AI 生成，仅供参考；不会写进词库</view>
+        <view class="ai-actions">
+          <view class="ai-save {{aiSaved ? 'done' : ''}}" catchtap="saveAi">{{aiSaved ? '✅ 已存入我的素材' : '⭐ 存入我的素材'}}</view>
+        </view>
+        <view class="ai-note">🤖 AI 生成，仅供参考；不会写进词库。存入的是「我的素材」，可在口语页「✏️ 自建」里练</view>
       </view>
     </view>
   </view>

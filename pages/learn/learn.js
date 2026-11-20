@@ -91,7 +91,7 @@ Page({
     if (this._player && this._player.destroy) this._player.destroy()
     this._player = audio.speak(w.word, false, {
       id: w.id,
-      lang: lang === 'ja' ? 'ja_JP' : 'en_US',
+      lang: getLangMeta(lang).voice,
       onError: function () {
         wx.showToast({ title: '朗读需联网或配置同声传译插件', icon: 'none' })
       }

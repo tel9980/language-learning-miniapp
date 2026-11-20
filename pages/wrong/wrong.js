@@ -81,7 +81,7 @@ Page({
     if (!word) return
     const lang = storage.getCurrentLang()
     if (this._audio && this._audio.destroy) this._audio.destroy()
-    this._audio = audio.speak(word, false, { id: e.currentTarget.dataset.id, lang: lang === 'ja' ? 'ja_JP' : 'en_US' })
+    this._audio = audio.speak(word, false, { id: e.currentTarget.dataset.id, lang: getLangMeta(lang).voice })
   },
 
   startReview() {

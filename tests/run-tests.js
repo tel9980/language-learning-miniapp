@@ -77,6 +77,7 @@ global.wx = {
   getStorageSync: k => (k in _store ? _store[k] : ''),
   setStorageSync: (k, v) => { _store[k] = v },
   removeStorageSync: k => { delete _store[k] },
+  getStorageInfoSync: () => ({ keys: Object.keys(_store), currentSize: 0, limitSize: 10240 }),
   removeSavedFile: () => {}
 }
 const profile = require('../utils/profile')
@@ -1301,6 +1302,45 @@ async function runExtraTests() {
   eq(typeof laJa.ensureLoaded, 'undefined', 'ensureLoaded 已移除（不再加载分包）')
   eq(laJa.remoteFor('st_js015'), 'https://yb.qy663.de5.net/audio/js015.mp3', '日语素材有 CDN 地址（前缀 id 也认）')
   eq(laJa.remoteFor('s001'), 'https://yb.qy663.de5.net/audio-en/s001.mp3', '英语素材有 CDN 地址')
+
+  // ---- 冷启动两笔省：一次 getStorageInfoSync 顶 5 次读 + 词频排序结果缓存 ----
+  {
+    const od = require('../utils/online-data')
+    const origGetOverride = od.getOverride
+    const origInfo = global.wx.getStorageInfoSync
+
+    // 前面的在线词库用例会给 getWords 留一个覆盖层，这里先摘掉，测内置词库本身
+    od.getOverride = function () { return null }
+    try {
+      let infoCalls = 0
+      global.wx.getStorageInfoSync = function () { infoCalls++; return origInfo() }
+      storage.invalidate()
+      storage.init()
+      eq(infoCalls, 1, 'init 只调一次 getStorageInfoSync（顶掉 5 次逐条读）')
+
+      const a1 = storage.getNewWords('en', 5)
+      const a2 = storage.getNewWords('en', 5)
+      eq(a1.length, 5, 'getNewWords 返回 limit 条')
+      eq(a1.map(w => w.id).join(','), a2.map(w => w.id).join(','), '排序结果被复用，两次完全一致')
+      ok(a1.every(w => w.id !== 'en_001'), '不再是字母序第一条（高频优先，en_001 是 abandoned 类低频词）')
+
+      // 分类过滤在 O(n) 过滤版里不能丢
+      const fin = storage.getNewWords('en', 100, '财务')
+      ok(fin.length === 40, '按分类取新词仍能取满 40 条财务词（实际 ' + fin.length + '）')
+      ok(fin.every(w => w.category === '财务'), '分类过滤只出该类词')
+
+      // 在线词库换掉整个数组后，排序缓存必须失效（否则按旧顺序出行）
+      od.getOverride = function () {
+        return { words: { en: [{ id: 'x1', word: 'zzz', phonetic: '', meaning: '测试', example: '', exampleCn: '', category: '日常' }] } }
+      }
+      const after = storage.getNewWords('en', 5)
+      eq(after.length, 1, '词库换成新数组后按新数组出词')
+      eq(after[0].id, 'x1', '拿到的是新数组里的词')
+    } finally {
+      od.getOverride = origGetOverride
+      global.wx.getStorageInfoSync = origInfo
+    }
+  }
 
   // ---- AI 补查：词库没有的词问 Worker（Key 在 Worker 里，客户端只认识域名）----
   const ai = require('../utils/ai-lookup')
