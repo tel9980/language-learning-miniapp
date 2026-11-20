@@ -1,5 +1,10 @@
 # 按需查词增强（Cloudflare Worker + Google Gemini）
 
+> 部署凭据：token 从 `~/.dsh/cf-token` 读（与 `deploy/cf/` 同一个文件，权限 600），
+> 环境变量 `CLOUDFLARE_API_TOKEN` 可覆盖，账号 ID 默认是 `deploy/ai/push.js` 里的常量。
+> 需要的权限：Workers Scripts:Edit、Workers KV Storage:Edit、DNS + Workers routes（读/写）。
+> KV 命名空间 `yuban-ai-cache` 用来缓存查询结果（30 天），没有这个权限也能部署，只是不缓存。
+
 小程序查词页遇到词库里没有的词时，可以点「🤖 用 AI 查」：请求打到这个 Worker，
 Worker 拿 Gemini Key 去问 Google，返回**中文释义 + 2 个例句 + 1 条用法提示**，
 页面上标「AI 生成，仅供参考」，**不写进词库**。
