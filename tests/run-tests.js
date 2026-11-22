@@ -1791,6 +1791,11 @@ async function runTailTests() {
   ok(/stream\(\)/.test(audioSrc), '下载失败退回流播（不比以前差）')
   ok(/ttsCache\.forget\(url\)/.test(audioSrc), '缓存文件坏了要丢掉，否则这句永远播不出来')
   ok(/prefetch/.test(audioSrc.split('module.exports')[1] || ''), 'prefetch 已导出')
+  // 开发者工具里 operateAudio:fail:access denied 很常见：本地文件（缓存/临时）播不了。
+  // 一条坏缓存不该让这个词永远读不出来 —— 丢掉缓存 + 自动流播一次。
+  ok(/let triedStream = false/.test(audioSrc), '本地播放失败可以流播兜一次')
+  ok(/if \(!triedStream && !destroyed\) \{[\s\S]{0,120}start\(url, 'url'\)/.test(audioSrc), '本地文件播不了就改成直接流播（工具里也能出声）')
+  ok(/ttsCache\.fileOf\(url\) === src/.test(audioSrc), '只丢真正坏掉的那条缓存')
   const speakSrc = read('pages/speak/speak.js')
   ok(/audio\.prefetch\(next\.id\)/.test(speakSrc), '口语页切词后预取下一条')
   ok(/audio\.prefetch\(list\[1\]\.id\)/.test(read('pages/learn/learn.js')), '学习页开局预取第二张')

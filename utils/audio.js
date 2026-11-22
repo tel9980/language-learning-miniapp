@@ -125,8 +125,9 @@ function playRemote(url, slow, handlers, onFail) {
   let lp = null
   let dlTimer = null
   let destroyed = false
+  let triedStream = false
 
-  function start(src) {
+  function start(src, kind) {
     if (destroyed) return
     lp = createPlayer({
       rate: slow ? 0.75 : 1,
@@ -134,9 +135,20 @@ function playRemote(url, slow, handlers, onFail) {
       onEnded: handlers.onEnded,
       onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
       onError(err) {
-        // 缓存文件坏了：丢掉它，下次重新下载（不然这句会一直播不出来）
-        if (src !== url) ttsCache.forget(url)
-        console.error('[audio] CDN 预生成音频播放失败', url, err && (err.errMsg || err))
+        const msg = String((err && err.errMsg) || err || '')
+        // 本地文件播不了（开发者工具常见 operateAudio:fail:access denied，
+        // 也可能是缓存文件被系统清掉了）：先当坏缓存丢掉，再直接流播 CDN 兜一次。
+        // 不这么做的话，一条坏缓存会让这个词一直「读不出来」，直到手动清缓存。
+        if (kind !== 'url') {
+          if (ttsCache.fileOf(url) === src) ttsCache.forget(url)
+          console.error('[audio] CDN 音频本地播放失败', kind, url, msg)
+          if (!triedStream && !destroyed) {
+            triedStream = true
+            start(url, 'url')
+            return
+          }
+        }
+        console.error('[audio] CDN 预生成音频播放失败', url, msg)
         if (onFail) onFail(err)
         else if (handlers.onError) handlers.onError(err)
       }
@@ -146,17 +158,18 @@ function playRemote(url, slow, handlers, onFail) {
 
   function stream() {
     console.warn('[audio] CDN 音频下载失败，改为直接流播', url)
-    start(url)
+    triedStream = true
+    start(url, 'url')
   }
 
   function tryCache() {
     const loc = ttsCache.fileOf(url)
-    if (loc) { start(loc); return true }
+    if (loc) { start(loc, 'cache'); return true }
     return false
   }
 
   function download() {
-    if (typeof wx.downloadFile !== 'function') { start(url); return }
+    if (typeof wx.downloadFile !== 'function') { start(url, 'url'); return }
     let done = false
     dlTimer = setTimeout(function () {
       if (done) return
@@ -172,7 +185,7 @@ function playRemote(url, slow, handlers, onFail) {
         if (destroyed) return
         if (res.statusCode === 200 && res.tempFilePath) {
           const loc = ttsCache.store(url, res.tempFilePath)
-          start(loc || res.tempFilePath)
+          start(loc || res.tempFilePath, loc ? 'cache' : 'temp')
         } else {
           stream()
         }
@@ -198,6 +211,7 @@ function playRemote(url, slow, handlers, onFail) {
     },
     retry() {
       destroyed = false
+      triedStream = false
       if (lp) lp.destroy()
       lp = null
       if (!tryCache()) download()
