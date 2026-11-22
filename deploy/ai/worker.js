@@ -310,6 +310,22 @@ export default {
     const url = new URL(request.url)
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
 
+    // 根路径给个人看的：这个域名不是网站，只有两个接口。
+    // 不做成一类「健康检查要靠日志」的黑盒，打开就知道活着没、缓存和 Key 在不在。
+    if (url.pathname === '/' || url.pathname === '/health') {
+      return json({
+        ok: true,
+        service: '语伴 AI 助手',
+        note: '这是接口地址，没有网页可看。小程序里不需要打开它。',
+        endpoints: [
+          { path: '/lookup?q=invoice&lang=en', method: 'GET', what: '查词（en / ja / vi）：释义 + 音标 + 例句' },
+          { path: '/eval', method: 'POST', what: 'AI 听音：上传一段录音，返回定性反馈（不打分）' }
+        ],
+        cache: !!env.AI_CACHE,
+        configured: !!env.GEMINI_API_KEY
+      }, 200, { 'Cache-Control': 'no-store' })
+    }
+
     if (url.pathname === '/eval') {
       if (request.method !== 'POST') return json({ ok: false, error: 'method-not-allowed' }, 405)
       return handleEval(request, env)

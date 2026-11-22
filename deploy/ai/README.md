@@ -22,7 +22,7 @@ Worker 拿 Gemini Key 去问 Google，返回**中文释义 + 2 个例句 + 1 条
 
 | 文件 | 作用 |
 | --- | --- |
-| `worker.js` | Worker 本体（模块语法）。`GET /lookup?q=<词>&lang=en\|ja` |
+| `worker.js` | Worker 本体（模块语法）。`GET /lookup?q=<词>&lang=en\|ja\|vi`、`POST /eval`（AI 听音）、`GET /`（接口自查） |
 | `push.js` | 一键部署：建 KV 命名空间 → 传脚本 → 设 `GEMINI_API_KEY` → 建 CNAME + Worker 路由（幂等，可反复跑） |
 
 ## 部署
@@ -62,6 +62,8 @@ GEMINI_API_KEY=xxxx node deploy/ai/push.js
 ## 自测
 
 ```bash
+# 打开根路径就能看清这个域名活着没、缓存和 Key 在不在（不是网页，是 JSON）
+curl 'https://ai.qy663.de5.net/'
 curl 'https://ai.qy663.de5.net/lookup?q=invoice&lang=en'
 curl 'https://ai.qy663.de5.net/lookup?q=領収書&lang=ja'
 ```

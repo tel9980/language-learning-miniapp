@@ -1821,6 +1821,8 @@ async function runTailTests() {
   ok(/x-device-id/.test(read('utils/ai-lookup.js')), 'AI 查词带设备号')
   ok(/x-device-id/.test(read('utils/ai-eval.js')), 'AI 听音带设备号')
   ok(/scope === 'device'/.test(workerSrc), '429 文案按设备/网络分开说')
+  ok(/url\.pathname === '\/' \|\| url\.pathname === '\/health'/.test(workerSrc), '根路径给人看：返回接口说明，不再是 not-found')
+  ok(/cache: !!env\.AI_CACHE/.test(workerSrc) && /configured: !!env\.GEMINI_API_KEY/.test(workerSrc), '根路径能看出缓存与 Key 是否就位')
 
   // I. 发布物：同一份数据不再进 git 两遍
   ok(!fsMod.existsSync(pathMod.join(__dirname, '..', 'deploy/cf/data.json')) ||
