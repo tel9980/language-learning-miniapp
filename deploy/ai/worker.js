@@ -15,9 +15,11 @@
 // 明确不做的事：不写词库、不落库到 data.json。AI 生成的内容只作为「查词参考」显示在页面上
 // （页面标注「AI 生成，仅供参考」），词库仍然只能通过 git push + CI 测试上线。
 
-// 模型名会被 Google 下线（gemini-2.0-flash 已经 404 了），所以按顺序试：
-// 先便宜的 flash-lite，不行再往上退。改这里就能换模型，不用动逻辑。
-const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.8-flash']
+// 模型名会被 Google 下线，所以按顺序试：先便宜的 flash-lite，不行再往上退。
+// 改这里就能换模型，不用动逻辑。
+// 2026-11 实测：gemini-2.0/2.5-flash 系列对新用户已经 404（"no longer available to new users"），
+// gemini-3.8-flash 时常 503（high demand），所以列表里同时放 lite、latest 别名和主力款。
+const MODELS = ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.5-flash', 'gemini-3.8-flash']
 const MAX_Q = 40
 const CACHE_TTL = 60 * 60 * 24 * 30   // 30 天
 // 每个 IP 每天真调 Gemini 的次数上限（缓存命中不计数）。
