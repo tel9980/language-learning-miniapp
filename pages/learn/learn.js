@@ -78,6 +78,8 @@ Page({
       flipped: false,
       catEmpty: this.data.mode === 'new' && !list.length
     })
+    // 预取下一条的预生成音频（单词的 mp3 也是 CDN 上的，见 utils/audio.js 的 prefetch）
+    if (list[1]) audio.prefetch(list[1].id)
   },
   setMode(e) {
     this.setData({ mode: e.currentTarget.dataset.mode }, () => this.buildQueue())
@@ -105,6 +107,7 @@ Page({
     const nextIndex = this.data.index + 1
     if (nextIndex < queue.length) {
       this.setData({ index: nextIndex, current: queue[nextIndex], flipped: false })
+      if (queue[nextIndex + 1]) audio.prefetch(queue[nextIndex + 1].id)
     } else {
       wx.showToast({ title: '本轮完成！', icon: 'success' })
       setTimeout(() => this.load(), 600)

@@ -11,10 +11,10 @@ const feedback = require('../../utils/feedback')
 const theme = require('../../utils/theme')
 const profile = require('../../utils/profile')
 const nav = require('../../utils/nav')
-const { getWords } = require('../../utils/words')
 const { getLangMeta } = require('../../utils/lang')
 const sentenceProgress = require('../../utils/sentence-progress')
-const custom = require('../../utils/custom-items')
+const session = require('../../utils/speak-session')
+const shadowTip = require('../../utils/shadow-tip')
 
 // 跟读模式：word=单词 | sentence=句子 | dialogue=情景对话 | custom=自建素材
 Page({
@@ -75,6 +75,12 @@ Page({
     const p = profile.currentProfile() || {}
     this.setData({ isKid: p.mode === 'kid', stars: storage.getStats().totalCorrect || 0 })
     const intent = nav.takeIntent('pages/speak/speak')
+    // 从搜索页点「去跟读这句」进来：只练这一条，练完回正常队列
+    if (intent && intent.item) {
+      this.refreshScenes()
+      this.startOne(intent.item)
+      return
+    }
     if (intent && intent.focus) {
       this.refreshScenes()
       this.startFocus()
@@ -100,8 +106,7 @@ Page({
 
   // 队列指纹：决定「要不要重建队列」。变了才重建，没变就沿用。
   _sig() {
-    return [this.data.track, this.data.levelIndex, this.data.sceneIndex,
-      storage.getCurrentLang(), this.data.mode].join('|')
+    return session.signature(this.data)
   },
 
   // 评分/录音记录是延迟落盘的，离开页面前必须冲一次
@@ -142,38 +147,22 @@ Page({
     })
   },
 
-  // 汇总某语种下全部可跟读条目（词 + 句 + 对话台词 + 自建）
+  // 汇总某语种下全部可跟读条目（词 + 句 + 对话台词 + 自建），实现见 utils/speak-session.js
   allItems(lang) {
-    // 自建素材存的是 { text, cn }，练习页统一按 { word, meaning } 取值，必须归一化
-    const mine = custom.toPracticeItems(storage.getCustomItems(lang))
-    return getWords(lang).concat(sentences.getAllItems(lang)).concat(mine)
+    return session.allItems(lang)
   },
 
   buildQueueAndLoad() {
-    const lang = storage.getCurrentLang()
-    const level = this.data.levelNames[this.data.levelIndex]
-    let pool = []
-    if (this.data.track === 'word') {
-      pool = getWords(lang).map(w => Object.assign({}, w, { kind: 'word' }))
-    } else if (this.data.track === 'sentence') {
-      pool = sentences.getSentences(lang, level === '全部' ? null : level).map(s => sentences.toItem(s, 'st'))
-    } else if (this.data.track === 'custom') {
-      pool = custom.toPracticeItems(storage.getCustomItems(lang))
-    } else {
-      const list = level === '全部' ? sentences.getDialogues(lang) : sentences.getDialogues(lang, level)
-      const dlg = list[this.data.sceneIndex]
-      pool = dlg ? dlg.lines.map(l => sentences.toItem(Object.assign({ scene: dlg.scene, level: dlg.level }, l), 'dl')) : []
-    }
-    // 没有 word 的条目练不了（舞台空白、发音念不出来），一律不进队列
-    pool = pool.filter(w => w && w.word)
-    const records = speaking.getRecords()
-    const fresh = pool.filter(w => !records[w.id])
-    const done = pool.filter(w => records[w.id])
-    const queue = fresh.concat(done)
+    const queue = session.buildQueue({
+      lang: storage.getCurrentLang(),
+      track: this.data.track,
+      levelName: this.data.levelNames[this.data.levelIndex],
+      sceneIndex: this.data.sceneIndex
+    })
     this._queue = queue
     this._memoIndex = 0
-    this._queueSig = [this.data.track, this.data.levelIndex, this.data.sceneIndex,
-      storage.getCurrentLang(), 'train'].join('|')
+    this._queueSig = session.signature({ track: this.data.track, levelIndex: this.data.levelIndex,
+      sceneIndex: this.data.sceneIndex, mode: 'train' })
     this.setData(Object.assign({
       queueLen: queue.length, index: 0, showLine: 0, mode: 'train', abCount: 0
     }, this._progress(0, queue.length)), () => this.loadCurrent())
@@ -196,15 +185,7 @@ Page({
   // 进度显示：条目少时用圆点，条目多（几十上百）时改用进度条，
   // 避免为每个条目都渲染一个 view 节点（220 词 = 220 个节点，明显拖慢渲染）
   _progress(index, total) {
-    const n = total || 0
-    const showDots = n > 0 && n <= 20
-    const dots = []
-    if (showDots) for (let i = 0; i < n; i++) dots.push(i)
-    return {
-      showDots, dots,
-      progressText: n ? (Math.min(index + 1, n) + ' / ' + n) : '0 / 0',
-      progressPercent: n ? Math.round((index + 1) / n * 100) : 0
-    }
+    return session.progress(index, total)
   },
 
   loadCurrent() {
@@ -233,6 +214,9 @@ Page({
       showLine: 0, revealed: false, otherLine,
       karaokeOn: false, karaokeIdx: -1, karaokeTokens: karaoke.toPlain(tokens), abCount: 0
     }, this._progress(this.data.index, this._queue.length)))
+    // 预取下一条的预生成音频：点「下一句」时文件已经在本地，切换是瞬时的
+    const next = this._queue[this.data.index + 1]
+    if (next) audio.prefetch(next.id)
   },
 
   // ---------- 音频播放（带降级兜底 + 逐词高亮 + AB复读） ----------
@@ -477,17 +461,7 @@ Page({
 
   // 时长对比：只比说了多久，不比音色。差 15% 以内算对得上。
   _shadowTip() {
-    const std = this._stdDuration || 0
-    const mine = this._recDurationMs || 0
-    if (!std || !mine || std < 400) return '先跟住节奏，再抠发音。'
-    const sec = Math.abs(mine - std) / 1000
-    const stdS = (std / 1000).toFixed(1)
-    const mineS = (mine / 1000).toFixed(1)
-    if (Math.abs(mine - std) / std <= 0.15) {
-      return '节奏对得上（标准音 ' + stdS + 's / 你 ' + mineS + 's），可以开始抠发音了。'
-    }
-    if (mine > std) return '你比标准音慢了 ' + sec.toFixed(1) + 's（' + stdS + 's / ' + mineS + 's），中间卡顿了，先顺一遍再提速。'
-    return '你比标准音快了 ' + sec.toFixed(1) + 's（' + stdS + 's / ' + mineS + 's），注意别吞音，尤其词尾辅音。'
+    return shadowTip.tip(this._stdDuration, this._recDurationMs)
   },
 
   // ---------- 录音 ----------
@@ -511,7 +485,9 @@ Page({
       cn: cur ? cur.meaning : '',
       kind: this.data.track,
       score: this._lastScore,
-      recognized: this._lastRecognized
+      recognized: this._lastRecognized,
+      // 录制时长：录音页的「进步对比」用它比语速（标准音时长在影子跟读里另算）
+      ms: this._recDurationMs || 0
     }).then((entry) => {
       // 关键：落盘成功后临时文件已被移走，后续播放必须用 entry.filePath
       if (entry && entry.filePath) that._recFilePath = entry.filePath
@@ -692,6 +668,10 @@ Page({
     const i = this.data.index + 1
     if (i < this._queue.length) {
       this.setData({ index: i }, () => this.loadCurrent())
+    } else if (this.data.mode === 'one') {
+      // 单条练习：练完这条就回正常队列，不要停在一条上转圈
+      wx.showToast({ title: '这一条练完了', icon: 'success' })
+      this.setData({ mode: 'train' }, () => { this.refreshScenes(); this.buildQueueAndLoad() })
     } else if (this.data.mode === 'focus' || this.data.mode === 'due') {
       const wasDue = this.data.mode === 'due'
       this.setData({ mode: 'train', sceneIndex: this.data.sceneIndex }, () => {
@@ -710,6 +690,23 @@ Page({
   },
 
   // ---------- 重点复练 ----------
+  // 单条练习：搜索页点「去跟读这句」进来的，队列里就这一条
+  startOne(id) {
+    const lang = storage.getCurrentLang()
+    const item = this.allItems(lang).filter(function (it) { return it.id === id })[0]
+    if (!item) {
+      wx.showToast({ title: '这条素材找不到了', icon: 'none' })
+      return
+    }
+    this.stopAll()
+    this._queue = [item]
+    this._memoIndex = 0
+    this.setData(Object.assign({ mode: 'one', queueLen: 1, index: 0 }, this._progress(0, 1)), () => {
+      this._queueSig = this._sig()
+      this.loadCurrent()
+    })
+  },
+
   startFocus() {
     const lang = storage.getCurrentLang()
     const list = speaking.getFocusItems(this.allItems(lang))

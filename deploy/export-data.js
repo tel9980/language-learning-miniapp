@@ -43,12 +43,8 @@ const out = path.join(__dirname, 'data.json')
 fs.writeFileSync(out, json)
 console.log('✅ 已导出:', out)
 
-// Cloudflare Pages 的发布目录也放一份，省得每次手工复制
-const cfDir = path.join(__dirname, 'cf')
-if (fs.existsSync(cfDir)) {
-  fs.writeFileSync(path.join(cfDir, 'data.json'), json)
-  console.log('✅ 已同步:', path.join(cfDir, 'data.json'))
-}
+// Cloudflare Pages 的发布目录不再留一份副本（两份 181KB 的 JSON 各自进 git，
+// 迟早出现「仓库里一致、线上是旧的」）。发布时才复制：见 deploy/cf/deploy.sh 与 CI。
 console.log('   version:', payload.version)
 Object.keys(payload.words).forEach(function (lang) {
   console.log('   [' + lang + '] 词:', (payload.words[lang] || []).length,

@@ -992,7 +992,7 @@ recordings.save('wxfile://tmp_abc.mp3', { label: 'hi' }).then((entry) => {
 }).then((entry) => {
   eq(entry, null, 'save resolves null when saveFile fails and nothing can be freed')
   return runExtraTests()
-}).then(() => {
+}).then(() => runTailTests()).then(() => {
   console.log(`\n单元测试结果：${pass} 通过 / ${fail} 失败`)
   if (fail) {
     failures.forEach(f => console.log('  ✗ ' + f))
@@ -1676,4 +1676,153 @@ async function runExtraTests() {
   ok(/bindtap="comparePlay"/.test(speakXml), 'wxml 上挂了 comparePlay')
   ok(/bindtap="aiListen"/.test(speakXml), 'wxml 上挂了 aiListen')
   ok(/aiLoading/.test(speakXml), 'AI 听音有 loading 态（模型要想一两秒）')
+}
+
+// ---- 追加用例：本轮新增的纯逻辑模块（日志 / 影子跟读 / 队列 / 设备号 / 预取 / 录音对比）----
+async function runTailTests() {
+  const fsMod = require('fs')
+  const pathMod = require('path')
+  const read = (p) => fsMod.readFileSync(pathMod.join(__dirname, '..', p), 'utf8')
+
+  // A. 线上日志：拿到实时日志就双写，拿不到也只 console，不许抛
+  const logger = require('../utils/logger')
+  let logged = []
+  const origLM = global.wx.getRealtimeLogManager
+  global.wx.getRealtimeLogManager = function () {
+    return {
+      info: (...a) => logged.push(['info', a.join(' ')]),
+      warn: (...a) => logged.push(['warn', a.join(' ')]),
+      error: (...a) => logged.push(['error', a.join(' ')])
+    }
+  }
+  ok(typeof logger.info === 'function', 'logger 有 info')
+  const origConsoleLog = console.log
+  console.log = () => {}
+  logger.info('hello', 1)
+  console.log = origConsoleLog
+  eq(logged.length, 1, 'logger.info 写进实时日志')
+  eq(logged[0][0], 'info', '级别正确')
+  const origConsoleError = console.error
+  console.error = () => {}
+  logger.error(new Error('boom'))
+  console.error = origConsoleError
+  eq(logged.length, 2, 'logger.error 写进实时日志')
+  ok(/boom/.test(logged[1][1]), 'Error 的 message 被带进日志')
+  ok(logged[1][1].length <= 400, '单条日志有长度上限（后台单条有上限，超了会被截断）')
+  global.wx.getRealtimeLogManager = function () { return null }
+  let threw = false
+  const origConsoleWarn = console.warn
+  console.warn = () => {}
+  try { logger.warn('no manager') } catch (e) { threw = true }
+  console.warn = origConsoleWarn
+  ok(!threw, '拿不到实时日志管理器时不抛异常（老基础库）')
+  global.wx.getRealtimeLogManager = origLM
+
+  // B. 影子跟读：只比时长，比值不对时给方向性提示
+  const st = require('../utils/shadow-tip')
+  eq(st.tip(0, 1000), '先跟住节奏，再抠发音。', '没有标准音时长时给通用建议')
+  eq(st.tip(2000, 0), '先跟住节奏，再抠发音。', '没有录音时长时给通用建议')
+  eq(st.tip(300, 300), '先跟住节奏，再抠发音。', '标准音太短（单词）时比值无意义')
+  ok(/节奏对得上/.test(st.tip(2000, 2050)), '差 2.5% 算节奏对得上')
+  ok(/慢了/.test(st.tip(2000, 3000)), '明显慢时提示卡顿')
+  ok(/快了/.test(st.tip(2000, 1200)), '明显快时提示吞音')
+  ok(st.tip(2000, 2050).indexOf('2.0s') > 0, '提示里带标准音秒数')
+  ok(st.tip(2000, 3000).indexOf('1.0s') > 0, '提示里带慢了多久')
+
+  // C. 队列与进度：纯逻辑，可脱离页面渲染验证
+  const session = require('../utils/speak-session')
+  const pg0 = session.progress(0, 0)
+  eq(pg0.progressText, '0 / 0', '空队列进度文案')
+  eq(pg0.showDots, false, '空队列不画圆点')
+  const pg3 = session.progress(1, 3)
+  eq(pg3.progressText, '2 / 3', '进度文案是「当前 / 总数」')
+  eq(pg3.dots.length, 3, '20 条以内画圆点')
+  eq(pg3.progressPercent, 67, '百分比四舍五入')
+  const pg50 = session.progress(49, 50)
+  eq(pg50.showDots, false, '条目多的时候不画圆点（省节点）')
+  eq(pg50.dots.length, 0, '不画圆点时不生成数组')
+  eq(pg50.progressPercent, 100, '最后一条是 100%')
+  eq(session.progress(5, 3).progressText, '3 / 3', '下标越界时按总数封顶')
+
+  // 前面的用例可能留下过「在线词库覆盖层」（只有 1 个词），先清掉再断言内置词库
+  const od = require('../utils/online-data')
+  const odBackup = od.getOverride
+  od.getOverride = () => null
+  const qWords = session.buildQueue({ lang: 'en', track: 'word', levelName: '全部', sceneIndex: 0 })
+  ok(qWords.length >= 400, '英语单词队列包含整个词库')
+  ok(qWords.every(w => w && w.word), '队列里没有空词（练不了的不进队列）')
+  ok(qWords.every(w => w.kind === 'word'), '单词队列条目标了 kind=word')
+  const qSent = session.buildQueue({ lang: 'en', track: 'sentence', levelName: '全部', sceneIndex: 0 })
+  ok(qSent.length >= 100, '英语句子队列取到句库')
+  ok(qSent.every(w => String(w.id).indexOf('st_') === 0), '句子 id 带 st_ 前缀（评分据此分流）')
+  const qDlg = session.buildQueue({ lang: 'vi', track: 'dialogue', levelName: '全部', sceneIndex: 0 })
+  ok(qDlg.length > 0, '越南语对话队列非空')
+  ok(qDlg.every(w => String(w.id).indexOf('dl_') === 0), '台词 id 带 dl_ 前缀')
+  const qBad = session.buildQueue({ lang: 'vi', track: 'dialogue', levelName: '全部', sceneIndex: 99 })
+  eq(qBad.length, 0, '场景下标越界时返回空队列而不是崩')
+  ok(Array.isArray(session.allItems('ja')) && session.allItems('ja').length >= 200, 'allItems 汇总词+句')
+  od.getOverride = odBackup
+
+  const sig1 = session.signature({ track: 'word', levelIndex: 0, sceneIndex: 0, mode: 'train' })
+  const sig2 = session.signature({ track: 'word', levelIndex: 0, sceneIndex: 0, mode: 'train' })
+  const sig3 = session.signature({ track: 'word', levelIndex: 1, sceneIndex: 0, mode: 'train' })
+  eq(sig1, sig2, '同样状态签名一致（能沿用上次位置）')
+  ok(sig1 !== sig3, '换了分类签名就变（重建队列）')
+
+  // D. 设备标识：本机随机、可持久化、格式能过服务端校验
+  delete require.cache[require.resolve('../utils/device')]
+  const device = require('../utils/device')
+  const id1 = device.id()
+  const id2 = device.id()
+  eq(id1, id2, '同一台设备两次取到的是同一个号')
+  ok(/^[a-z0-9]{6,40}$/i.test(id1), '设备号能通过服务端正则（否则额度按 IP 算）')
+  ok(id1.indexOf('dev') === 0, '设备号有 dev 前缀，便于日志里认出来')
+  ok(id1 !== 'devundefined' && id1.length > 10, '设备号有随机部分')
+
+  // E. 播放链路：CDN 音频先落盘缓存，下载失败才退回流播
+  const audioSrc = read('utils/audio.js')
+  ok(/function prefetch\(/.test(audioSrc), 'audio 有 prefetch（预取下一条）')
+  ok(/ttsCache\.fileOf\(url\)/.test(audioSrc), 'CDN 音频先试缓存文件')
+  ok(/wx\.downloadFile/.test(audioSrc), '缓存未命中时下载落盘')
+  ok(/stream\(\)/.test(audioSrc), '下载失败退回流播（不比以前差）')
+  ok(/ttsCache\.forget\(url\)/.test(audioSrc), '缓存文件坏了要丢掉，否则这句永远播不出来')
+  ok(/prefetch/.test(audioSrc.split('module.exports')[1] || ''), 'prefetch 已导出')
+  const speakSrc = read('pages/speak/speak.js')
+  ok(/audio\.prefetch\(next\.id\)/.test(speakSrc), '口语页切词后预取下一条')
+  ok(/audio\.prefetch\(list\[1\]\.id\)/.test(read('pages/learn/learn.js')), '学习页开局预取第二张')
+  ok(/audio\.prefetch\(nxt\.id\)/.test(read('pages/dictation/dictation.js')), '听写页切题后预取下一题')
+
+  // F. 录音进步对比：同一句录多次要能看出「从多少分到多少分」
+  const recSrc = read('pages/recordings/recordings.js')
+  ok(/buildGroups\(/.test(recSrc), '录音页按素材归组')
+  ok(/bothScored/.test(recSrc), '两次都有分才显示分差')
+  ok(/compareGroup\(/.test(recSrc), '有「前后对比」播放')
+  const recXml = read('pages/recordings/recordings.wxml')
+  ok(/bindtap="compareGroup"/.test(recXml), 'wxml 上挂了前后对比')
+  ok(/groups/.test(recXml), 'wxml 渲染进步卡片')
+
+  // G. 搜索：句子 / 对话台词 / 自建素材都要能搜到
+  const searchSrc = read('pages/search/search.js')
+  ok(/_searchExtras\(/.test(searchSrc), '搜索有跨素材检索')
+  ok(/sentCount/.test(searchSrc) && /customCount/.test(searchSrc), '页面有句子与自建素材的计数')
+  ok(/practiceOne\(/.test(searchSrc), '搜到的句子能直接去跟读')
+  const searchXml = read('pages/search/search.wxml')
+  ok(/(bindtap|catchtap)="practiceOne"/.test(searchXml), 'wxml 上挂了「去跟读这句」')
+
+  // H. worker：同一 WiFi 下多台设备不再互相挤占额度
+  const workerSrc = read('deploy/ai/worker.js')
+  ok(/DEVICE_DAILY_LIMIT/.test(workerSrc), 'worker 有每设备额度')
+  ok(/function takeQuota\(/.test(workerSrc), '额度判断走 takeQuota（先设备再 IP）')
+  ok(/x-device-id/.test(workerSrc), 'worker 读 x-device-id')
+  ok(/x-device-id/.test(read('utils/ai-lookup.js')), 'AI 查词带设备号')
+  ok(/x-device-id/.test(read('utils/ai-eval.js')), 'AI 听音带设备号')
+  ok(/scope === 'device'/.test(workerSrc), '429 文案按设备/网络分开说')
+
+  // I. 发布物：同一份数据不再进 git 两遍
+  ok(!fsMod.existsSync(pathMod.join(__dirname, '..', 'deploy/cf/data.json')) ||
+    /deploy\/cf\/data\.json/.test(read('.gitignore')),
+  'deploy/cf/data.json 不进仓库（发布时复制）')
+  ok(/cp \.\.\/data\.json data\.json/.test(read('deploy/cf/deploy.sh')), 'deploy.sh 发布前复制一份')
+  ok(/cp deploy\/data\.json deploy\/cf\/data\.json/.test(read('.github/workflows/ci.yml')), 'CI 发布前复制一份')
+  ok(/git diff --exit-code deploy\/data\.json\n/.test(read('.github/workflows/ci.yml')), 'CI 只校验仓库里那份 data.json')
 }

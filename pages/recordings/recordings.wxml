@@ -9,6 +9,37 @@
     </view>
   </view>
 
+  <!-- 同一句练了多次：拿最早和最新两条对比，分数与语速一起看 -->
+  <view class="progress card" wx:if="{{groups.length}}">
+    <view class="title">进步对比</view>
+    <view class="muted">同一句练得越多，越能看出变化</view>
+    <view class="group" wx:for="{{groups}}" wx:key="itemId">
+      <view class="group-head">
+        <view class="group-label">{{item.label}}</view>
+        <view class="group-count">练了 {{item.count}} 次</view>
+      </view>
+      <view class="group-cn" wx:if="{{item.cn}}">{{item.cn}}</view>
+      <view class="group-row">
+        <view class="group-col">
+          <view class="group-tag">最早</view>
+          <view class="group-score" wx:if="{{item.bothScored}}">{{item.firstScore}} 分</view>
+          <view class="group-sec" wx:if="{{item.firstSec}}">{{item.firstSec}}s</view>
+          <view class="group-time">{{item.firstTime}}</view>
+        </view>
+        <view class="group-arrow">→</view>
+        <view class="group-col">
+          <view class="group-tag">最新</view>
+          <view class="group-score {{item.up ? 'up' : ''}}" wx:if="{{item.bothScored}}">{{item.lastScore}} 分 <text class="delta" wx:if="{{item.deltaText}}">({{item.deltaText}})</text></view>
+          <view class="group-sec" wx:if="{{item.lastSec}}">{{item.lastSec}}s</view>
+          <view class="group-time">{{item.lastTime}}</view>
+        </view>
+        <view class="group-play {{compareId===item.itemId?'playing':''}}" data-item="{{item.itemId}}" bindtap="compareGroup">
+          {{compareId===item.itemId?'⏸ 播放中':'🔁 前后对比'}}
+        </view>
+      </view>
+    </view>
+  </view>
+
   <block wx:if="{{list.length}}">
     <view class="rec-item card" wx:for="{{list}}" wx:key="id">
       <view class="rec-top">

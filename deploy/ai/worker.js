@@ -24,7 +24,8 @@ const MAX_Q = 40
 const CACHE_TTL = 60 * 60 * 24 * 30   // 30 天
 // 每个 IP 每天真调 Gemini 的次数上限（缓存命中不计数）。
 // 目的是防止有人拿这个公开地址刷额度：小程序是公开的，Worker 地址也一样公开。
-const DAILY_LIMIT = 300
+const DAILY_LIMIT = 300         // 每个出口 IP（一家人共用一个 WiFi 时共享这一份额度）
+const DEVICE_DAILY_LIMIT = 120  // 每台设备：避免同一 WiFi 下一台机器把全家的额度吃光
 const LIMIT_TTL = 60 * 60 * 24 * 2
 const UA_OK = ['en', 'ja', 'vi']
 
@@ -32,6 +33,7 @@ const UA_OK = ['en', 'ja', 'vi']
 // 只给小程序的日语/越南语用户用——这两种语言没有可用的客观评测插件（智聆只支持中英文）。
 // 录音每次不一样，没法缓存，所以日配额单独设一个小值。
 const EVAL_DAILY_LIMIT = 60
+const EVAL_DEVICE_LIMIT = 30
 const EVAL_MAX_B64 = 400 * 1024      // 约 300KB 音频，正常 10 秒录音只有 20KB 左右
 const EVAL_MAX_TEXT = 120
 const EVAL_MIME = ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/wav', 'audio/x-m4a', 'audio/webm', 'audio/ogg']
@@ -71,6 +73,27 @@ async function bumpLimit(env, ip, prefix, limit) {
 
 function clientIp(request) {
   return request.headers.get('cf-connecting-ip') || request.headers.get('x-real-ip') || 'unknown'
+}
+
+// 设备标识：客户端生成的一串随机字母数字（存在本机 settings 里），只用来分摊额度，
+// 不含任何用户信息，也不落日志。格式不合法的直接当没有。
+function deviceId(request) {
+  const raw = request.headers.get('x-device-id') || ''
+  return /^[a-z0-9]{6,40}$/i.test(raw) ? raw : ''
+}
+
+// 额度：先看设备，再看出口 IP。
+// 以前只按 IP 算，一家人共用同一个 WiFi 就是一个池子，谁查猛了别人就没额度，
+// 而提示只写「明天再来」，用户根本不知道是被自己家另一台手机用掉的。
+async function takeQuota(env, request, prefix, ipLimit, devLimit) {
+  const dev = deviceId(request)
+  if (dev) {
+    const d = await bumpLimit(env, dev, prefix + 'd:', devLimit)
+    if (!d.allowed) return { allowed: false, scope: 'device', limit: devLimit }
+  }
+  const ip = await bumpLimit(env, clientIp(request), prefix, ipLimit)
+  if (!ip.allowed) return { allowed: false, scope: 'network', limit: ipLimit }
+  return { allowed: true }
 }
 
 const LANG_NAME = { en: '英语', ja: '日语', vi: '越南语' }
@@ -262,12 +285,14 @@ async function handleEval(request, env) {
   if (!text) return json({ ok: false, error: 'empty-text' }, 400)
   if (text.length > EVAL_MAX_TEXT) return json({ ok: false, error: 'text-too-long' }, 400)
 
-  const limit = await bumpLimit(env, clientIp(request), 'ev:', EVAL_DAILY_LIMIT)
+  const limit = await takeQuota(env, request, 'ev:', EVAL_DAILY_LIMIT, EVAL_DEVICE_LIMIT)
   if (!limit.allowed) {
     return json({
       ok: false,
       error: 'rate-limited',
-      message: '今天的 AI 评测次数用完了（每个网络每天 ' + EVAL_DAILY_LIMIT + ' 次），明天再来。'
+      message: limit.scope === 'device'
+        ? '这台设备今天的 AI 评测次数用完了（每台每天 ' + limit.limit + ' 次），明天再来。'
+        : '今天的 AI 评测次数用完了（同一个网络每天 ' + limit.limit + ' 次），明天再来。'
     }, 429, { 'Cache-Control': 'no-store' })
   }
 
@@ -307,13 +332,12 @@ export default {
       } catch (e) { /* 缓存坏了不影响主流程 */ }
     }
 
-    const limit = await bumpLimit(env, clientIp(request), '', DAILY_LIMIT)
+    const limit = await takeQuota(env, request, '', DAILY_LIMIT, DEVICE_DAILY_LIMIT)
     if (!limit.allowed) {
-      return json({
-        ok: false,
-        error: 'rate-limited',
-        message: '今天的 AI 查词次数用完了（每个网络每天 ' + DAILY_LIMIT + ' 次），明天再来，或者先看词库里有没有。'
-      }, 429, { 'Cache-Control': 'no-store' })
+      const msg = limit.scope === 'device'
+        ? '这台设备今天的 AI 查词次数用完了（每台设备每天 ' + limit.limit + ' 次），明天再来，或者先看词库里有没有。'
+        : '今天的 AI 查词次数用完了（同一个网络每天 ' + limit.limit + ' 次，家里几台手机共用这一份），明天再来。'
+      return json({ ok: false, error: 'rate-limited', message: msg }, 429, { 'Cache-Control': 'no-store' })
     }
 
     let payload

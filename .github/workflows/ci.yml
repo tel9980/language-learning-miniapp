@@ -25,7 +25,7 @@ jobs:
       - name: 检查导出物与仓库一致（改词库后忘了重新导出会在这里失败）
         run: |
           node deploy/export-data.js
-          git diff --exit-code deploy/data.json deploy/cf/data.json
+          git diff --exit-code deploy/data.json
 
   deploy:
     name: 发布在线词库到 Cloudflare Pages
@@ -48,6 +48,7 @@ jobs:
             exit 0
           fi
           node deploy/export-data.js
+          cp deploy/data.json deploy/cf/data.json
           mkdir -p deploy/cf/audio deploy/cf/audio-en deploy/cf/audio-vi
           cp audio-src/ja/*.mp3 deploy/cf/audio/
           cp audio-src/en/*.mp3 deploy/cf/audio-en/

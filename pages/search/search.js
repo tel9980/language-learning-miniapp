@@ -4,8 +4,13 @@ const favorites = require('../../utils/favorites')
 const {
   getWords, getLangMeta, getExamCategories, getWordsByCategory
 } = require('../../utils/words')
+const sentences = require('../../utils/sentences')
+const nav = require('../../utils/nav')
 const audio = require('../../utils/audio')
 const aiLookup = require('../../utils/ai-lookup')
+
+// 句子/对话台词/自建素材各显示多少条（词库那边有「加载更多」，这两栏够看就行）
+const SEC_LIMIT = 20
 
 Page({
   behaviors: [theme],
@@ -24,6 +29,10 @@ Page({
     favIds: [],
     visibleCount: 30,       // 增量渲染：先显示 30 条，下滑加载更多
     hasMore: false,
+    // 有关键词时顺带搜句子/对话台词（sentResults）和自己存的素材（customResults）：
+    // 以前只搜词库，库里的 340 条句子和「我的素材」在搜索里根本不存在。
+    sentResults: [], sentCount: 0, sentDots: '',
+    customResults: [], customCount: 0,
     aiLoading: false,       // 词库查不到时用 AI 现查一次（见 utils/ai-lookup.js）
     aiResult: null,
     aiError: '',
@@ -151,6 +160,16 @@ Page({
       favIds: favorites.list(lang),
       visibleCount: count, hasMore: list.length > count
     }
+
+    // 句子 / 对话台词 / 我的素材：只在有关键词时搜。
+    // 没有关键词时这三栏没有意义（会把整个句库铺满屏幕），词库那边本来就能按分类翻。
+    const hits = kw ? this._searchExtras(lang, kw) : { sent: [], custom: [] }
+    patch.sentResults = hits.sent.slice(0, SEC_LIMIT)
+    patch.sentCount = hits.sent.length
+    patch.sentDots = hits.sent.length > SEC_LIMIT ? '只显示前 ' + SEC_LIMIT + ' 条，输入更具体的关键词可缩小范围' : ''
+    patch.customResults = hits.custom.slice(0, SEC_LIMIT)
+    patch.customCount = hits.custom.length
+
     // 换关键词/切分类时把上一次的 AI 结果收掉，免得新查询下面还挂着旧词的释义
     if (reset !== false && (this.data.aiResult || this.data.aiError)) {
       patch.aiResult = null
@@ -159,6 +178,31 @@ Page({
     }
     // 不再清 expandedId：加载更多、换关键词都不该把用户正在看的详情收起来
     this.setData(patch)
+  },
+
+  // 词库以外的两类内容：句子库（含对话台词）、自建素材
+  _searchExtras(lang, kw) {
+    const sent = sentences.getAllItems(lang).filter(function (it) {
+      return (it.word || '').toLowerCase().indexOf(kw) >= 0 ||
+        (it.meaning || '').toLowerCase().indexOf(kw) >= 0 ||
+        (it.scene || '').toLowerCase().indexOf(kw) >= 0
+    })
+    const custom = storage.getCustomItems(lang).filter(function (it) {
+      return (it.text || '').toLowerCase().indexOf(kw) >= 0 ||
+        (it.cn || '').toLowerCase().indexOf(kw) >= 0 ||
+        (it.scene || '').toLowerCase().indexOf(kw) >= 0
+    }).map(function (it) {
+      // 自建素材存的是 { text, cn }，这里归一化成和句子一样的 { word, meaning }，模板只写一套
+      return { id: it.id, word: it.text, meaning: it.cn, scene: it.scene, kind: 'custom' }
+    })
+    return { sent: sent, custom: custom }
+  },
+
+  // 句子/自建素材的「去跟读」：把这一条单独组成队列练（口语页 mode: one）
+  practiceOne(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    nav.go('/pages/speak/speak', { item: id })
   },
 
   // 词库里没有的词：让 Worker 现查一次（Worker 拿着 Gemini Key 去问，Key 不在客户端）。
@@ -233,7 +277,10 @@ Page({
     const word = e.currentTarget.dataset.word
     if (!word) return
     if (this._player) this._player.destroy()
-    this._player = audio.speak(word, false, { id: e.currentTarget.dataset.id })
+    this._player = audio.speak(word, false, {
+      id: e.currentTarget.dataset.id,
+      lang: getLangMeta(this.data.lang).voice
+    })
   },
 
   onUnload() {

@@ -7,6 +7,8 @@
 //
 // 隐私边界：只有用户点了「AI 听听」并且同意上传，才会读录音文件发出去。
 // Worker 不落盘、不缓存（每次录音都不一样），上传的是 mp3 的 base64，约 20-40KB。
+const device = require('./device')
+
 const ENDPOINT = 'https://ai.qy663.de5.net/eval'
 const MAX_B64 = 400 * 1024      // 与 Worker 的 EVAL_MAX_B64 保持一致
 const TIMEOUT = 25000
@@ -69,7 +71,7 @@ function evaluate(opts) {
         url: ENDPOINT,
         method: 'POST',
         timeout: TIMEOUT,
-        header: { 'content-type': 'application/json' },
+        header: { 'content-type': 'application/json', 'x-device-id': device.id() },
         data: { audio: b64, mime: mimeOf(opts.filePath), text: text, lang: opts.lang || 'en' },
         success(res) {
           const data = res && res.data

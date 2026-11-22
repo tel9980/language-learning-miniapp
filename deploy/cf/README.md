@@ -14,7 +14,7 @@
 bash deploy/cf/deploy.sh
 ```
 
-它会：① 重新导出 `deploy/data.json` 与 `deploy/cf/data.json` → ② `wrangler pages deploy` →
+它会：① 重新导出 `deploy/data.json`，再复制一份到 `deploy/cf/data.json`（这个副本不进 git）→ ② `wrangler pages deploy` →
 ③ 拉一次线上地址，打印版本号和各语种条数（版本不对会直接报错退出）。
 
 token 自动从 `~/.dsh/cf-token` 读，也可以用环境变量 `CLOUDFLARE_API_TOKEN` 覆盖。
@@ -23,7 +23,7 @@ token 自动从 `~/.dsh/cf-token` 读，也可以用环境变量 `CLOUDFLARE_API
 > ⚠️ Cloudflare 的规则：**修改一个已有 token 的权限，必须点「Roll / 重新生成」拿到新值才生效**，
 > 旧值仍然只带旧权限。本次就卡在这里（权限勾了、值没换 → 一直 403）。
 
-不想碰 token 也可以手动传：把 `deploy/cf/` 下的 `index.html`、`data.json`、`_headers`、`404.html`
+不想碰 token 也可以手动传：先 `node deploy/export-data.js && cp deploy/data.json deploy/cf/data.json`，再把 `deploy/cf/` 下的 `index.html`、`data.json`、`_headers`、`404.html`
 打包成 zip，控制台 → Workers & Pages → Create → **Pages → Upload assets** → 拖进去，项目名填 `yuban-data`。
 
 ## 目录内容
@@ -31,7 +31,7 @@ token 自动从 `~/.dsh/cf-token` 读，也可以用环境变量 `CLOUDFLARE_API
 ```
 deploy/cf/
 ├── index.html         ← 人看的说明页（读 data.json 显示版本与条数）
-├── data.json          ← 词库本体（由 deploy/export-data.js 自动同步过来，别手改）
+├── data.json          ← 词库本体（发布时从 ../data.json 复制过来；已 .gitignore，别手改）
 ├── 404.html           ← 自定义 404
 ├── _headers           ← Pages 响应头（只加 CORS，其它交给 Pages 默认）
 ├── deploy.sh          ← ⭐ 一条命令发布 + 自检

@@ -135,6 +135,8 @@ Page({
   next() {
     const i = this.data.index + 1
     if (i < this.data.total) {
+      const nxt = this.data.queue[i + 1]
+      if (nxt && nxt.id) audio.prefetch(nxt.id)
       this.setData({ index: i, current: this.data.queue[i], input: '', revealed: false, isRight: false, hasAnswer: false }, () => this.play())
       return
     }

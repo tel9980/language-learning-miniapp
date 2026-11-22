@@ -17,3 +17,35 @@
 .clear-btn { text-align: center; font-size: 26rpx; color: #FF6B6B; padding: 30rpx; }
 .empty { text-align: center; padding: 100rpx 40rpx; }
 .empty-icon { font-size: 100rpx; margin-bottom: 24rpx; }
+
+/* 进步对比：同一句的最早 vs 最新 */
+.progress { margin-bottom: 20rpx; }
+.group { margin-top: 22rpx; padding-top: 18rpx; border-top: 1rpx solid #EEF1F6; }
+.group-head { display: flex; align-items: baseline; justify-content: space-between; }
+.group-label { font-size: 29rpx; font-weight: 600; color: #2f3742; }
+.group-count { font-size: 23rpx; color: #8a94a6; }
+.group-cn { margin-top: 6rpx; font-size: 24rpx; color: #8a94a6; }
+.group-row { display: flex; align-items: center; margin-top: 14rpx; gap: 10rpx; }
+.group-col { flex: 0 0 auto; min-width: 150rpx; }
+.group-tag { font-size: 22rpx; color: #9aa4b2; }
+.group-score { font-size: 30rpx; font-weight: 600; color: #2f3742; }
+.group-score.up { color: #2FA84F; }
+.delta { font-size: 22rpx; font-weight: 400; }
+.group-sec { font-size: 22rpx; color: #8a94a6; }
+.group-time { font-size: 20rpx; color: #b3bbc7; }
+.group-arrow { color: #c8cfda; font-size: 26rpx; }
+.group-play {
+  margin-left: auto;
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  background: #EEF3FF;
+  color: #2B6CF6;
+  font-size: 24rpx;
+}
+.group-play.playing { background: #E3ECFF; }
+.theme-dark .group { border-top-color: rgba(255,255,255,0.08); }
+.theme-dark .group-label, .theme-dark .group-score { color: #dfe5ee; }
+.theme-dark .group-score.up { color: #7fdc9c; }
+.theme-dark .group-count, .theme-dark .group-cn, .theme-dark .group-sec, .theme-dark .group-tag { color: #7d8798; }
+.theme-dark .group-time { color: #5f6a7a; }
+.theme-dark .group-play { background: rgba(120,160,255,0.18); color: #9dc0ff; }

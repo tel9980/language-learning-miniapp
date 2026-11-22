@@ -146,3 +146,33 @@
   background: #EAF7EE;
   color: #2FA84F;
 }
+
+/* 搜索结果的「句子与对话」「我的素材」两栏 */
+.sec-head {
+  margin: 28rpx 0 12rpx;
+  font-size: 27rpx;
+  font-weight: 600;
+  color: #2f3742;
+}
+.sec-count {
+  margin-left: 12rpx;
+  font-weight: 400;
+  font-size: 23rpx;
+  color: #8a94a6;
+}
+.sec-more {
+  margin: 8rpx 0 4rpx;
+  font-size: 23rpx;
+}
+.mini-btn {
+  display: inline-block;
+  margin-top: 14rpx;
+  padding: 8rpx 22rpx;
+  border-radius: 999rpx;
+  background: #EEF3FF;
+  color: #2B6CF6;
+  font-size: 24rpx;
+}
+.theme-dark .sec-head { color: #dfe5ee; }
+.theme-dark .sec-count, .theme-dark .sec-more { color: #7d8798; }
+.theme-dark .mini-btn { background: rgba(120, 160, 255, 0.18); color: #9dc0ff; }

@@ -22,8 +22,9 @@ fi
 export CLOUDFLARE_API_TOKEN
 export CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-fb907fe08010a1b319f68be568331ce5}"
 
-echo "→ 先刷新词库 JSON（deploy/data.json 与 deploy/cf/data.json）"
+echo "→ 先刷新词库 JSON（deploy/data.json，再复制成发布用的 deploy/cf/data.json）"
 ( cd .. && node export-data.js )
+cp ../data.json data.json
 
 echo "→ 把预生成音频铺到 CDN（代码包里不再放 mp3，这里就是用户听到的那一份）"
 rm -rf audio audio-en audio-vi && mkdir -p audio audio-en audio-vi

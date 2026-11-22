@@ -1,5 +1,17 @@
 const storage = require('./utils/storage')
 const onlineData = require('./utils/online-data')
+const logger = require('./utils/logger')
+
+// 出错时取当前页面路径，实时日志里才分得清是哪个页面炸的
+function currentRoute() {
+  try {
+    const pages = getCurrentPages()
+    const p = pages[pages.length - 1]
+    return p && p.route ? p.route : ''
+  } catch (e) {
+    return ''
+  }
+}
 
 App({
   globalData: {
@@ -36,15 +48,21 @@ App({
     this.applyTheme()
   },
   // ---- 兜底：小程序没有错误边界，页面里抛异常会直接白屏且无提示 ----
+  // 错误同时写进微信「实时日志」（后台 → 运维中心 → 实时日志），否则真机崩溃
+  // 只有用户自己知道，开发者这边一无所知。见 utils/logger.js。
   onError(err) {
-    if (typeof console !== 'undefined' && console.error) console.error('[app] 未捕获错误', err)
+    logger.error(logger.withPage(currentRoute(), '未捕获错误'), err)
   },
   onUnhandledRejection(res) {
-    if (typeof console !== 'undefined' && console.error) console.error('[app] 未处理的 Promise 拒绝', res && res.reason)
+    logger.error(logger.withPage(currentRoute(), '未处理的 Promise 拒绝'), res && res.reason)
   },
   // 页面路径不存在（例如手改分享路径、旧版链接）时回首页，而不是停在错误页
   onPageNotFound(res) {
-    if (typeof console !== 'undefined' && console.warn) console.warn('[app] 页面不存在', res && res.path)
+    logger.warn('页面不存在', res && res.path)
     wx.reLaunch({ url: '/pages/index/index' })
+  },
+  // 内存告警：低端机上出现「录音没存下来 / 图片白屏」时，先看这里有没有记录
+  onMemoryWarning(res) {
+    logger.warn('内存告警 level=' + ((res && res.level) || '?'), currentRoute())
   }
 })

@@ -7,6 +7,8 @@
 //
 // 缓存：本地留 40 条（同一个词反复查不再花钱），Worker 侧还有 KV 缓存 30 天。
 
+const device = require('./device')
+
 const AI_URLS = ['https://ai.qy663.de5.net/lookup']
 const CACHE_KEY = 'lp_ai_lookup_v1'
 const MAX_CACHE = 40
@@ -58,6 +60,8 @@ function lookup(word, lang, cb) {
     url: AI_URLS[0] + '?q=' + encodeURIComponent(q) + '&lang=' + (lang || 'en'),
     method: 'GET',
     timeout: TIMEOUT,
+    // 设备标识：服务端用它分摊额度（同一 WiFi 下几台手机不至于互相挤占）
+    header: { 'x-device-id': device.id() },
     success(res) {
       const d = res && res.data
       if (res.statusCode !== 200 || !d || !d.ok) {

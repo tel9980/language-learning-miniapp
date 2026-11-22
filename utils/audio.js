@@ -115,31 +115,110 @@ function createPlayer(opts) {
   return { play, stop, destroy }
 }
 
-// 直接流播一个远程 mp3（不经过 downloadFile：真机上 InnerAudioContext 播网络音频
-// 不受 downloadFile 合法域名限制）。分包加载失败时用它播 CDN 上的同一批离线音频。
+// 预生成音频（CDN 上的 mp3）：先落盘缓存，第二次起零网络。
+//
+// 为什么必须缓存：一句要听 4~6 次（标准 → 慢速 → AB 复读 → 影子三段），
+// 每条 5~7KB，流播就得每次走一遍网络，弱网上「点了半天才出声」全集中在这里。
+// CDN 的 cache-control 是 max-age=14400 + must-revalidate，靠平台 HTTP 缓存不可靠。
+// 下载失败（域名没配、断网）就退回流播，行为不比以前差。
 function playRemote(url, slow, handlers, onFail) {
   let lp = null
-  function start() {
+  let dlTimer = null
+  let destroyed = false
+
+  function start(src) {
+    if (destroyed) return
     lp = createPlayer({
       rate: slow ? 0.75 : 1,
       onPlay() { if (handlers.onPlay) handlers.onPlay() },
       onEnded: handlers.onEnded,
       onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
       onError(err) {
-        console.error('[audio] CDN 离线音频播放失败', url, err && (err.errMsg || err))
+        // 缓存文件坏了：丢掉它，下次重新下载（不然这句会一直播不出来）
+        if (src !== url) ttsCache.forget(url)
+        console.error('[audio] CDN 预生成音频播放失败', url, err && (err.errMsg || err))
         if (onFail) onFail(err)
         else if (handlers.onError) handlers.onError(err)
       }
     })
-    lp.play(url)
+    lp.play(src)
   }
-  start()
+
+  function stream() {
+    console.warn('[audio] CDN 音频下载失败，改为直接流播', url)
+    start(url)
+  }
+
+  function tryCache() {
+    const loc = ttsCache.fileOf(url)
+    if (loc) { start(loc); return true }
+    return false
+  }
+
+  function download() {
+    if (typeof wx.downloadFile !== 'function') { start(url); return }
+    let done = false
+    dlTimer = setTimeout(function () {
+      if (done) return
+      done = true
+      if (!destroyed) stream()
+    }, DOWNLOAD_TIMEOUT)
+    wx.downloadFile({
+      url: url,
+      success(res) {
+        if (done) return
+        done = true
+        clearTimeout(dlTimer)
+        if (destroyed) return
+        if (res.statusCode === 200 && res.tempFilePath) {
+          const loc = ttsCache.store(url, res.tempFilePath)
+          start(loc || res.tempFilePath)
+        } else {
+          stream()
+        }
+      },
+      fail() {
+        if (done) return
+        done = true
+        clearTimeout(dlTimer)
+        if (!destroyed) stream()
+      }
+    })
+  }
+
+  if (!tryCache()) download()
+
   return {
     remote: true,
     stop() { if (lp) lp.stop() },
-    destroy() { if (lp) lp.destroy() },
-    retry() { start() }
+    destroy() {
+      destroyed = true
+      clearTimeout(dlTimer)
+      if (lp) lp.destroy()
+    },
+    retry() {
+      destroyed = false
+      if (lp) lp.destroy()
+      lp = null
+      if (!tryCache()) download()
+    }
   }
+}
+
+// 预取：把下一条的预生成音频先下到缓存里（不播）。
+// 用户点「下一句」时文件已经在本地，切换是瞬时的；失败什么都不做。
+function prefetch(id, lang) {
+  const url = id ? localAudio.remoteFor(id) : ''
+  if (!url) return
+  if (ttsCache.fileOf(url)) return
+  if (typeof wx.downloadFile !== 'function') return
+  wx.downloadFile({
+    url: url,
+    success(res) {
+      if (res.statusCode === 200 && res.tempFilePath) ttsCache.store(url, res.tempFilePath)
+    },
+    fail() {}
+  })
 }
 
 // 带降级的发音播放
@@ -376,4 +455,4 @@ function speak(text, slow, handlers) {
   }
 }
 
-module.exports = { ttsUrl, baiduUrl, isJapaneseText, needJapaneseVoice, isVietnameseText, createPlayer, speak, DOWNLOAD_TIMEOUT }
+module.exports = { ttsUrl, baiduUrl, isJapaneseText, needJapaneseVoice, isVietnameseText, createPlayer, speak, prefetch, DOWNLOAD_TIMEOUT }

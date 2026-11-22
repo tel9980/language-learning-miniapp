@@ -23,3 +23,7 @@ deploy/cf/worker.js
 # 发布时由 packageJa/ja/*.mp3、packageEn/en/*.mp3 复制过来（CDN 兜底，体积大，不进仓库）
 deploy/cf/audio/
 deploy/cf/audio-en/
+deploy/cf/audio-vi/
+
+# 发布时才由 deploy/data.json 复制过来（同一份数据不重复进 git）
+deploy/cf/data.json

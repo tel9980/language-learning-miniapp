@@ -49,7 +49,40 @@
 
     <view class="load-more" wx:if="{{hasMore}}" bindtap="loadMore">加载更多（已显示 {{results.length}}/{{resultCount}}）</view>
 
-    <view class="empty" wx:if="{{resultCount === 0}}">
+    <!-- 句子与对话台词：以前搜索只覆盖词库，库里 340 条句子在搜索里根本不存在 -->
+    <block wx:if="{{keyword && sentCount > 0}}">
+      <view class="sec-head">句子与对话 <text class="sec-count">{{sentCount}} 条</text></view>
+      <view class="word-item card" wx:for="{{sentResults}}" wx:key="id">
+        <view class="word-head">
+          <view class="word-main">
+            <text class="word-text">{{item.word}}</text>
+          </view>
+          <view class="play-btn" data-word="{{item.word}}" data-id="{{item.id}}" catchtap="playWord">🔊</view>
+        </view>
+        <view class="word-meaning">{{item.meaning}}</view>
+        <view class="word-cat">{{item.scene}}<text wx:if="{{item.level}}"> · {{item.level}}</text></view>
+        <view class="mini-btn" data-id="{{item.id}}" catchtap="practiceOne">🎤 去跟读这句</view>
+      </view>
+      <view class="sec-more muted" wx:if="{{sentDots}}">{{sentDots}}</view>
+    </block>
+
+    <!-- 我的素材：AI 查词存下来的、自己导入的 -->
+    <block wx:if="{{keyword && customCount > 0}}">
+      <view class="sec-head">我的素材 <text class="sec-count">{{customCount}} 条</text></view>
+      <view class="word-item card" wx:for="{{customResults}}" wx:key="id">
+        <view class="word-head">
+          <view class="word-main">
+            <text class="word-text">{{item.word}}</text>
+          </view>
+          <view class="play-btn" data-word="{{item.word}}" data-id="{{item.id}}" catchtap="playWord">🔊</view>
+        </view>
+        <view class="word-meaning">{{item.meaning}}</view>
+        <view class="word-cat">{{item.scene}}</view>
+        <view class="mini-btn" data-id="{{item.id}}" catchtap="practiceOne">🎤 去跟读这句</view>
+      </view>
+    </block>
+
+    <view class="empty" wx:if="{{resultCount === 0 && sentCount === 0 && customCount === 0}}">
       <view class="empty-icon">🔎</view>
       <view>没有找到匹配的单词，换个关键词试试</view>
 
