@@ -162,6 +162,22 @@ eq(new Set(jaDlgIds).size, jaDlgIds.length, 'Japanese dialogue line ids unique')
 ok(jaDlg.every(function (d) { return d.lines.length >= 3 }), 'each Japanese dialogue has >= 3 lines')
 ok(jaSent.some(function (x) { return /[\u3040-\u309f\u30a0-\u30ff]/.test(x.text) }), 'Japanese sentences contain kana')
 
+// ---- 越南语素材（2026-11 新增：起步版 80 词 + 40 句 + 4 组对话）----
+const viSent = sentences.getSentences('vi')
+const viDlg = sentences.getDialogues('vi')
+eq(viSent.length, 40, 'Vietnamese sentences = 40')
+eq(viDlg.length, 4, 'Vietnamese dialogues = 4')
+const viSentIds = viSent.map(function (x) { return x.id })
+eq(new Set(viSentIds).size, viSentIds.length, 'Vietnamese sentence ids unique')
+ok(viSent.every(function (x) { return x.text && x.cn && x.scene && x.level }), 'Vietnamese sentences all complete')
+ok(viSent.some(function (x) { return x.level === 'A1' }) && viSent.some(function (x) { return x.level === 'A2' }),
+  'Vietnamese sentences span A1..A2')
+const viDlgIds = []
+viDlg.forEach(function (d) { d.lines.forEach(function (l) { viDlgIds.push(l.id) }) })
+eq(viDlgIds.length, 21, 'Vietnamese dialogue lines = 21')
+eq(new Set(viDlgIds).size, viDlgIds.length, 'Vietnamese dialogue line ids unique')
+ok(viDlg.every(function (d) { return d.lines.length >= 3 }), 'each Vietnamese dialogue has >= 3 lines')
+
 // ---- nav（tabBar 跳转必须走 switchTab，且能跨 tab 传意图） ----
 global.wx = global.wx || {}
 let lastSwitch = null, lastNav = null
@@ -198,6 +214,9 @@ ok(au.baiduUrl('hello world', true, 'en_US').indexOf('spd=2') > 0, 'baidu slow s
 ok(au.baiduUrl('hello world', false, 'en_US').indexOf('text=hello%20world') > 0, 'baidu encodes text')
 ok(au.baiduUrl('x', false, 'ja_JP').indexOf('lan=jap') > 0, 'baidu ja maps to jap')
 eq(au.isJapaneseText('おはようございます'), true, 'kana detected as japanese')
+eq(au.isVietnameseText('xin chào'), true, 'vietnamese diacritics detected')
+eq(au.isVietnameseText('hello world'), false, 'plain latin is not vietnamese')
+eq(au.isVietnameseText('おはよう'), false, 'kana is not vietnamese')
 eq(au.isJapaneseText('Good morning'), false, 'english not japanese')
 eq(au.isJapaneseText(''), false, 'empty not japanese')
 eq(sc.canEvaluateText('Good morning'), false, 'english text still needs plugin (absent here)')
@@ -229,6 +248,8 @@ eq(sc.countWords('How are you doing today'), 5, 'countWords counts words')
 eq(sc.countWords(''), 0, 'countWords empty = 0')
 eq(sc.canEvaluate('en'), false, 'no eval plugin in test env')
 eq(sc.canEvaluate('ja'), false, 'ja never uses eval plugin')
+eq(sc.canEvaluate('vi'), false, 'vi never uses eval plugin（智聆只支持中英文）')
+eq(sc.canEvaluateText('xin chào'), false, 'vietnamese text is not sent to the eval plugin')
 eq(sc.supportsLang('en'), true, 'en supported by eval plugin')
 eq(sc.supportsLang('ja'), false, 'ja unsupported by eval plugin')
 eq(sc.isSupported(), false, 'isSupported false without any plugin')
@@ -570,9 +591,11 @@ eq(plain2[0].active, undefined, 'toPlain 不带 active 字段（高亮靠下标�
 const words = require('../utils/words')
 const EN_WORDS = words.WORDS.en
 const JA_WORDS = words.WORDS.ja
+const VI_WORDS = words.WORDS.vi
 eq(EN_WORDS.length, 480, 'english word count = 480')
 eq(JA_WORDS.length, 110, 'japanese word count = 110')
-const allWords = EN_WORDS.concat(JA_WORDS)
+eq(VI_WORDS.length, 80, 'vietnamese word count = 80')
+const allWords = EN_WORDS.concat(JA_WORDS, VI_WORDS)
 const idSet = {}
 let dupId = 0
 allWords.forEach(w => { if (idSet[w.id]) dupId++; idSet[w.id] = 1 })
@@ -589,6 +612,13 @@ function dupWordsIn(list) {
 }
 eq(dupWordsIn(EN_WORDS), 0, 'no duplicate english word forms')
 eq(dupWordsIn(JA_WORDS), 0, 'no duplicate japanese word forms')
+eq(dupWordsIn(VI_WORDS), 0, 'no duplicate vietnamese word forms')
+// 越南语音标用近似 IPA（方括号内），必须从方括号开头，否则说明是随手填的
+ok(VI_WORDS.every(function (w) { return w.phonetic.indexOf('[') === 0 }), '越南语音标统一用 [IPA] 写法')
+const viCats = words.getExamCategories('vi').map(c => c.name)
+;['问候', '日常', '食物', '数字', '时间', '动词', '旅行', '饮食', '健康', '工作'].forEach(c => {
+  ok(viCats.indexOf(c) >= 0, `vietnamese category "${c}" is selectable`)
+})
 // 新增分类必须能在筛选里选到，否则只能藏在「全部」里
 const enCats = words.getExamCategories('en').map(c => c.name)
 ;['四级', '六级', '考研', '雅思托福', '日常', '情绪', '工作', '科技', '旅行', '健康', '饮食', '社交'].forEach(c => {
@@ -639,7 +669,7 @@ eq(localAudio.remoteFor('dl_d003_1'), 'https://yb.qy663.de5.net/audio-en/d003_1.
 
 // 对话听写（pages/dictation 的 dlg 模式）按「dl_ + 台词 id」取音频，
 // 每条台词都必须能找到音频，否则真机上那一句必然读不出来。
-;['en', 'ja'].forEach(function (lg) {
+;['en', 'ja', 'vi'].forEach(function (lg) {
   let lines = 0
   let missing = []
   sentences.getDialogues(lg).forEach(function (d) {
@@ -664,7 +694,7 @@ const noAudio = audioIds.filter(function (id) { return !localAudio.has(id) })
 eq(noAudio.length, 0, 'every Japanese item has bundled audio (missing: ' + noAudio.slice(0, 5).join(',') + ')')
 
 // 素材 id → 仓库里的音频文件（audio-src/<语种>/<原始id>.mp3）
-const AUDIO_DIR = { ja: 'audio-src/ja', en: 'audio-src/en' }
+const AUDIO_DIR = { ja: 'audio-src/ja', en: 'audio-src/en', vi: 'audio-src/vi' }
 function audioFile(id) {
   const lang = localAudio.langOf(id)
   if (!lang) return ''
@@ -695,6 +725,23 @@ const audioKb = kbOf(audioIds)
 ok(audioKb < 1900, 'Japanese audio stays under 1.9MB (actual ' + audioKb.toFixed(0) + 'KB, 用户下载流量要克制)')
 ok(localAudio.countOf('ja') === audioIds.length,
   'local-audio index covers exactly the current Japanese items (' + localAudio.countOf('ja') + ' vs ' + audioIds.length + ')')
+
+// 越南语没有任何在线合成源：句子、台词、单词、例句**每一条**都必须有 mp3，
+// 少一条就意味着那个条目在真机上彻底没声音（连兜底都没有）。
+eq(localAudio.remoteFor('vs001'), 'https://yb.qy663.de5.net/audio-vi/vs001.mp3', '越南语素材指向 CDN 的 audio-vi 目录')
+eq(localAudio.langOf('vd001_1'), 'vi', 'langOf maps a Vietnamese dialogue line to its region')
+const viAudioIds = []
+viSent.forEach(function (x) { viAudioIds.push(x.id) })
+viDlg.forEach(function (d) { d.lines.forEach(function (l) { viAudioIds.push(l.id) }) })
+VI_WORDS.forEach(function (w) {
+  viAudioIds.push(w.id)
+  if (w.example) viAudioIds.push(w.id + '_ex')
+})
+eq(viAudioIds.length, 221, '越南语音频应有 221 条（40 句 + 21 台词 + 80 词 + 80 例句）')
+const viMissing = viAudioIds.filter(function (id) { return !localAudio.has(id) })
+eq(viMissing.length, 0, '每个越南语条目都有离线音频（缺: ' + viMissing.slice(0, 5).join(',') + '）')
+eq(badMp3(viAudioIds).length, 0, '越南语音频都是真 mp3')
+ok(localAudio.countOf('vi') === viAudioIds.length, 'vietnamese audio index count matches (' + localAudio.countOf('vi') + ')')
 
 // 英语：只预生成句子与对话台词（单词在线发音一直稳，880 个文件塞不进任何一个分包）
 const enAudioIds = []

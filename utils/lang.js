@@ -5,7 +5,11 @@
 // 两者格式不同，别混用。
 const LANGS = {
   en: { name: '英语', flag: '🇬🇧', tts: 'en-US', voice: 'en_US' },
-  ja: { name: '日语', flag: '🇯🇵', tts: 'ja-JP', voice: 'ja_JP' }
+  ja: { name: '日语', flag: '🇯🇵', tts: 'ja-JP', voice: 'ja_JP' },
+  // 越南语没有任何可用的在线合成（有道/百度都没越南语音色、同声传译只支持中英文），
+  // 全部发音走预生成 mp3（utils/local-audio.js），所以 tts 字段实际上用不到，
+  // 留着只是为了结构统一。
+  vi: { name: '越南语', flag: '🇻🇳', tts: 'vi-VN', voice: 'vi_VN' }
 }
 
 const LANG_KEYS = Object.keys(LANGS)

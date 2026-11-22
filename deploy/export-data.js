@@ -11,15 +11,18 @@ const payload = {
   // 不写 generatedAt：内容相同时整个文件逐字节不变，git 里就不会有「只有时间戳变了」的假改动
   words: {
     en: words.WORDS.en,
-    ja: words.WORDS.ja
+    ja: words.WORDS.ja,
+    vi: words.WORDS.vi
   },
   sentences: {
     en: sentences.SENTENCES.en,
-    ja: sentences.SENTENCES.ja
+    ja: sentences.SENTENCES.ja,
+    vi: sentences.SENTENCES.vi
   },
   dialogues: {
     en: sentences.DIALOGUES.en,
-    ja: sentences.DIALOGUES.ja
+    ja: sentences.DIALOGUES.ja,
+    vi: sentences.DIALOGUES.vi
   }
 }
 

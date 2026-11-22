@@ -226,6 +226,48 @@ const SENTENCES = {
     { id: 'js098', text: 'それは残念ですね。', cn: '那真遗憾。', scene: '情绪表达', level: 'A1' },
     { id: 'js099', text: '合格したと聞いて、とても嬉しいです。', cn: '听说你及格了，我很高兴。', scene: '情绪表达', level: 'A2' },
     { id: 'js100', text: '少し疲れたので、早めに休みます。', cn: '有点累了，我早点休息。', scene: '情绪表达', level: 'A1' }
+  ],
+  vi: [
+    { id: 'vs001', text: 'Xin chào, tôi tên là Lý Minh.', cn: '你好，我叫李明。', scene: '自我介绍', level: 'A1' },
+    { id: 'vs002', text: 'Rất vui được gặp bạn.', cn: '很高兴认识你。', scene: '自我介绍', level: 'A1' },
+    { id: 'vs003', text: 'Tôi đến từ Trung Quốc.', cn: '我来自中国。', scene: '自我介绍', level: 'A1' },
+    { id: 'vs004', text: 'Tôi đang học tiếng Việt.', cn: '我在学越南语。', scene: '自我介绍', level: 'A1' },
+    { id: 'vs005', text: 'Tôi học tiếng Việt được ba tháng.', cn: '我学越南语三个月了。', scene: '自我介绍', level: 'A2' },
+    { id: 'vs006', text: 'Hôm nay trời đẹp quá.', cn: '今天天气真好。', scene: '日常闲聊', level: 'A1' },
+    { id: 'vs007', text: 'Cuối tuần bạn làm gì?', cn: '周末你做什么？', scene: '日常闲聊', level: 'A1' },
+    { id: 'vs008', text: 'Chúng ta đi uống cà phê nhé.', cn: '我们去喝咖啡吧。', scene: '日常闲聊', level: 'A2' },
+    { id: 'vs009', text: 'Dạo này bạn có bận không?', cn: '最近你忙吗？', scene: '日常闲聊', level: 'A2' },
+    { id: 'vs010', text: 'Hẹn gặp lại ngày mai.', cn: '明天见。', scene: '日常闲聊', level: 'A1' },
+    { id: 'vs011', text: 'Cho tôi một bát phở.', cn: '给我一碗河粉。', scene: '点餐', level: 'A1' },
+    { id: 'vs012', text: 'Cho tôi xem thực đơn.', cn: '给我看一下菜单。', scene: '点餐', level: 'A1' },
+    { id: 'vs013', text: 'Món này có cay không?', cn: '这道菜辣吗？', scene: '点餐', level: 'A1' },
+    { id: 'vs014', text: 'Làm ơn tính tiền cho tôi.', cn: '请给我结账。', scene: '点餐', level: 'A2' },
+    { id: 'vs015', text: 'Cái này bao nhiêu tiền?', cn: '这个多少钱？', scene: '购物', level: 'A1' },
+    { id: 'vs016', text: 'Đắt quá, bớt một chút được không?', cn: '太贵了，能便宜一点吗？', scene: '购物', level: 'A2' },
+    { id: 'vs017', text: 'Tôi lấy cái này.', cn: '我要这个。', scene: '购物', level: 'A1' },
+    { id: 'vs018', text: 'Có màu khác không?', cn: '有别的颜色吗？', scene: '购物', level: 'A2' },
+    { id: 'vs019', text: 'Xin lỗi, nhà ga ở đâu?', cn: '不好意思，车站在哪里？', scene: '问路', level: 'A1' },
+    { id: 'vs020', text: 'Đi thẳng rồi rẽ trái.', cn: '直走然后左转。', scene: '问路', level: 'A1' },
+    { id: 'vs021', text: 'Chỗ này cách trung tâm bao xa?', cn: '这里离市中心多远？', scene: '问路', level: 'A2' },
+    { id: 'vs022', text: 'Bạn có thể nói chậm hơn không?', cn: '你能说慢一点吗？', scene: '沟通澄清', level: 'A2' },
+    { id: 'vs023', text: 'Xin lỗi, tôi không hiểu.', cn: '抱歉，我不懂。', scene: '沟通澄清', level: 'A1' },
+    { id: 'vs024', text: 'Bạn nói lại lần nữa được không?', cn: '你能再说一遍吗？', scene: '沟通澄清', level: 'A2' },
+    { id: 'vs025', text: 'Cảm ơn bạn rất nhiều.', cn: '非常感谢你。', scene: '表达感谢', level: 'A1' },
+    { id: 'vs026', text: 'Không có gì, đó là việc nên làm.', cn: '不客气，这是应该的。', scene: '表达感谢', level: 'A1' },
+    { id: 'vs027', text: 'Theo tôi, kế hoạch này hợp lý.', cn: '我认为这个计划合理。', scene: '表达观点', level: 'A2' },
+    { id: 'vs028', text: 'Tôi nghĩ chúng ta cần thêm thời gian.', cn: '我觉得我们需要更多时间。', scene: '表达观点', level: 'A2' },
+    { id: 'vs029', text: 'Buổi sáng tôi thường chạy bộ.', cn: '早上我通常跑步。', scene: '生活习惯', level: 'A2' },
+    { id: 'vs030', text: 'Tôi dậy lúc sáu giờ mỗi ngày.', cn: '我每天六点起床。', scene: '生活习惯', level: 'A1' },
+    { id: 'vs031', text: 'Tối nào tôi cũng đọc sách.', cn: '我每晚都看书。', scene: '生活习惯', level: 'A2' },
+    { id: 'vs032', text: 'Cuộc họp bắt đầu lúc chín giờ.', cn: '会议九点开始。', scene: '工作沟通', level: 'A1' },
+    { id: 'vs033', text: 'Tôi sẽ gửi tài liệu cho bạn tối nay.', cn: '我今晚把资料发给你。', scene: '工作沟通', level: 'A2' },
+    { id: 'vs034', text: 'Ngày mai tôi xin nghỉ phép.', cn: '明天我请假。', scene: '工作沟通', level: 'A2' },
+    { id: 'vs035', text: 'Tôi muốn đặt một phòng.', cn: '我想订一间房。', scene: '出行', level: 'A2' },
+    { id: 'vs036', text: 'Chuyến bay mấy giờ khởi hành?', cn: '航班几点起飞？', scene: '出行', level: 'A2' },
+    { id: 'vs037', text: 'Cho tôi mua hai vé.', cn: '我买两张票。', scene: '出行', level: 'A1' },
+    { id: 'vs038', text: 'Mai tôi sẽ đến muộn một chút.', cn: '明天我会稍微晚到一点。', scene: '日常求助', level: 'A2' },
+    { id: 'vs039', text: 'Tôi bị sốt và đau đầu.', cn: '我发烧而且头疼。', scene: '看医生', level: 'A1' },
+    { id: 'vs040', text: 'Bạn có thể giúp tôi một chút không?', cn: '你能帮我一下吗？', scene: '日常求助', level: 'A1' },
   ]
 }
 
@@ -373,6 +415,49 @@ const DIALOGUES = {
         { id: 'jd008_3', role: '社員', text: '熱があって、病院へ行きたいんです。', cn: '我发烧了，想去医院。' },
         { id: 'jd008_4', role: '課長', text: 'わかりました。お大事に。', cn: '知道了。保重身体。' },
         { id: 'jd008_5', role: '社員', text: 'すみません、明日の資料は今晩送ります。', cn: '抱歉，明天的资料我今晚发。' }
+      ]
+    }
+  ],
+  vi: [
+    {
+      id: 'vd001', scene: '咖啡店点单', level: 'A1',
+      lines: [
+        { id: 'vd001_1', role: 'Nhân viên', text: 'Chào bạn, bạn dùng gì ạ?', cn: '你好，您要什么？' },
+        { id: 'vd001_2', role: 'Khách', text: 'Cho tôi một cà phê sữa.', cn: '给我一杯奶咖啡。' },
+        { id: 'vd001_3', role: 'Nhân viên', text: 'Bạn uống nóng hay đá?', cn: '您要热的还是冰的？' },
+        { id: 'vd001_4', role: 'Khách', text: 'Cho tôi cà phê đá. Bao nhiêu tiền?', cn: '我要冰咖啡。多少钱？' },
+        { id: 'vd001_5', role: 'Nhân viên', text: 'Ba mươi nghìn đồng.', cn: '三万盾。' }
+      ]
+    },
+    {
+      id: 'vd002', scene: '问路', level: 'A1',
+      lines: [
+        { id: 'vd002_1', role: 'Khách', text: 'Xin lỗi, nhà ga ở đâu?', cn: '不好意思，车站在哪里？' },
+        { id: 'vd002_2', role: 'Người qua đường', text: 'Bạn đi thẳng, rồi rẽ phải.', cn: '你直走，然后右转。' },
+        { id: 'vd002_3', role: 'Khách', text: 'Có xa không?', cn: '远吗？' },
+        { id: 'vd002_4', role: 'Người qua đường', text: 'Không xa, khoảng năm phút.', cn: '不远，大概五分钟。' },
+        { id: 'vd002_5', role: 'Khách', text: 'Cảm ơn bạn nhiều.', cn: '非常感谢你。' }
+      ]
+    },
+    {
+      id: 'vd003', scene: '初次见面', level: 'A1',
+      lines: [
+        { id: 'vd003_1', role: 'Nam', text: 'Chào bạn, mình tên Nam. Còn bạn?', cn: '你好，我叫南。你呢？' },
+        { id: 'vd003_2', role: 'Lý Minh', text: 'Mình là Lý Minh, người Trung Quốc.', cn: '我是李明，中国人。' },
+        { id: 'vd003_3', role: 'Nam', text: 'Rất vui được gặp bạn. Bạn học gì ở đây?', cn: '很高兴认识你。你在这里学什么？' },
+        { id: 'vd003_4', role: 'Lý Minh', text: 'Mình học tiếng Việt.', cn: '我学越南语。' },
+        { id: 'vd003_5', role: 'Nam', text: 'Tiếng Việt khó không?', cn: '越南语难吗？' },
+        { id: 'vd003_6', role: 'Lý Minh', text: 'Hơi khó, nhưng mình rất thích.', cn: '有点难，但我很喜欢。' }
+      ]
+    },
+    {
+      id: 'vd004', scene: '看病', level: 'A2',
+      lines: [
+        { id: 'vd004_1', role: 'Bác sĩ', text: 'Bạn bị sao?', cn: '你怎么了？' },
+        { id: 'vd004_2', role: 'Bệnh nhân', text: 'Tôi bị sốt và đau đầu.', cn: '我发烧而且头疼。' },
+        { id: 'vd004_3', role: 'Bác sĩ', text: 'Bạn bị sốt từ hôm qua à?', cn: '你从昨天开始发烧吗？' },
+        { id: 'vd004_4', role: 'Bệnh nhân', text: 'Vâng, từ tối hôm qua.', cn: '是的，从昨晚开始。' },
+        { id: 'vd004_5', role: 'Bác sĩ', text: 'Bạn uống thuốc này, nghỉ ngơi hai ngày.', cn: '你吃这个药，休息两天。' }
       ]
     }
   ]

@@ -9,7 +9,7 @@
 //      由 Cloudflare 出海去调 Google；
 //   3. 同一个词被多人查时，KV 缓存把成本压到接近 0。
 //
-// 路由：GET /lookup?q=word&lang=en|ja
+// 路由：GET /lookup?q=word&lang=en|ja|vi
 // 绑定：AI_CACHE（KV 命名空间）、GEMINI_API_KEY（secret）
 //
 // 明确不做的事：不写词库、不落库到 data.json。AI 生成的内容只作为「查词参考」显示在页面上
@@ -24,7 +24,7 @@ const CACHE_TTL = 60 * 60 * 24 * 30   // 30 天
 // 目的是防止有人拿这个公开地址刷额度：小程序是公开的，Worker 地址也一样公开。
 const DAILY_LIMIT = 300
 const LIMIT_TTL = 60 * 60 * 24 * 2
-const UA_OK = ['en', 'ja']
+const UA_OK = ['en', 'ja', 'vi']
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -63,9 +63,11 @@ function clientIp(request) {
   return request.headers.get('cf-connecting-ip') || request.headers.get('x-real-ip') || 'unknown'
 }
 
+const LANG_NAME = { en: '英语', ja: '日语', vi: '越南语' }
 function buildPrompt(q, lang) {
   const isJa = lang === 'ja'
-  const langName = isJa ? '日语' : '英语'
+  const isVi = lang === 'vi'
+  const langName = LANG_NAME[lang] || '英语'
   return [
     '你是一位严谨的' + langName + '老师，正在为一个中国学习者解释一个词。',
     '词：' + q,
@@ -73,7 +75,7 @@ function buildPrompt(q, lang) {
     '{',
     '  "found": true 或 false（这个词是否真实存在、不是你编的）,',
     '  "word": "规范写法（' + langName + '原文）",',
-    '  "phonetic": "音标或读音（' + (isJa ? '罗马音' : 'IPA，带斜杠') + '）",',
+    '  "phonetic": "音标或读音（' + (isJa ? '罗马音' : (isVi ? '带声调符号的越南语写法 + 近似 IPA' : 'IPA，带斜杠')) + '）",',
     '  "meaning": "中文释义，词性缩写开头，最多 40 字",',
     '  "examples": [{"text": "' + langName + '例句", "cn": "中文翻译"}],  // 恰好 2 条，日常场景',
     '  "tip": "一条最容易犯的错或用法提醒，中文，最多 50 字"',

@@ -48,6 +48,16 @@ function isJapaneseText(text) {
   return KANA_RE.test(String(text || ''))
 }
 
+// 越南语：没有任何在线合成源可用（有道/百度都没越南语音色，同声传译只支持中英文），
+// 所有越南语发音都来自预生成 mp3。所以碰到「没有本地音频的越南语文本」时不该去撞网络，
+// 直接报错让页面提示，省掉几次注定失败的请求和 8 秒看门狗。
+// 用「越南语特有字母 + 声调符号」判断，而不是看用户设置的语言——设置切到越南语、
+// 素材还是英语时，英语仍要能正常走在线合成。
+const VI_RE = /[ăâđêôơưĂÂĐÊÔƠƯ]|[àáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]/i
+function isVietnameseText(text) {
+  return VI_RE.test(String(text || ''))
+}
+
 // 同声传译 TTS 是否可用（注意：智聆插件没有 textToSpeech，不能算）
 function pluginTtsAvailable() {
   try {
@@ -139,6 +149,7 @@ function playRemote(url, slow, handlers, onFail) {
 //   整句（>2 词） → 百度 → 有道 → 有道备源
 //   日语单词      → 有道 → 有道备源（百度 lan=jap 会 403，不试）
 //   日语整句      → 同声传译插件（有道对日语句子同样 500，装了插件就直接上）
+//   越南语        → 只用预生成 mp3（没有任何在线源），没有音频就老实报错
 // 最后一级若同声传译插件可用，再用它的本地合成兜底。
 //
 // handlers.lang 可传 'en_US'/'ja_JP'；onFallback(source) 告知降级到哪一级
@@ -198,7 +209,11 @@ function speak(text, slow, handlers) {
   // 网络发音链（本地音频不可用时走这里）
   function runNetwork() {
     let sources
-    if (jaText) {
+    if (isVietnameseText(raw)) {
+      // 越南语没有在线源，只有预生成 mp3（上面的 localAudio 分支）。走到这里说明
+      // 这条文本没有对应音频（比如 AI 现查的词），直接失败并由页面给准确提示。
+      sources = []
+    } else if (jaText) {
       // 日语：有道 dictvoice 只有「词」能出声（且必须带 le=jap），整句返回 0 字节或 500；
       // 百度 lan=jap 是 403；同声传译的 textToSpeech 只支持中英文。
       // 所以整句不去撞必然失败的请求，直接交给插件兜底、插件不行就报错让页面提示。
@@ -361,4 +376,4 @@ function speak(text, slow, handlers) {
   }
 }
 
-module.exports = { ttsUrl, baiduUrl, isJapaneseText, needJapaneseVoice, createPlayer, speak, DOWNLOAD_TIMEOUT }
+module.exports = { ttsUrl, baiduUrl, isJapaneseText, needJapaneseVoice, isVietnameseText, createPlayer, speak, DOWNLOAD_TIMEOUT }

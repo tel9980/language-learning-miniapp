@@ -23,7 +23,9 @@ const REGION = {
   // 日语在主包放不下、只能在分包里；分包在个别真机上会加载失败，所以同一批 mp3
   // 还会随 Pages 部署到 CDN，加载失败时直接流播（见 utils/local-audio.js 的 remoteFor）
   ja: { dir: 'audio-src/ja', remote: 'https://yb.qy663.de5.net/audio/' },
-  en: { dir: 'audio-src/en', remote: 'https://yb.qy663.de5.net/audio-en/' }
+  en: { dir: 'audio-src/en', remote: 'https://yb.qy663.de5.net/audio-en/' },
+  // 越南语没有任何在线合成源，单词、例句、句子、台词全部要预生成
+  vi: { dir: 'audio-src/vi', remote: 'https://yb.qy663.de5.net/audio-vi/' }
 }
 
 // 每个语种要合成的素材 id（英语不含单词：单词在线发音一直稳，880 个文件放不下）
@@ -31,7 +33,9 @@ function itemsOf(lang) {
   const ids = []
   s.getSentences(lang).forEach(x => ids.push(x.id))
   s.getDialogues(lang).forEach(d => d.lines.forEach(l => ids.push(l.id)))
-  if (lang === 'ja') {
+  // 日语单词能靠有道词库发音，但这批音频一样预生成（免得每次都靠网络）；
+  // 越南语单词则完全依赖预生成
+  if (lang === 'ja' || lang === 'vi') {
     w.getWords(lang).forEach(x => {
       ids.push(x.id)
       if (x.example) ids.push(x.id + '_ex')
@@ -70,7 +74,8 @@ lines.push('// mp3 不进代码包（真机读不到包内文件），只放仓�
 lines.push('// 这里只维护「哪个 id 有音频、CDN 地址是什么」，见 remoteFor()。')
 lines.push('')
 lines.push('const REGION = {')
-Object.keys(out).forEach(lang => {
+const regionKeys = Object.keys(out)
+regionKeys.forEach((lang, li) => {
   const r = out[lang]
   lines.push('  ' + lang + ': {')
   lines.push('    remote: ' + q(r.remote || '') + ',')
@@ -79,7 +84,9 @@ Object.keys(out).forEach(lang => {
   lines.push('    ids: {')
   r.ids.forEach(id => lines.push('      ' + q(id) + ': 1' + (id.indexOf("'") < 0 ? ',' : '')))
   lines.push('    }')
-  lines.push('  }' + (lang === 'ja' ? ',' : ''))
+  // 逗号要按「是不是最后一个语种」来加，早先写死 lang === 'ja'，
+  // 加了第三个语种就变成 `},  vi: {...}` 这种语法错误
+  lines.push('  }' + (li < regionKeys.length - 1 ? ',' : ''))
 })
 lines.push('}')
 lines.push('')

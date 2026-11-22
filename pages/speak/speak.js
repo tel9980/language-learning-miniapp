@@ -66,8 +66,7 @@ Page({
 
   onShow() {
     this.syncTheme()
-    // 换到日语时确保离线音频分包已加载（主包里没有日语音频）
-    // 离线音频现在优先流播 CDN（见 utils/audio.js），不再预载分包——
+    // 离线音频优先流播 CDN（见 utils/audio.js），不预载分包——
     // 预载要拉 1–3MB，而真机上读分包文件还可能失败，不如按需。
     this.setData({ scoreSupported: speechScore.isSupported(storage.getCurrentLang()) })
     const p = profile.currentProfile() || {}
@@ -272,8 +271,11 @@ Page({
         // 别说成「网络不好」，直接讲清楚能怎么办。
         const ja = audio.needJapaneseVoice(text)
         const long = ja && String(text).trim().length > 6
+        // 越南语没有任何在线合成源，只有内置素材的预生成音频
+        const vi = audio.isVietnameseText(text)
         wx.showToast({
-          title: long ? '日语整句暂无合成发音，可点单词单独听' : '这句暂时读不出来，点一下再试',
+          title: vi ? '越南语只支持内置素材的发音，这句读不出来'
+            : (long ? '日语整句暂无合成发音，可点单词单独听' : '这句暂时读不出来，点一下再试'),
           icon: 'none'
         })
         that.stopHighlight()

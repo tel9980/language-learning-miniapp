@@ -4,7 +4,7 @@ const storage = require('../../utils/storage')
 const speaking = require('../../utils/speaking')
 const profile = require('../../utils/profile')
 const family = require('../../utils/family')
-const { getLangMeta } = require('../../utils/lang')
+const { getLangMeta, LANG_KEYS } = require('../../utils/lang')
 
 const app = getApp()
 
@@ -40,7 +40,7 @@ Page({
     this.setData({ stats, today, dueCount, mastered, lang, langName: meta.name, langFlag: meta.flag, dailyGoal, goalPercent, goalTip, speakCount, focusCount, unreadComments: family.unreadComments(), myName: p.name, myAvatar: p.avatar, modeName: modeNames[p.mode] || '标准' })
   },
   switchLang() {
-    const langs = ['en', 'ja']
+    const langs = LANG_KEYS
     const cur = this.data.lang
     const next = langs[(langs.indexOf(cur) + 1) % langs.length]
     storage.setLang(next)

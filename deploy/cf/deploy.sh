@@ -26,11 +26,13 @@ echo "→ 先刷新词库 JSON（deploy/data.json 与 deploy/cf/data.json）"
 ( cd .. && node export-data.js )
 
 echo "→ 把预生成音频铺到 CDN（代码包里不再放 mp3，这里就是用户听到的那一份）"
-rm -rf audio audio-en && mkdir -p audio audio-en
+rm -rf audio audio-en audio-vi && mkdir -p audio audio-en audio-vi
 cp ../audio-src/ja/*.mp3 audio/
 cp ../audio-src/en/*.mp3 audio-en/
+cp ../audio-src/vi/*.mp3 audio-vi/
 echo "   日语 $(ls audio | wc -l | tr -d ' ') 个 mp3，$(du -sh audio | cut -f1)"
 echo "   英语 $(ls audio-en | wc -l | tr -d ' ') 个 mp3，$(du -sh audio-en | cut -f1)"
+echo "   越南语 $(ls audio-vi | wc -l | tr -d ' ') 个 mp3，$(du -sh audio-vi | cut -f1)"
 
 echo "→ 发布到 Cloudflare Pages"
 npx --yes wrangler@3 pages deploy . --project-name yuban-data --branch main --commit-dirty=true

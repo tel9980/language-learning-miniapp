@@ -23,6 +23,8 @@ import argparse, asyncio, json, os, subprocess, sys, tempfile
 VOICES = {
     'ja': 'ja-JP-NanamiNeural',
     'en': 'en-US-JennyNeural',
+    # 越南语只有这两个神经音色（HoaiMy 女 / NamMinh 男）
+    'vi': 'vi-VN-HoaiMyNeural',
 }
 LIMIT = 1                      # 并发数，太大容易被限流（>1 会大量返回 No audio was received）
 TARGET = ('-ar', '16000', '-ac', '1', '-b:a', '16k')

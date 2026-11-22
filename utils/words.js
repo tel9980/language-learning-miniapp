@@ -1,19 +1,19 @@
 // 词库：英语为主，结构上预留多语言扩展（增加 ja 等语种即可）
-// 数据本身拆在 words.en.js / words.ja.js 里，**按语种懒加载**：切到日语时不必解析 480 个英语词
+// 数据本身拆在 words.en.js / words.ja.js / words.vi.js 里，**按语种懒加载**：切到日语或越南语时不必解析 480 个英语词
 // （首页只用到 utils/lang.js 的语言元信息，早就不经过这里）。
 // 字段：id / word 词形 / phonetic 音标 / meaning 释义 / example 例句 / exampleCn 例句中文 / category 类别
 const { getLangMeta, LANG_KEYS } = require('./lang')
 
 const _builtin = {}
 function builtin(langKey) {
-  const k = langKey === 'ja' ? 'ja' : 'en'
+  const k = LANG_KEYS.indexOf(langKey) >= 0 ? langKey : 'en'
   if (!_builtin[k]) _builtin[k] = require('./words.' + k).words
   return _builtin[k]
 }
 
 // 兼容旧的 words.WORDS.en 写法：仍是同一个数组，只是取的时候才加载
 const WORDS = {}
-Object.keys({ en: 1, ja: 1 }).forEach(function (k) {
+LANG_KEYS.forEach(function (k) {
   Object.defineProperty(WORDS, k, { get() { return builtin(k) }, enumerable: true })
 })
 
