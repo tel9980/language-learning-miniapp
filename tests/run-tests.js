@@ -1369,8 +1369,12 @@ async function runExtraTests() {
   eq(shipped.words.ja.length, 110, '发布包日语 110 词')
   eq(shipped.sentences.en.length, 120, '发布包英语 120 句')
   eq(shipped.sentences.ja.length, 100, '发布包日语 100 句')
-  const cfCopy = require('../deploy/cf/data.json')
-  eq(cfCopy.version, shipped.version, '发布目录里的 data.json 与 deploy/data.json 同版本')
+  // 发布目录不再留一份副本（两份 181KB 各自进 git 迟早不一致）：
+  // deploy/data.json 是唯一来源，发布时由 deploy.sh / CI 复制过去
+  const fsHere = require('fs')
+  ok(!fsHere.existsSync(pathMod.join(__dirname, '..', 'deploy/cf/data.json')) ||
+    /deploy\/cf\/data\.json/.test(fsHere.readFileSync(pathMod.join(__dirname, '..', '.gitignore'), 'utf8')),
+    'deploy/cf/data.json 不进仓库（发布时才复制）')
 
   od.DATA_URLS.splice(0, od.DATA_URLS.length)
   Array.prototype.push.apply(od.DATA_URLS, shippedSources)
