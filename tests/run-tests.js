@@ -162,19 +162,22 @@ eq(new Set(jaDlgIds).size, jaDlgIds.length, 'Japanese dialogue line ids unique')
 ok(jaDlg.every(function (d) { return d.lines.length >= 3 }), 'each Japanese dialogue has >= 3 lines')
 ok(jaSent.some(function (x) { return /[\u3040-\u309f\u30a0-\u30ff]/.test(x.text) }), 'Japanese sentences contain kana')
 
-// ---- 越南语素材（2026-11 新增：起步版 80 词 + 40 句 + 4 组对话）----
+// ---- 越南语素材（2026-11：80 词 + 100 句 + 8 组对话）----
 const viSent = sentences.getSentences('vi')
 const viDlg = sentences.getDialogues('vi')
-eq(viSent.length, 40, 'Vietnamese sentences = 40')
-eq(viDlg.length, 4, 'Vietnamese dialogues = 4')
+eq(viSent.length, 100, 'Vietnamese sentences = 100')
+eq(viDlg.length, 8, 'Vietnamese dialogues = 8')
 const viSentIds = viSent.map(function (x) { return x.id })
 eq(new Set(viSentIds).size, viSentIds.length, 'Vietnamese sentence ids unique')
 ok(viSent.every(function (x) { return x.text && x.cn && x.scene && x.level }), 'Vietnamese sentences all complete')
 ok(viSent.some(function (x) { return x.level === 'A1' }) && viSent.some(function (x) { return x.level === 'A2' }),
   'Vietnamese sentences span A1..A2')
+// 扩到 100 句后要真的覆盖到 B1/B2，否则还是只有入门句
+ok(viSent.some(function (x) { return x.level === 'B1' }) && viSent.some(function (x) { return x.level === 'B2' }),
+  'Vietnamese sentences also cover B1/B2')
 const viDlgIds = []
 viDlg.forEach(function (d) { d.lines.forEach(function (l) { viDlgIds.push(l.id) }) })
-eq(viDlgIds.length, 21, 'Vietnamese dialogue lines = 21')
+eq(viDlgIds.length, 44, 'Vietnamese dialogue lines = 44')
 eq(new Set(viDlgIds).size, viDlgIds.length, 'Vietnamese dialogue line ids unique')
 ok(viDlg.every(function (d) { return d.lines.length >= 3 }), 'each Vietnamese dialogue has >= 3 lines')
 
@@ -737,7 +740,7 @@ VI_WORDS.forEach(function (w) {
   viAudioIds.push(w.id)
   if (w.example) viAudioIds.push(w.id + '_ex')
 })
-eq(viAudioIds.length, 221, '越南语音频应有 221 条（40 句 + 21 台词 + 80 词 + 80 例句）')
+eq(viAudioIds.length, 304, '越南语音频应有 304 条（100 句 + 44 台词 + 80 词 + 80 例句）')
 const viMissing = viAudioIds.filter(function (id) { return !localAudio.has(id) })
 eq(viMissing.length, 0, '每个越南语条目都有离线音频（缺: ' + viMissing.slice(0, 5).join(',') + '）')
 eq(badMp3(viAudioIds).length, 0, '越南语音频都是真 mp3')
@@ -1598,4 +1601,79 @@ async function runExtraTests() {
   eq(ai.MAX_CACHE, 40, '本地 AI 缓存上限 40 条')
   ai.clearCache()
   global.wx.request = origAiReq
+
+  // ---- AI 听音反馈（utils/ai-eval.js）：日语/越南语没有客观评分时的兜底 ----
+  const aiEval = require('../utils/ai-eval')
+  eq(aiEval.mimeOf('wxfile://tmp_a.mp3'), 'audio/mpeg', 'mp3 录音按 audio/mpeg 上传')
+  eq(aiEval.mimeOf('a.m4a'), 'audio/mp4', 'm4a 录音按 audio/mp4 上传')
+  eq(aiEval.mimeOf('a.bin'), 'audio/mpeg', '未知扩展名退回 audio/mpeg')
+
+  // 没录音就别发请求（点了按钮但还没录）
+  const noRec = await aiEval.evaluate({ text: 'xin chào', lang: 'vi' })
+  eq(noRec.ok, false, '没有录音文件时直接失败')
+  eq(noRec.error, 'no-recording', '失败原因说清楚是没录音')
+
+  // 上传成功：把 Worker 的 verdict/issues/tip 原样透出
+  const origReq2 = global.wx.request
+  const origFs2 = global.wx.getFileSystemManager
+  let evalReq = null
+  global.wx.getFileSystemManager = function () {
+    return { readFile(o) { o.success({ data: 'QUJD' }) } }   // 假装读到 3 字节 base64
+  }
+  global.wx.request = function (o) {
+    evalReq = o
+    o.success({ statusCode: 200, data: { ok: true, verdict: '声调有点平', issues: ['phở 读成了平调'], tip: '把问号音往上带' } })
+  }
+  const good = await aiEval.evaluate({ filePath: 'wxfile://tmp_a.mp3', text: 'phở', lang: 'vi' })
+  eq(good.ok, true, 'AI 有反馈时 ok=true')
+  eq(good.verdict, '声调有点平', 'verdict 原样给页面')
+  eq(good.issues.length, 1, 'issues 原样给页面')
+  eq(good.tip, '把问号音往上带', 'tip 原样给页面')
+  eq(evalReq && evalReq.method, 'POST', '评测走 POST')
+  ok(evalReq && /\/eval$/.test(evalReq.url), '评测打到 Worker 的 /eval')
+  eq(evalReq && evalReq.data && evalReq.data.lang, 'vi', '带上语种，prompt 才对')
+  eq(evalReq && evalReq.data && evalReq.data.mime, 'audio/mpeg', '带上真实 mime')
+
+  // 限额用完：把 Worker 的文案带给用户，不要吞成「网络错误」
+  global.wx.request = function (o) {
+    o.success({ statusCode: 429, data: { ok: false, error: 'rate-limited', message: '今天的 AI 评测次数用完了' } })
+  }
+  const limited = await aiEval.evaluate({ filePath: 'wxfile://tmp_a.mp3', text: 'phở', lang: 'vi' })
+  eq(limited.ok, false, '限额用完 ok=false')
+  eq(limited.error, 'rate-limited', '限额用完有明确 error')
+  eq(limited.message, '今天的 AI 评测次数用完了', 'Worker 的文案原样透出')
+
+  // 网络挂：给一句人话
+  global.wx.request = function (o) { o.fail({ errMsg: 'request:fail' }) }
+  const netFail = await aiEval.evaluate({ filePath: 'wxfile://tmp_a.mp3', text: 'phở', lang: 'vi' })
+  eq(netFail.ok, false, '网络失败 ok=false')
+  eq(netFail.error, 'network', '网络失败 error=network')
+
+  // 读不到文件（录音被系统清理）：当作没录音，别发出空 body
+  global.wx.getFileSystemManager = function () {
+    return { readFile(o) { o.fail({ errMsg: 'readFile:fail' }) } }
+  }
+  const noFile = await aiEval.evaluate({ filePath: 'wxfile://gone.mp3', text: 'phở', lang: 'vi' })
+  eq(noFile.ok, false, '文件读不出来时失败')
+  eq(noFile.error, 'no-recording', '读不出来按「重录一次」处理')
+
+  global.wx.request = origReq2
+  global.wx.getFileSystemManager = origFs2
+
+  // 上传过录音这件事必须用户点过一次才记下来（默认 false）
+  const settings = storage.getSettings()
+  eq(settings.aiEvalAgreed === undefined || settings.aiEvalAgreed === false, true, 'AI 评测默认没同意过上传')
+  storage.setAiEvalAgreed(true)
+  eq(storage.getSettings().aiEvalAgreed, true, '同意过一次就记住，不再反复弹窗')
+  storage.setAiEvalAgreed(false)
+
+  // ---- 影子跟读 / AI 听音的页面接线（静态守门，防止哪天被删掉）----
+  const fsMod = require('fs')
+  const speakJs = fsMod.readFileSync(require('path').join(__dirname, '..', 'pages/speak/speak.js'), 'utf8')
+  const speakXml = fsMod.readFileSync(require('path').join(__dirname, '..', 'pages/speak/speak.wxml'), 'utf8')
+  ok(/comparePlay\(\)/.test(speakJs), '口语页有 comparePlay（标准音 ←→ 我的录音）')
+  ok(/_shadowTip\(\)/.test(speakJs), '口语页有 shadowTip（时长对比结论）')
+  ok(/bindtap="comparePlay"/.test(speakXml), 'wxml 上挂了 comparePlay')
+  ok(/bindtap="aiListen"/.test(speakXml), 'wxml 上挂了 aiListen')
+  ok(/aiLoading/.test(speakXml), 'AI 听音有 loading 态（模型要想一两秒）')
 }

@@ -12,6 +12,16 @@ function idCandidates(id) {
   return out
 }
 
+// ids 是「空格分隔的整串」，查表用 indexOf（前后补空格避免 vi_01 命中 vi_010）。
+// 这样 722 个 id 的清单只占一个字符串字面量，不用在启动时构建 722 键的对象。
+function padded(r) {
+  if (!r._pad) r._pad = ' ' + r.ids + ' '
+  return r._pad
+}
+function hasId(r, id) {
+  return padded(r).indexOf(' ' + id + ' ') >= 0
+}
+
 // 素材 id 属于哪个语种；没有返回空串
 function langOf(id) {
   if (!id) return ''
@@ -19,7 +29,7 @@ function langOf(id) {
   const ids = idCandidates(id)
   for (let li = 0; li < langs.length; li++) {
     for (let ii = 0; ii < ids.length; ii++) {
-      if (REGION[langs[li]].ids[ids[ii]]) return langs[li]
+      if (hasId(REGION[langs[li]], ids[ii])) return langs[li]
     }
   }
   return ''
@@ -37,7 +47,7 @@ function remoteFor(id) {
     const r = REGION[langs[li]]
     if (!r.remote) continue
     for (let ii = 0; ii < ids.length; ii++) {
-      if (r.ids[ids[ii]]) return r.remote + ids[ii] + '.mp3'
+      if (hasId(r, ids[ii])) return r.remote + ids[ii] + '.mp3'
     }
   }
   return ''

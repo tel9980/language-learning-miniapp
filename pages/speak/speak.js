@@ -2,6 +2,7 @@ const storage = require('../../utils/storage')
 const speaking = require('../../utils/speaking')
 const sentences = require('../../utils/sentences')
 const audio = require('../../utils/audio')
+const aiEval = require('../../utils/ai-eval')
 const localAudio = require('../../utils/local-audio')
 const speechScore = require('../../utils/speech-score')
 const recordings = require('../../utils/recordings')
@@ -26,6 +27,8 @@ Page({
     queueLen: 0, dots: [], index: 0, current: null,
     showDots: true, progressText: '0 / 0', progressPercent: 0,
     recording: false, hasRecording: false, playingMine: false,
+    comparing: false, shadowTip: '',
+    aiLoading: false, aiFeedback: null,
     focusCount: 0, justRated: false, todayCount: 0,
     // 客观评分
     scoreSupported: false, scoring: false, score: null, recognized: '',
@@ -225,6 +228,8 @@ Page({
     this.setData(Object.assign({
       current: w, hasRecording: false, justRated: false,
       score: null, recognized: '', playingMine: false, scoreDetail: null, wrongWords: [],
+      comparing: false, shadowTip: '',
+      aiLoading: false, aiFeedback: null,
       showLine: 0, revealed: false, otherLine,
       karaokeOn: false, karaokeIdx: -1, karaokeTokens: karaoke.toPlain(tokens), abCount: 0
     }, this._progress(this.data.index, this._queue.length)))
@@ -282,6 +287,7 @@ Page({
       },
       onDuration(ms) {
         // 拿到真实音频时长后重排高亮时间表（估算 → 实测）
+        if (ms > 0) that._stdDuration = ms    // 影子跟读拿它跟我的录音比长短
         if (that._highlighter && ms > 0) that._highlighter.retime(ms)
       },
       onEnded() {
@@ -304,6 +310,7 @@ Page({
     // 只在真的在加载时才 setData，避免每次切词都白渲染一轮
     if (this.data.audioLoading) this.setData({ audioLoading: false })
     if (this._audioPlayer) { try { this._audioPlayer.destroy() } catch (e) {} this._audioPlayer = null }
+    if (this._compareCtx) { try { this._compareCtx.destroy() } catch (e) {} this._compareCtx = null }
   },
   playStd() { if (this.data.current) { this._abPlaying = false; this.playText(this.data.current.word, false, this.data.current.id) } },
   playSlow() { if (this.data.current) { this._abPlaying = false; this.playText(this.data.current.word, true, this.data.current.id) } },
@@ -362,6 +369,127 @@ Page({
     else start()
   },
 
+  // 影子跟读：标准音 → 我的录音 → 标准音，串成一遍。
+  // 日语和越南语没有客观评分（智聆只支持中英文），音色只能靠耳朵；
+  // 但「你说了多久 vs 标准音多长」是能算的，读太快、读太慢会被直接点出来。
+  comparePlay() {
+    const cur = this.data.current
+    if (!cur) return
+    if (!this._recFilePath && !this._savePromise) {
+      wx.showToast({ title: '先按下面的按钮录一遍', icon: 'none' })
+      return
+    }
+    const that = this
+    const run = function () {
+      if (!that._recFilePath) {
+        wx.showToast({ title: '录音已失效，请重录', icon: 'none' })
+        return
+      }
+      that.stopAudio()
+      feedback.tap()
+      that.setData({ comparing: true, shadowTip: '' })
+      const voice = getLangMeta(storage.getCurrentLang()).voice
+      const playStd = function (then) {
+        that._audioPlayer = audio.speak(cur.word, false, {
+          id: cur.id,
+          lang: voice,
+          onDuration(ms) { if (ms > 0) that._stdDuration = ms },
+          onEnded() { if (then) then() },
+          onError() {
+            that.setData({ comparing: false })
+            wx.showToast({ title: '标准音没读出来，先看看网络', icon: 'none' })
+          }
+        })
+      }
+      const playMine = function (then) {
+        const ctx = wx.createInnerAudioContext()
+        that._compareCtx = ctx
+        const done = function () {
+          try { ctx.destroy() } catch (e) {}
+          if (that._compareCtx === ctx) that._compareCtx = null
+          if (then) then()
+        }
+        ctx.onEnded(done)
+        ctx.onError(done)
+        ctx.src = that._recFilePath
+        ctx.play()
+      }
+      playStd(function () {
+        playMine(function () {
+          playStd(function () {
+            that.setData({ comparing: false, shadowTip: that._shadowTip() })
+          })
+        })
+      })
+    }
+    // 刚录完就点对比时，落盘可能还在途中
+    if (this._savePromise) this._savePromise.then(run).catch(run)
+    else run()
+  },
+
+  // AI 听音反馈：智聆评不了的语种（日语/越南语）用这个给「哪里不对」的具体话。
+  // 录音要上传，所以第一次必须先让用户明确同意，同意过就记在设置里不再问。
+  aiListen() {
+    const cur = this.data.current
+    if (!cur) return
+    if (!this._recFilePath && !this._savePromise) {
+      wx.showToast({ title: '先按下面的按钮录一遍', icon: 'none' })
+      return
+    }
+    if (this.data.aiLoading) return
+    const that = this
+    const run = function () {
+      if (!that._recFilePath) {
+        wx.showToast({ title: '录音已失效，请重录', icon: 'none' })
+        return
+      }
+      that.stopAudio()
+      that.setData({ aiLoading: true, aiFeedback: null })
+      aiEval.evaluate({
+        filePath: that._recFilePath,
+        text: cur.word,
+        lang: storage.getCurrentLang()
+      }).then(function (r) {
+        if (!r || !r.ok) {
+          that.setData({ aiLoading: false })
+          wx.showToast({ title: (r && r.message) || 'AI 这次没听明白', icon: 'none' })
+          return
+        }
+        that.setData({ aiLoading: false, aiFeedback: r })
+      }).catch(function () {
+        that.setData({ aiLoading: false })
+        wx.showToast({ title: 'AI 这次没听明白，再点一次', icon: 'none' })
+      })
+    }
+    if (storage.getSettings().aiEvalAgreed) { run(); return }
+    wx.showModal({
+      title: '把这段录音发给 AI 听？',
+      content: '这一段录音会上传到 AI 服务器（境外）听一遍，返回「哪里不对」的文字建议。只上传这一小段，服务器不保存、不缓存。不想上传就别点确定。',
+      confirmText: '同意并评测',
+      cancelText: '不上传',
+      success(res) {
+        if (!res.confirm) return
+        storage.setAiEvalAgreed(true)
+        run()
+      }
+    })
+  },
+
+  // 时长对比：只比说了多久，不比音色。差 15% 以内算对得上。
+  _shadowTip() {
+    const std = this._stdDuration || 0
+    const mine = this._recDurationMs || 0
+    if (!std || !mine || std < 400) return '先跟住节奏，再抠发音。'
+    const sec = Math.abs(mine - std) / 1000
+    const stdS = (std / 1000).toFixed(1)
+    const mineS = (mine / 1000).toFixed(1)
+    if (Math.abs(mine - std) / std <= 0.15) {
+      return '节奏对得上（标准音 ' + stdS + 's / 你 ' + mineS + 's），可以开始抠发音了。'
+    }
+    if (mine > std) return '你比标准音慢了 ' + sec.toFixed(1) + 's（' + stdS + 's / ' + mineS + 's），中间卡顿了，先顺一遍再提速。'
+    return '你比标准音快了 ' + sec.toFixed(1) + 's（' + stdS + 's / ' + mineS + 's），注意别吞音，尤其词尾辅音。'
+  },
+
   // ---------- 录音 ----------
   // 优先走智聆评测插件：它自己录音，并把「发音分 + 逐词错误 + 录音文件」一次给全。
   // 注意 wx.getRecorderManager() 是全局单例，插件内部也用它，两边同时开会互相覆盖回调，
@@ -397,6 +525,12 @@ Page({
 
   toggleRecord() {
     if (this.data.recording) { this.stopRecord(); return }
+    // 智聆后台对同一个小程序的调用有频率限制（错误码 20802），用户连点两下很容易踩到，
+    // 而且报出来的是一句看不懂的英文错误。这里先拦一道：两次评测之间至少隔 2 秒。
+    if (this._evalAvailable(this.data.current) && this._lastEvalAt && Date.now() - this._lastEvalAt < 2000) {
+      wx.showToast({ title: '慢一点，刚评过一次', icon: 'none' })
+      return
+    }
     const that = this
     this.stopAudio()
     feedback.tap()
@@ -445,6 +579,8 @@ Page({
       })
       if (ev.supported) {
         this._evaluator = ev
+        this._lastEvalAt = Date.now()
+        this._recStartedAt = Date.now()
         this.setData({ recording: true, hasRecording: false, scoring: true, score: null, scoreDetail: null, wrongWords: [] })
         ev.start()
         return
@@ -482,6 +618,7 @@ Page({
         this.setData({ scoring: true, score: null, recognized: '' })
       }
     }
+    this._recStartedAt = Date.now()
     try {
       this._recManager.start({ duration: 60000, format: 'mp3', sampleRate: 16000, numberOfChannels: 1 })
       this.setData({ recording: true, hasRecording: false })
@@ -491,6 +628,11 @@ Page({
   },
 
   stopRecord() {
+    // 影子跟读要比「说了多久」，插件的回调不给时长，就用按下到松手的时间当近似
+    if (this._recStartedAt) {
+      this._recDurationMs = Date.now() - this._recStartedAt
+      this._recStartedAt = 0
+    }
     // 智聆路径：录音归插件管，stop 之后由它的 onStop 回调收尾
     if (this._evaluator) { this._evaluator.stop(); return }
     if (this._recManager && this.data.recording) {

@@ -28,9 +28,17 @@ const DAILY_LIMIT = 300
 const LIMIT_TTL = 60 * 60 * 24 * 2
 const UA_OK = ['en', 'ja', 'vi']
 
+// 发音评测（/eval）：把用户的一段录音发给多模态模型，让它说人话式的定性反馈。
+// 只给小程序的日语/越南语用户用——这两种语言没有可用的客观评测插件（智聆只支持中英文）。
+// 录音每次不一样，没法缓存，所以日配额单独设一个小值。
+const EVAL_DAILY_LIMIT = 60
+const EVAL_MAX_B64 = 400 * 1024      // 约 300KB 音频，正常 10 秒录音只有 20KB 左右
+const EVAL_MAX_TEXT = 120
+const EVAL_MIME = ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/wav', 'audio/x-m4a', 'audio/webm', 'audio/ogg']
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type'
 }
 
@@ -46,14 +54,14 @@ function json(body, status, extra) {
 
 // 每 IP 每天计数：KV 自增做不了原子操作，少量并发会少记几次——
 // 这里只要拦住「刷」，不需要精确账本。
-async function bumpLimit(env, ip) {
+async function bumpLimit(env, ip, prefix, limit) {
   if (!env.AI_CACHE) return { allowed: true, used: 0 }
   const day = new Date().toISOString().slice(0, 10)
-  const key = 'rl:' + day + ':' + ip
+  const key = 'rl:' + (prefix || '') + day + ':' + ip
   try {
     const cur = await env.AI_CACHE.get(key)
     const n = cur ? (parseInt(cur, 10) || 0) : 0
-    if (n >= DAILY_LIMIT) return { allowed: false, used: n }
+    if (n >= (limit || DAILY_LIMIT)) return { allowed: false, used: n }
     await env.AI_CACHE.put(key, String(n + 1), { expirationTtl: LIMIT_TTL })
     return { allowed: true, used: n + 1 }
   } catch (e) {
@@ -156,11 +164,131 @@ function normalize(obj, q, lang) {
   }
 }
 
+
+// ---------- 发音评测（/eval） ----------
+//
+// 为什么要它：智聆只有中英文，日语和越南语没有客观评分，用户只能自己凭感觉。
+// 多模态模型听一段录音能给「哪里不对」的具体话，这比一个假分数有用得多。
+// 明确不做的事：不给 0-100 分——模型不懂音素对齐，打出来的分比没有更糟。
+
+const EVAL_LANG_NAME = { en: '英语', ja: '日语', vi: '越南语' }
+
+function evalPrompt(text, lang) {
+  return [
+    '你是' + (EVAL_LANG_NAME[lang] || '英语') + '发音教练。下面这段录音是一个中国学习者在朗读这句话：',
+    '"' + text + '"',
+    '',
+    '请仔细听这段录音，只做定性判断，不要打分。严格返回这个 JSON 结构：',
+    '{"verdict":"一句话总评，中文，25 字以内",',
+    ' "issues":["具体问题，中文，每个 20 字以内"],',
+    ' "tip":"一条最值得改的建议，中文，30 字以内"}',
+    '',
+    '要求：',
+    '1. issues 最多 3 条，只说能从录音里听出来的问题（声调/音调、长短音、辅音、元音、语速、吞音、断句）；',
+    '2. 听不出来的方面不要编，宁可少写；录音明显没声音或听不清时，verdict 写"没听清，录得近一点再试一次"，issues 给空数组；',
+    '3. 不要复述原句，不要给分数，不要用英文回答。'
+  ].join('\n')
+}
+
+async function askEval(env, b64, mime, text, lang) {
+  let lastErr = null
+  for (let i = 0; i < MODELS.length; i++) {
+    const MODEL = MODELS[i]
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+      MODEL + ':generateContent?key=' + encodeURIComponent(env.GEMINI_API_KEY)
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: evalPrompt(text, lang) },
+            { inlineData: { mimeType: mime, data: b64 } }
+          ]
+        }],
+        generationConfig: { temperature: 0.2, responseMimeType: 'application/json' }
+      })
+    })
+    if (!res.ok) {
+      const body = await res.text()
+      lastErr = new Error('gemini ' + res.status + ': ' + body.slice(0, 160))
+      // 模型下线/过载才换下一个，参数错误换模型也没用
+      if (/ 404| 429| 503|NOT_FOUND|overloaded|high demand/i.test(' ' + res.status + ' ' + body)) continue
+      throw lastErr
+    }
+    const data = await res.json()
+    const parts = (data.candidates && data.candidates[0] && data.candidates[0].content &&
+      data.candidates[0].content.parts) || []
+    const raw = parts.map(function (p) { return p.text || '' }).join('')
+    if (!raw) { lastErr = new Error('gemini returned empty text'); continue }
+    let obj
+    try { obj = JSON.parse(raw) } catch (e) {
+      const m = raw.match(/\{[\s\S]*\}/)
+      if (!m) { lastErr = new Error('gemini returned non-json'); continue }
+      try { obj = JSON.parse(m[0]) } catch (e2) { lastErr = new Error('gemini returned bad json'); continue }
+    }
+    return normalizeEval(obj)
+  }
+  throw lastErr || new Error('no model available')
+}
+
+function cut(v, n) {
+  const s = String(v == null ? '' : v).replace(/\s+/g, ' ').trim()
+  return s.length > n ? s.slice(0, n) + '…' : s
+}
+
+function normalizeEval(obj) {
+  const issues = Array.isArray(obj && obj.issues) ? obj.issues : []
+  return {
+    ok: true,
+    verdict: cut(obj && obj.verdict, 60) || '听到了，但没听出具体问题。',
+    issues: issues.filter(function (x) { return String(x || '').trim() }).slice(0, 3).map(function (x) { return cut(x, 40) }),
+    tip: cut(obj && obj.tip, 60),
+    source: 'ai'
+  }
+}
+
+async function handleEval(request, env) {
+  if (!env.GEMINI_API_KEY) return json({ ok: false, error: 'not-configured' }, 503)
+  let body
+  try { body = await request.json() } catch (e) { return json({ ok: false, error: 'bad-body' }, 400) }
+  const b64 = String((body && body.audio) || '')
+  const text = String((body && body.text) || '').trim()
+  const lang = UA_OK.indexOf(body && body.lang) >= 0 ? body.lang : 'en'
+  let mime = String((body && body.mime) || 'audio/mpeg')
+  if (EVAL_MIME.indexOf(mime) < 0) mime = 'audio/mpeg'
+  if (!b64) return json({ ok: false, error: 'empty-audio' }, 400)
+  if (b64.length > EVAL_MAX_B64) return json({ ok: false, error: 'audio-too-long', message: '录音太长了，10 秒以内最合适' }, 413)
+  if (!text) return json({ ok: false, error: 'empty-text' }, 400)
+  if (text.length > EVAL_MAX_TEXT) return json({ ok: false, error: 'text-too-long' }, 400)
+
+  const limit = await bumpLimit(env, clientIp(request), 'ev:', EVAL_DAILY_LIMIT)
+  if (!limit.allowed) {
+    return json({
+      ok: false,
+      error: 'rate-limited',
+      message: '今天的 AI 评测次数用完了（每个网络每天 ' + EVAL_DAILY_LIMIT + ' 次），明天再来。'
+    }, 429, { 'Cache-Control': 'no-store' })
+  }
+
+  let payload
+  try {
+    payload = await askEval(env, b64, mime, text, lang)
+  } catch (e) {
+    return json({ ok: false, error: 'upstream', detail: String(e && e.message || e).slice(0, 200) }, 502)
+  }
+  return json(payload, 200, { 'Cache-Control': 'no-store' })
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
 
+    if (url.pathname === '/eval') {
+      if (request.method !== 'POST') return json({ ok: false, error: 'method-not-allowed' }, 405)
+      return handleEval(request, env)
+    }
     if (url.pathname !== '/lookup') {
       return json({ ok: false, error: 'not-found' }, 404)
     }
@@ -179,7 +307,7 @@ export default {
       } catch (e) { /* 缓存坏了不影响主流程 */ }
     }
 
-    const limit = await bumpLimit(env, clientIp(request))
+    const limit = await bumpLimit(env, clientIp(request), '', DAILY_LIMIT)
     if (!limit.allowed) {
       return json({
         ok: false,

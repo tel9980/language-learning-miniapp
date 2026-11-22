@@ -26,7 +26,7 @@ function defaults() {
   return {
     progress: {},
     stats: { totalLearned: 0, totalReviews: 0, totalCorrect: 0, streak: 0, lastActive: '', firstDay: '' },
-    settings: { lang: 'en', dailyGoal: 20, feedbackEnabled: true, guideSeen: false },
+    settings: { lang: 'en', dailyGoal: 20, feedbackEnabled: true, guideSeen: false, aiEvalAgreed: false },
     daily: {},
     custom: [],
     theme: { fontScale: 1, darkMode: false }
@@ -273,6 +273,8 @@ function getCurrentLang() { return getSettings().lang || 'en' }
 function setDailyGoal(n) { const s = getSettings(); s.dailyGoal = n; write(KEY_SETTINGS, s) }
 function setFeedbackEnabled(v) { const s = getSettings(); s.feedbackEnabled = !!v; write(KEY_SETTINGS, s) }
 function setGuideSeen(v) { const s = getSettings(); s.guideSeen = !!v; write(KEY_SETTINGS, s) }
+// AI 听音评测需要把录音上传，必须用户亲口同意一次才记下来（问过一次就不再问）
+function setAiEvalAgreed(v) { const s = getSettings(); s.aiEvalAgreed = !!v; write(KEY_SETTINGS, s) }
 function setLearnCat(cat) { const s = getSettings(); s.learnCat = cat || ''; write(KEY_SETTINGS, s) }
 
 // 无障碍主题
@@ -489,7 +491,7 @@ function importData(data) {
 
 module.exports = {
   init, todayKey, getSettings, setLang, getCurrentLang, setDailyGoal,
-  setFeedbackEnabled, setGuideSeen, setLearnCat, getTheme, setFontScale, setDarkMode,
+  setFeedbackEnabled, setGuideSeen, setLearnCat, setAiEvalAgreed, getTheme, setFontScale, setDarkMode,
   getCustomItems, addCustomItems, removeCustomItem,
   getProgress, getStats, getDaily, getDueWords, getNewWords, getToday,
   review, quizAnswer, getMasteredCount, INTERVALS,

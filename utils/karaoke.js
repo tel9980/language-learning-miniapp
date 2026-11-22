@@ -4,8 +4,17 @@
 // 日语：日语没有空格，按空格切会把整句当成一个 token，高亮等于失效。
 // 所以含假名的文本改用 TinySegmenter（18KB 纯 JS，见 utils/tiny-segmenter.js）切分。
 
-const TinySegmenter = require('./tiny-segmenter')
-const _jpSegmenter = new TinySegmenter()
+// TinySegmenter 是 21.6KB 的纯 JS（含一张大特征表），只有日语文本用得上。
+// 学英语/越南语的用户一次都不会用到它，所以延到第一次切分日语时才 require，
+// 不让他们在进页面时就白解析这 21.6KB。
+let _jpSegmenter = null
+function jpSegmenter() {
+  if (!_jpSegmenter) {
+    const TinySegmenter = require('./tiny-segmenter')
+    _jpSegmenter = new TinySegmenter()
+  }
+  return _jpSegmenter
+}
 
 const KANA_RE = /[\u3040-\u309f\u30a0-\u30ff]/
 const KANJI_RE = /[\u4e00-\u9fff]/
@@ -18,7 +27,7 @@ function tokenize(text) {
   if (!s) return []
   if (hasKana(s)) {
     // 含假名 → 日语，用形态切分；标点会被单独切成 token，高亮时正好停顿一下
-    return _jpSegmenter.segment(s)
+    return jpSegmenter().segment(s)
       .map(function (t) { return String(t).trim() }).filter(Boolean)
   }
   return s.split(/\s+/).filter(Boolean)

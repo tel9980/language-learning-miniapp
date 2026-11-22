@@ -59,6 +59,21 @@ Object.keys(REGION).forEach(lang => {
 })
 
 const q = v => "'" + v + "'"
+
+// 把 id 列表排成若干行字符串拼接，每行不超过 110 字符，方便 diff 看
+function wrapIds(ids) {
+  const list = ids.slice().sort()
+  const parts = []
+  let cur = ''
+  list.forEach(id => {
+    const next = cur ? cur + ' ' + id : id
+    if (next.length > 100 && cur) { parts.push(cur + ' '); cur = id }
+    else cur = next
+  })
+  if (cur) parts.push(cur)
+  return parts.map((p, i) => q(p) + (i < parts.length - 1 ? ' +' : '')).join('\n      ')
+}
+
 const lines = []
 lines.push('// 离线音频清单（自动生成，不要手改）')
 lines.push('//')
@@ -81,9 +96,9 @@ regionKeys.forEach((lang, li) => {
   lines.push('    remote: ' + q(r.remote || '') + ',')
   lines.push('    count: ' + r.ids.length + ',')
   lines.push('    bytes: ' + (sizes[lang] || 0) + ',')
-  lines.push('    ids: {')
-  r.ids.forEach(id => lines.push('      ' + q(id) + ': 1' + (id.indexOf("'") < 0 ? ',' : '')))
-  lines.push('    }')
+  // ids 用「空格分隔的整串」而不是 { 'id': 1 } 的映射表：722 个 id 的映射表是
+  // 17KB，运行时只需判断「这个 id 在不在里面」，indexOf 足够，还省掉一次对象构建。
+  lines.push('    ids: ' + wrapIds(r.ids))
   // 逗号要按「是不是最后一个语种」来加，早先写死 lang === 'ja'，
   // 加了第三个语种就变成 `},  vi: {...}` 这种语法错误
   lines.push('  }' + (li < regionKeys.length - 1 ? ',' : ''))

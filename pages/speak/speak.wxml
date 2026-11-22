@@ -144,7 +144,19 @@
 
       <view class="playback" wx:if="{{hasRecording}}">
         <view class="play-mine {{playingMine?'playing':''}}" bindtap="playMine">▶️ 听我的回放</view>
-        <view class="muted">对比标准音，看看哪里可以更像</view>
+        <view class="play-dup {{comparing?'playing':''}}" bindtap="comparePlay">🔁 标准音 ←→ 我的录音</view>
+      </view>
+      <view class="shadow-tip" wx:if="{{shadowTip}}">{{shadowTip}}</view>
+
+      <!-- 智聆只评中英文；日语/越南语用它换一段「哪里不对」的人话 -->
+      <view class="ai-eval" wx:if="{{hasRecording}}">
+        <view class="ai-btn {{aiLoading?'loading':''}}" bindtap="aiListen">{{aiLoading ? '🤖 AI 正在听…' : '🤖 AI 听听哪里不对'}}</view>
+        <view class="ai-card" wx:if="{{aiFeedback}}">
+          <view class="ai-verdict">{{aiFeedback.verdict}}</view>
+          <view class="ai-issue" wx:for="{{aiFeedback.issues}}" wx:key="*this">· {{item}}</view>
+          <view class="ai-tip" wx:if="{{aiFeedback.tip}}">👉 {{aiFeedback.tip}}</view>
+          <view class="ai-note">AI 只是听个大概，不打分，参考着改</view>
+        </view>
       </view>
     </view>
 
