@@ -595,7 +595,7 @@ const words = require('../utils/words')
 const EN_WORDS = words.WORDS.en
 const JA_WORDS = words.WORDS.ja
 const VI_WORDS = words.WORDS.vi
-eq(EN_WORDS.length, 480, 'english word count = 480')
+eq(EN_WORDS.length, 800, 'english word count = 800')
 eq(JA_WORDS.length, 110, 'japanese word count = 110')
 eq(VI_WORDS.length, 80, 'vietnamese word count = 80')
 const allWords = EN_WORDS.concat(JA_WORDS, VI_WORDS)
@@ -616,6 +616,12 @@ function dupWordsIn(list) {
 eq(dupWordsIn(EN_WORDS), 0, 'no duplicate english word forms')
 eq(dupWordsIn(JA_WORDS), 0, 'no duplicate japanese word forms')
 eq(dupWordsIn(VI_WORDS), 0, 'no duplicate vietnamese word forms')
+// 英语 800 词全部带第二例句/译文/常见搭配（词卡背面展示，不作选择题干扰项）
+const enrichFields = ['ex2', 'ex2c', 'col']
+let enrichEmpty = 0
+EN_WORDS.forEach(w => { enrichFields.forEach(f => { if (!w[f] || !String(w[f]).trim() || String(w[f]).trim().toLowerCase() === 'none') enrichEmpty++ }) })
+eq(enrichEmpty, 0, 'every english word has ex2/ex2c/col non-empty')
+ok(EN_WORDS.every(w => w.ex2 !== w.example), '第二例句与第一例句不同')
 // 越南语音标用近似 IPA（方括号内），必须从方括号开头，否则说明是随手填的
 ok(VI_WORDS.every(function (w) { return w.phonetic.indexOf('[') === 0 }), '越南语音标统一用 [IPA] 写法')
 const viCats = words.getExamCategories('vi').map(c => c.name)
@@ -631,8 +637,8 @@ const jaCats = words.getExamCategories('ja').map(c => c.name)
 ;['问候', '日常', '食物', '数字', '时间', '动词'].forEach(c => {
   ok(jaCats.indexOf(c) >= 0, `japanese category "${c}" is selectable`)
 })
-eq(words.getWordsByCategory('en', '日常').length, 30, 'filter by 日常 returns 30')
-eq(words.getWords('en').length, 480, 'getWords ignores unknown lang fallback')
+eq(words.getWordsByCategory('en', '日常').length, 134, 'filter by 日常 returns 134')
+eq(words.getWords('en').length, 800, 'getWords ignores unknown lang fallback')
 
 // ---- audio：日语必须带 le=jap，否则有道只返回 1920 字节静音占位文件 ----
 const audio = require('../utils/audio')
@@ -746,15 +752,22 @@ eq(viMissing.length, 0, '每个越南语条目都有离线音频（缺: ' + viMi
 eq(badMp3(viAudioIds).length, 0, '越南语音频都是真 mp3')
 ok(localAudio.countOf('vi') === viAudioIds.length, 'vietnamese audio index count matches (' + localAudio.countOf('vi') + ')')
 
-// 英语：只预生成句子与对话台词（单词在线发音一直稳，880 个文件塞不进任何一个分包）
+// 英语：800 词 + 800 例句 + 120 句 + 28 台词全部预生成（单词发音不再依赖有道/百度在线源）
 const enAudioIds = []
 sentences.getSentences('en').forEach(function (x) { enAudioIds.push(x.id) })
 sentences.getDialogues('en').forEach(function (d) { d.lines.forEach(function (l) { enAudioIds.push(l.id) }) })
+EN_WORDS.forEach(function (w) {
+  enAudioIds.push(w.id)
+  if (w.example) enAudioIds.push(w.id + '_ex')
+})
+eq(enAudioIds.length, 1748, '英语音频应有 1748 条（120 句 + 28 台词 + 800 词 + 800 例句）')
 const enMissing = enAudioIds.filter(function (id) { return !localAudio.has(id) })
-eq(enMissing.length, 0, 'every English sentence has bundled audio (missing: ' + enMissing.slice(0, 5).join(',') + ')')
+eq(enMissing.length, 0, 'every English item has bundled audio (missing: ' + enMissing.slice(0, 5).join(',') + ')')
 eq(badMp3(enAudioIds).length, 0, 'English audio files are real mp3')
 const enKb = kbOf(enAudioIds)
-ok(enKb < 1200, 'English audio stays under 1.2MB (actual ' + enKb.toFixed(0) + 'KB)')
+ok(enKb < 14000, 'English audio stays under 14MB (actual ' + enKb.toFixed(0) + 'KB)')
+ok(localAudio.countOf('en') === enAudioIds.length,
+  'English audio index count matches (' + localAudio.countOf('en') + ' vs ' + enAudioIds.length + ')')
 
 // 代码包内的 mp3 真机播不了 —— 实录报错：
 //   [InnerAudio] operateAudio fail: errMsg="operateAudio:fail:access denied, appId=wx..."
@@ -906,11 +919,12 @@ eq(storageMod.getNewWords('en', 5, '不存在的分类').length, 0, 'unknown cat
 // 不排序时新用户第一天拿到的是 abandon/adjust/accommodate 这类低频难词；
 // 排序后第一个应该是 keep（COCA 156）这种真正的高频词。
 const wordRank = require('../utils/word-rank')
-ok(wordRank.size > 400, 'word rank table covers most english words')
+ok(wordRank.size >= 700, 'word rank table covers most english words')
 eq(wordRank.rankOf('en_211'), 156, 'rank of "keep" comes from ECDICT frq')
 eq(wordRank.rankOf('ja_001'), Infinity, 'japanese words have no rank (sort last)')
 const sortedFresh = storageMod.getNewWords('en', 8)
-eq(sortedFresh[0].word, 'keep', 'first new word is the most frequent one')
+// 扩到 800 词后，新加入的高频词 even(COCA 107) 比 keep(156) 更常用，排到了第一位
+eq(sortedFresh[0].word, 'even', 'first new word is the most frequent one')
 let rankAscending = true
 for (let i = 1; i < sortedFresh.length; i++) {
   if (wordRank.rankOf(sortedFresh[i - 1].id) > wordRank.rankOf(sortedFresh[i].id)) rankAscending = false
@@ -1299,7 +1313,7 @@ async function runExtraTests() {
   let o7 = null
   od.checkUpdate(function (r) { o7 = r }, { force: true })
   eq(o7 && o7.updated, true, '在线版本更新成功')
-  eq(words.getWords('en').length, 1, '内置 480 词被在线词库覆盖')
+  eq(words.getWords('en').length, 1, '内置 800 词被在线词库覆盖')
   eq(words.getWords('en')[0].word, 'zebra-online', '取到的就是在线的词')
   eq(words.getWords('ja').length, 110, '没覆盖的语种仍用内置词库')
   ok(words.getExamCategories('en').some(function (c) { return c.name === '日常' }), '在线词的分类也能被分类列表看到')
@@ -1309,7 +1323,7 @@ async function runExtraTests() {
   let o8 = null
   od.checkUpdate(function (r) { o8 = r }, { force: true })
   eq(o8 && o8.updated, true, '空覆盖层版本也能更新')
-  eq(words.getWords('en').length, 480, '空覆盖层回落到内置词库')
+  eq(words.getWords('en').length, 800, '空覆盖层回落到内置词库')
 
   // 6 小时节流：别每次启动都为「比一个版本号」白拉 134KB
   const realNow = Date.now
@@ -1365,7 +1379,7 @@ async function runExtraTests() {
     words: shipped.words, sentences: shipped.sentences, dialogues: shipped.dialogues
   })).digest('hex').slice(0, 13)
   eq(fp, shipped.version, '指纹与内容一致（改词库才变版本，重复部署不会让用户白拉）')
-  eq(shipped.words.en.length, 480, '发布包英语 480 词')
+  eq(shipped.words.en.length, 800, '发布包英语 800 词')
   eq(shipped.words.ja.length, 110, '发布包日语 110 词')
   eq(shipped.sentences.en.length, 120, '发布包英语 120 句')
   eq(shipped.sentences.ja.length, 100, '发布包日语 100 句')
@@ -1429,7 +1443,7 @@ async function runExtraTests() {
 
       // 分类过滤在 O(n) 过滤版里不能丢
       const fin = storage.getNewWords('en', 100, '财务')
-      ok(fin.length === 40, '按分类取新词仍能取满 40 条财务词（实际 ' + fin.length + '）')
+      ok(fin.length === 42, '按分类取新词仍能取满 42 条财务词（实际 ' + fin.length + '）')
       ok(fin.every(w => w.category === '财务'), '分类过滤只出该类词')
 
       // 在线词库换掉整个数组后，排序缓存必须失效（否则按旧顺序出行）

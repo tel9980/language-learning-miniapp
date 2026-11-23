@@ -28,19 +28,16 @@ const REGION = {
   vi: { dir: 'audio-src/vi', remote: 'https://yb.qy663.de5.net/audio-vi/' }
 }
 
-// 每个语种要合成的素材 id（英语不含单词：单词在线发音一直稳，880 个文件放不下）
+// 每个语种要合成的素材 id（英语现在也含单词和例句：800 词全部预生成离线音频）
 function itemsOf(lang) {
   const ids = []
   s.getSentences(lang).forEach(x => ids.push(x.id))
   s.getDialogues(lang).forEach(d => d.lines.forEach(l => ids.push(l.id)))
-  // 日语单词能靠有道词库发音，但这批音频一样预生成（免得每次都靠网络）；
-  // 越南语单词则完全依赖预生成
-  if (lang === 'ja' || lang === 'vi') {
-    w.getWords(lang).forEach(x => {
-      ids.push(x.id)
-      if (x.example) ids.push(x.id + '_ex')
-    })
-  }
+  // 三个语种的单词都预生成：免得每次发音都靠网络（日语/越南语本来就有，英语这次补齐）
+  w.getWords(lang).forEach(x => {
+    ids.push(x.id)
+    if (x.example) ids.push(x.id + '_ex')
+  })
   return ids
 }
 

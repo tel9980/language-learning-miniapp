@@ -7,8 +7,7 @@ const w = require('../utils/words')
 
 const lang = (process.argv[2] || 'ja').trim()
 const target = process.argv[3] || ('/tmp/' + lang + '_items.json')
-// 英语单词没必要预生成：有道单词发音一直是好的（整句才不稳），
-// 而且 440 词 + 440 例句 = 880 个文件约 6MB，主包根本放不下。
+// 英语单词也预生成发音（800 词 + 800 例句），这样首句秒开、不依赖有道/百度在线源。
 const skipWords = process.argv.indexOf('--no-words') > 0
 
 const out = { sentences: [], dialogues: [], words: [] }

@@ -25,6 +25,10 @@
 .divider { width: 80rpx; height: 4rpx; background: #EEF1FB; margin: 32rpx 0; border-radius: 4rpx; }
 .example { font-size: 28rpx; text-align: center; color: #1F2733; line-height: 1.6; }
 .example-cn { font-size: 24rpx; text-align: center; color: #8A94A6; margin-top: 12rpx; line-height: 1.6; }
+.extra { margin-top: 20rpx; width: 100%; }
+.col { font-size: 22rpx; text-align: center; color: #4A6CF7; background: #EEF2FF; border-radius: 999rpx; padding: 6rpx 0; }
+.ex2 { font-size: 24rpx; text-align: center; color: #3A4250; line-height: 1.5; margin-top: 16rpx; }
+.ex2-cn { font-size: 22rpx; text-align: center; color: #8A94A6; line-height: 1.5; margin-top: 6rpx; }
 .speak-btn { text-align: center; color: #4A6CF7; font-size: 28rpx; padding: 24rpx; }
 .rate-area { margin-top: 12rpx; }
 .rate-title { text-align: center; font-size: 26rpx; color: #8A94A6; margin-bottom: 20rpx; }
@@ -49,3 +53,11 @@
   padding: 10rpx 28rpx;
   border-radius: 999rpx;
 }
+
+/* 深色模式：卡片背面与新增的搭配/第二例句 */
+.theme-dark .back { background: #262D3D; color: #E8EAF0; }
+.theme-dark .example { color: #E8EAF0; }
+.theme-dark .divider { background: #3B455C; }
+.theme-dark .col { background: #333C50; color: #8FA8FF; }
+.theme-dark .ex2 { color: #C9D2E3; }
+.theme-dark .ex2-cn { color: #9AA3B5; }

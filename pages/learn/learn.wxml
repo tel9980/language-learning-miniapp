@@ -27,6 +27,11 @@
         <view class="divider"></view>
         <view class="example">{{current.example}}</view>
         <view class="example-cn">{{current.exampleCn}}</view>
+        <view class="extra" wx:if="{{current.ex2 || current.col}}">
+          <view class="col" wx:if="{{current.col}}">搭配 · {{current.col}}</view>
+          <view class="ex2" wx:if="{{current.ex2}}">{{current.ex2}}</view>
+          <view class="ex2-cn" wx:if="{{current.ex2c}}">{{current.ex2c}}</view>
+        </view>
       </view>
     </view>
 
