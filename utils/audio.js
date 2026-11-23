@@ -323,6 +323,11 @@ function speak(text, slow, handlers) {
 
     // 记录「这次播的是缓存文件」，播放失败时好把坏缓存删掉、退回在线重试同一源
     let curCached = ''
+    // 当前源 + 是否已经用「直连 URL」重试过：下载下来的临时文件播不了时（真机偶发、
+    // 开发者工具常见 operateAudio:fail:access denied），同一个源改成直接流播再试一次，
+    // 而不是白白丢掉这个源跳到下一个——否则百度+有道全都「下载成功但播不出」，直接报错。
+    let curSource = null
+    let triedDirect = false
 
     // 加载态 + 下载看门狗：同一次播放里只保存一份计时器，
     // 换源/停止/销毁都要把它清掉，否则迟到的回调会把已经切走的播放又拉起来。
@@ -352,6 +357,15 @@ function speak(text, slow, handlers) {
           ttsCache.forget(curCached)
           curCached = ''
           i = Math.max(0, i - 1)   // 退回上一个源，改成在线下载重试
+          next()
+          return
+        }
+        // 下载下来的临时文件播不了：同一个源改成直连 URL 再试一次
+        if (curSource && !triedDirect) {
+          triedDirect = true
+          console.warn('[audio] 临时文件播放失败，改为直连这个源 ' + curSource.id)
+          player.play(curSource.url)
+          return
         }
         next()
       }
@@ -395,6 +409,8 @@ function speak(text, slow, handlers) {
     // 这段时间用户看到的是「点了没反应」。这里挂一个看门狗，超时就放弃当前源直接降级，
     // 同时把「正在加载」告诉页面（handlers.onLoading），至少让人知道它在等。
     function playSource(s) {
+      curSource = s
+      triedDirect = false
       const cached = ttsCache.fileOf(s.url)
       if (cached) {
         curCached = s.url
@@ -451,6 +467,7 @@ function speak(text, slow, handlers) {
     function directThenNext(s) {
       if (s && !s._direct) {
         s._direct = true
+        triedDirect = true          // 已经在直连了，onError 不用再重试同一个源
         curCached = ''
         setLoading(false)
         console.warn('[audio] 下载失败/超时，改为直接流播', s.id)

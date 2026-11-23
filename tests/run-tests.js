@@ -1810,6 +1810,12 @@ async function runTailTests() {
   ok(/let triedStream = false/.test(audioSrc), '本地播放失败可以流播兜一次')
   ok(/if \(!triedStream && !destroyed\) \{[\s\S]{0,120}start\(url, 'url'\)/.test(audioSrc), '本地文件播不了就改成直接流播（工具里也能出声）')
   ok(/ttsCache\.fileOf\(url\) === src/.test(audioSrc), '只丢真正坏掉的那条缓存')
+  // 在线源也是「先下载再播」：下载成功但临时文件播不出来时，不能白白丢掉这个源，
+  // 要用同一个 URL 直接流播再试一次（否则百度+有道全跳过，直接报「读不出来」）。
+  ok(/let triedDirect = false/.test(audioSrc), '在线源记录是否已直连重试')
+  ok(/临时文件播放失败，改为直连这个源/.test(audioSrc), '临时文件播不了就直连同一个源重试')
+  ok(/if \(curSource && !triedDirect\) \{[\s\S]{0,120}player\.play\(curSource\.url\)/.test(audioSrc), '直连重试用的是同一个源的 URL')
+  ok(/directThenNext[\s\S]{0,200}triedDirect = true/.test(audioSrc), '已经在直连就不再重复重试')
   const speakSrc = read('pages/speak/speak.js')
   ok(/audio\.prefetch\(next\.id\)/.test(speakSrc), '口语页切词后预取下一条')
   ok(/audio\.prefetch\(list\[1\]\.id\)/.test(read('pages/learn/learn.js')), '学习页开局预取第二张')
