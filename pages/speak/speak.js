@@ -499,8 +499,26 @@ Page({
     return p
   },
 
+  // 第一次要录音时先请用户看《声纹授权协议》。
+  // 用 modal 说明「要采集什么」，再把用户送到独立协议页——审核要的是「独立协议」，
+  // 弹窗只做前情提示，真正的同意动作在那一页完成。
+  askVoiceprint() {
+    wx.showModal({
+      title: '录音前需要你的同意',
+      content: '跟读功能会采集你的声音，用于打分和本地回放。详情见《声纹授权协议》，同意后才会开始录音。',
+      confirmText: '看协议',
+      cancelText: '先不用',
+      success(res) {
+        if (res.confirm) wx.navigateTo({ url: '/pages/voiceprint/voiceprint?from=record' })
+      }
+    })
+  },
+
   toggleRecord() {
     if (this.data.recording) { this.stopRecord(); return }
+    // 声纹授权：微信审核要求「取得用户授权同意后，才能获取用户声纹信息」。
+    // 所以必须卡在「真正开录音之前」这一行，而不是进页面时弹窗（那属于强制授权）。
+    if (!storage.getVoiceprintAgreed()) { this.askVoiceprint(); return }
     // 智聆后台对同一个小程序的调用有频率限制（错误码 20802），用户连点两下很容易踩到，
     // 而且报出来的是一句看不懂的英文错误。这里先拦一道：两次评测之间至少隔 2 秒。
     if (this._evalAvailable(this.data.current) && this._lastEvalAt && Date.now() - this._lastEvalAt < 2000) {

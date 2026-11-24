@@ -1,6 +1,6 @@
 <view class="container {{themeClass}}">
   <view class="header card">
-    <view class="title">👨‍👩‍👧‍👦 家人档案</view>
+    <view class="title">👪 家人档案</view>
     <view class="muted">每人一份独立进度，互不干扰</view>
   </view>
 

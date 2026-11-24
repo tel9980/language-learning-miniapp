@@ -1,0 +1,61 @@
+<view class="page">
+  <view class="doc">
+    <view class="doc-title">声纹授权协议</view>
+    <view class="doc-sub">关于你的录音，我们做什么、不做什么</view>
+
+    <view class="block">
+      <view class="h">一、我们处理的是什么</view>
+      <view class="p">你在「口语练习」页主动点击「点此开始录音跟读」之后，小程序会采集你的一段人声录音（最长 60 秒）。这就是本协议所说的「声纹信息」——它只有你的声音本身，不包含姓名、手机号、位置等身份信息。</view>
+    </view>
+
+    <view class="block">
+      <view class="h">二、为什么要采集</view>
+      <view class="p">只有一个目的：给这句话打分、让你听自己的发音。具体三件事，可以只用其中一部分：</view>
+      <view class="li"><text class="n">1</text><text class="t"><text class="b">客观评分</text>（默认开启）把录音交给腾讯云「智聆口语评测」，换回发音分和逐词对错。</text></view>
+      <view class="li"><text class="n">2</text><text class="t"><text class="b">本地回放</text>（默认开启）录音存在你手机的微信本地空间，供你回听、和标准音对比。</text></view>
+      <view class="li"><text class="n">3</text><text class="t"><text class="b">AI 听音</text>（默认关闭，需你单独点同意）把录音上传到我们的服务器转发给 Google Gemini，换回一句文字点评。</text></view>
+    </view>
+
+    <view class="block">
+      <view class="h">三、存在哪里、留多久</view>
+      <view class="li"><text class="n">·</text><text class="t">评分用的那份：随请求发给腾讯云智聆，评分完成后不在我们这边保存。本项目没有自己的数据库，也没有任何服务器留存录音。</text></view>
+      <view class="li"><text class="n">·</text><text class="t">本地回放的那份：只存在你这台手机的微信本地空间，最多保留最近 30 条，超出后自动删最旧的。换手机、清缓存、卸载小程序都会一起消失。</text></view>
+      <view class="li"><text class="n">·</text><text class="t">AI 听音的那份：随请求发出，不落盘、不缓存，用完即弃。</text></view>
+    </view>
+
+    <view class="block">
+      <view class="h">四、不会做的事</view>
+      <view class="li"><text class="n">·</text><text class="t">不拿你的录音做声纹识别、不做身份认证、不判断「是不是同一个人」。</text></view>
+      <view class="li"><text class="n">·</text><text class="t">不把你的录音用于训练任何模型。</text></view>
+      <view class="li"><text class="n">·</text><text class="t">不卖、不分享给任何第三方，除了上面写明的腾讯云智聆与 Google Gemini（且只在你开启对应功能时）。</text></view>
+    </view>
+
+    <view class="block">
+      <view class="h">五、你的权利</view>
+      <view class="li"><text class="n">·</text><text class="t">随时可以撤回授权，撤回后不再采集。已经存在本机的录音可以一键删除。</text></view>
+      <view class="li"><text class="n">·</text><text class="t">撤回不影响你使用学单词、查词、听写、测验等不需要麦克风的功能。</text></view>
+    </view>
+  </view>
+
+  <view class="status {{agreed?'on':''}}">
+    <block wx:if="{{agreed}}">
+      <view class="status-main">✅ 你已同意本协议{{agreedAt?('（'+agreedAt+'）'):''}}</view>
+      <view class="status-sub">录音功能可以正常使用</view>
+    </block>
+    <block wx:else>
+      <view class="status-main">尚未同意</view>
+      <view class="status-sub">同意后才能录音；不同意也可以继续用其它功能</view>
+    </block>
+  </view>
+
+  <block wx:if="{{!agreed}}">
+    <view class="btn primary" bindtap="agree">同意并开始录音</view>
+    <view class="btn ghost" bindtap="revoke">暂不同意</view>
+  </block>
+  <block wx:else>
+    <view class="btn ghost" bindtap="revoke">撤回授权</view>
+    <view class="btn ghost danger" bindtap="deleteRecordings">删除全部录音</view>
+  </block>
+
+  <view class="foot">本协议自你点击同意时生效。项目开源，全部代码可在 GitHub 上查看，上面写的每一句都能在源码里对上。</view>
+</view>

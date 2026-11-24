@@ -128,6 +128,11 @@
       <view class="setting-value">立即检查 ›</view>
     </view>
 
+    <view class="setting-row" bindtap="openVoiceprint">
+      <view class="setting-label">🎙 录音与声纹授权</view>
+      <view class="setting-value">{{voiceprintAgreed?'已同意 · 查看':'未同意 · 查看'}} ›</view>
+    </view>
+
     <view class="setting-row" bindtap="toggleFeedback">
       <view class="setting-label">📳 触感反馈</view>
       <view class="switch {{feedbackEnabled?'on':''}}"><view class="knob"></view></view>

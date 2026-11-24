@@ -120,7 +120,7 @@
   </view>
 
   <view class="family-section">
-    <view class="section-label">👨‍👩‍👧‍👦 家人朋友</view>
+    <view class="section-label">👪 家人朋友</view>
     <view class="entry card" bindtap="goFamily">
       <view class="entry-icon family">🏆</view>
       <view class="entry-body">

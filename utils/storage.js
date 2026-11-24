@@ -26,7 +26,7 @@ function defaults() {
   return {
     progress: {},
     stats: { totalLearned: 0, totalReviews: 0, totalCorrect: 0, streak: 0, lastActive: '', firstDay: '' },
-    settings: { lang: 'en', dailyGoal: 20, feedbackEnabled: true, guideSeen: false, aiEvalAgreed: false },
+    settings: { lang: 'en', dailyGoal: 20, feedbackEnabled: true, guideSeen: false, aiEvalAgreed: false, voiceprintAgreed: false, voiceprintAgreedAt: '' },
     daily: {},
     custom: [],
     theme: { fontScale: 1, darkMode: false }
@@ -275,6 +275,15 @@ function setFeedbackEnabled(v) { const s = getSettings(); s.feedbackEnabled = !!
 function setGuideSeen(v) { const s = getSettings(); s.guideSeen = !!v; write(KEY_SETTINGS, s) }
 // AI 听音评测需要把录音上传，必须用户亲口同意一次才记下来（问过一次就不再问）
 function setAiEvalAgreed(v) { const s = getSettings(); s.aiEvalAgreed = !!v; write(KEY_SETTINGS, s) }
+// 声纹授权：微信审核要求「独立的《声纹授权协议》+ 取得用户授权同意后才能采集」。
+// 同意时间一起记下来（审核方可能要看「何时取得同意」），撤回时清空。
+function getVoiceprintAgreed() { return !!getSettings().voiceprintAgreed }
+function setVoiceprintAgreed(v) {
+  const s = getSettings()
+  s.voiceprintAgreed = !!v
+  s.voiceprintAgreedAt = v ? todayKey() : ''
+  write(KEY_SETTINGS, s)
+}
 function setLearnCat(cat) { const s = getSettings(); s.learnCat = cat || ''; write(KEY_SETTINGS, s) }
 
 // 无障碍主题
@@ -491,7 +500,7 @@ function importData(data) {
 
 module.exports = {
   init, todayKey, getSettings, setLang, getCurrentLang, setDailyGoal,
-  setFeedbackEnabled, setGuideSeen, setLearnCat, setAiEvalAgreed, getTheme, setFontScale, setDarkMode,
+  setFeedbackEnabled, setGuideSeen, setLearnCat, setAiEvalAgreed, getVoiceprintAgreed, setVoiceprintAgreed, getTheme, setFontScale, setDarkMode,
   getCustomItems, addCustomItems, removeCustomItem,
   getProgress, getStats, getDaily, getDueWords, getNewWords, getToday,
   review, quizAnswer, getMasteredCount, INTERVALS,

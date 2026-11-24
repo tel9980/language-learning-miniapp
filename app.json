@@ -15,6 +15,7 @@
     "pages/family-recordings/family-recordings",
     "pages/share/share",
     "pages/reminder/reminder",
+    "pages/voiceprint/voiceprint",
     "pages/today/today"
   ],
   "window": {

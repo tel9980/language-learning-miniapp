@@ -1,0 +1,44 @@
+.page { padding: 24rpx 24rpx 60rpx; }
+
+.doc { background: #fff; border-radius: 20rpx; padding: 32rpx 28rpx; margin-bottom: 24rpx; }
+.doc-title { font-size: 38rpx; font-weight: 700; color: #1F2430; margin-bottom: 8rpx; }
+.doc-sub { font-size: 24rpx; color: #8A94A6; margin-bottom: 28rpx; }
+
+.block { margin-bottom: 30rpx; }
+.block:last-child { margin-bottom: 0; }
+.h { font-size: 29rpx; font-weight: 600; color: #1F2430; margin-bottom: 12rpx; }
+.p { font-size: 26rpx; color: #4A5265; line-height: 1.75; }
+
+.li { display: flex; margin-top: 14rpx; }
+.li .n { flex: none; width: 32rpx; font-size: 26rpx; color: #4A6CF7; line-height: 1.75; }
+.li .t { flex: 1; font-size: 26rpx; color: #4A5265; line-height: 1.75; }
+.li .b { font-weight: 600; color: #1F2430; }
+
+.status { background: #F4F6FB; border-radius: 16rpx; padding: 24rpx 28rpx; margin-bottom: 24rpx; }
+.status.on { background: #EEF7F0; }
+.status-main { font-size: 27rpx; color: #1F2430; font-weight: 600; margin-bottom: 6rpx; }
+.status.on .status-main { color: #2E8B57; }
+.status-sub { font-size: 24rpx; color: #8A94A6; line-height: 1.6; }
+
+.btn { height: 92rpx; line-height: 92rpx; text-align: center; border-radius: 46rpx; font-size: 30rpx; margin-bottom: 20rpx; }
+.btn.primary { background: #4A6CF7; color: #fff; font-weight: 600; box-shadow: 0 8rpx 20rpx rgba(74,108,247,.28); }
+.btn.ghost { background: #fff; color: #4A5265; border: 2rpx solid #E2E7F0; }
+.btn.ghost.danger { color: #E45C5C; border-color: #F5D5D5; }
+
+.foot { font-size: 22rpx; color: #A8B0C0; line-height: 1.7; padding: 8rpx 12rpx; }
+
+/* 深色模式 */
+.theme-dark .doc { background: #262D3D; }
+.theme-dark .doc-title { color: #E8ECF5; }
+.theme-dark .doc-sub { color: #8B94A8; }
+.theme-dark .h { color: #E8ECF5; }
+.theme-dark .p { color: #B9C2D4; }
+.theme-dark .li .t { color: #B9C2D4; }
+.theme-dark .li .b { color: #E8ECF5; }
+.theme-dark .status { background: #2E3648; }
+.theme-dark .status.on { background: #24382C; }
+.theme-dark .status-main { color: #E8ECF5; }
+.theme-dark .status.on .status-main { color: #6FCF97; }
+.theme-dark .status-sub { color: #8B94A8; }
+.theme-dark .btn.ghost { background: #262D3D; color: #B9C2D4; border-color: #3A4356; }
+.theme-dark .foot { color: #6C7488; }

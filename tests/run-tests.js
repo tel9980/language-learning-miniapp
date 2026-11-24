@@ -1856,4 +1856,45 @@ async function runTailTests() {
   ok(/cp \.\.\/data\.json data\.json/.test(read('deploy/cf/deploy.sh')), 'deploy.sh 发布前复制一份')
   ok(/cp deploy\/data\.json deploy\/cf\/data\.json/.test(read('.github/workflows/ci.yml')), 'CI 发布前复制一份')
   ok(/git diff --exit-code deploy\/data\.json\n/.test(read('.github/workflows/ci.yml')), 'CI 只校验仓库里那份 data.json')
+
+  // J. 声纹授权：审核要求「独立协议 + 取得同意后才能采集」
+  // 卡点必须在 toggleRecord 里、且在真正开录音之前；进页面就弹窗属于强制授权，会被驳。
+  const speakForVp = read('pages/speak/speak.js')
+  ok(/if \(!storage\.getVoiceprintAgreed\(\)\) \{ this\.askVoiceprint\(\); return \}/.test(speakForVp),
+    '未同意声纹授权时不开始录音')
+  const vpIdx = speakForVp.indexOf('getVoiceprintAgreed')
+  const recIdx = speakForVp.indexOf('createEvaluator')
+  ok(vpIdx > 0 && recIdx > 0 && vpIdx < recIdx, '授权检查在评测/录音之前')
+  ok(/pages\/voiceprint\/voiceprint\?from=record/.test(speakForVp), '未同意时引导到独立协议页')
+  ok(!/onShow[\s\S]{0,400}askVoiceprint/.test(speakForVp), '不在进页面时强制弹窗')
+
+  // 协议页本身要能同意、撤回、删录音
+  const vpJs = read('pages/voiceprint/voiceprint.js')
+  ok(/storage\.setVoiceprintAgreed\(true\)/.test(vpJs), '协议页能记录同意')
+  ok(/storage\.setVoiceprintAgreed\(false\)/.test(vpJs), '协议页能撤回授权')
+  ok(/recordings\.clear\(\)/.test(vpJs), '协议页能一键删除本地录音')
+  const vpXml = read('pages/voiceprint/voiceprint.wxml')
+  ok(/bindtap="agree"/.test(vpXml) && /bindtap="revoke"/.test(vpXml), 'wxml 上有同意与撤回按钮')
+  // 协议正文必须真的写清「不做什么」，不能只是一句「我们会保护你的隐私」
+  ok(/做声纹识别/.test(vpXml), '协议写明不做声纹识别')
+  ok(/不用于训练任何模型|不把你的录音用于训练/.test(vpXml), '协议写明不训练模型')
+  ok(/腾讯云|智聆/.test(vpXml), '协议写明录音会发给腾讯云智聆')
+  ok(/30 条/.test(vpXml), '协议写明本地最多保留 30 条')
+
+  // 页面要注册进 app.json，否则真机点进去是空白
+  const appJson = JSON.parse(read('app.json'))
+  ok(appJson.pages.indexOf('pages/voiceprint/voiceprint') >= 0, '协议页已注册进 app.json')
+  // 统计页要有常驻入口（审核要求「随时可查看、可撤回」）
+  ok(/bindtap="openVoiceprint"/.test(read('pages/stats/stats.wxml')), '统计页有协议入口')
+  ok(/录音与声纹授权/.test(read('pages/stats/stats.wxml')), '入口文案写明声纹授权')
+
+  // 存储层：同意状态 + 同意日期都要落盘，撤回时清空日期
+  const stVp = require('../utils/storage')
+  stVp.init()
+  stVp.setVoiceprintAgreed(true)
+  ok(stVp.getVoiceprintAgreed() === true, '同意状态能读回')
+  ok(/^\d{4}-\d{2}-\d{2}$/.test(stVp.getSettings().voiceprintAgreedAt), '同意时记下日期')
+  stVp.setVoiceprintAgreed(false)
+  ok(stVp.getVoiceprintAgreed() === false, '撤回后状态为未同意')
+  eq(stVp.getSettings().voiceprintAgreedAt, '', '撤回后清空同意日期')
 }

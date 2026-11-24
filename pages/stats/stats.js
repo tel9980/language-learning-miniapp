@@ -17,7 +17,7 @@ Page({
     stats: {}, mastered: 0, accuracy: 0, dailyGoal: 20,
     levels: [], days: [], speak: {},
     calendar: [], unlockedCount: 0, badges: [], shareTitle: '',
-    feedbackEnabled: true, fontScale: 1, darkMode: false, ttsCacheKb: 0
+    feedbackEnabled: true, fontScale: 1, darkMode: false, ttsCacheKb: 0, voiceprintAgreed: false
   },
   onShow() {
     this.syncTheme()
@@ -106,7 +106,8 @@ Page({
       calendar: cal, badges, unlockedCount, shareTitle: shareTitle,
       mastered: mastered,
       dailyGoal: settings.dailyGoal || 20,
-      feedbackEnabled: settings.feedbackEnabled !== false
+      feedbackEnabled: settings.feedbackEnabled !== false,
+      voiceprintAgreed: !!settings.voiceprintAgreed
     }, () => { this.drawChart(); this.drawFluencyChart() })
   },
   // 设备像素比只取一次：wx.getSystemInfoSync 已废弃，且每次重画都调一次是浪费。
@@ -335,6 +336,11 @@ Page({
       }
       wx.showToast({ title: '已经是最新版本', icon: 'success' })
     }, { force: true })
+  },
+
+  // 声纹授权入口：协议必须「随时可查看、可撤回」，所以放在使用设置里常驻
+  openVoiceprint() {
+    wx.navigateTo({ url: '/pages/voiceprint/voiceprint' })
   },
 
   clearTtsCache() {
