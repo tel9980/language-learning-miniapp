@@ -25,6 +25,8 @@ VOICES = {
     'en': 'en-US-JennyNeural',
     # 越南语只有这两个神经音色（HoaiMy 女 / NamMinh 男）
     'vi': 'vi-VN-HoaiMyNeural',
+    # 韩语三个神经音色：SunHi 女 / InJoon 男 / Hyunsu 男（用女声，与日/越一致）
+    'ko': 'ko-KR-SunHiNeural',
 }
 LIMIT = 1                      # 并发数，太大容易被限流（>1 会大量返回 No audio was received）
 TARGET = ('-ar', '16000', '-ac', '1', '-b:a', '16k')

@@ -33,7 +33,8 @@ function getEvalPlugin() {
 }
 
 // 智聆目前只提供中英文评测：日语、越南语都不支持 → 走自评
-const NO_EVAL_LANGS = { ja: 1, vi: 1 }
+// 智聆只支持中英文：日语、越南语、韩语都拿不到客观分，只能自评
+const NO_EVAL_LANGS = { ja: 1, vi: 1, ko: 1 }
 function supportsLang(lang) {
   return !NO_EVAL_LANGS[lang]
 }
@@ -42,10 +43,13 @@ function supportsLang(lang) {
 const KANA_RE = /[\u3040-\u309f\u30a0-\u30ff]/
 // 越南语特有的字母（ă â đ ê ô ơ ư）与声调符号：智聆不认识越南语，送进去只会白跑一次请求
 const VI_RE = /[ăâđêôơưĂÂĐÊÔƠƯ]|[àáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]/i
+// 韩语谚文：智聆不认识韩语，送进去只会白跑一次请求
+const HANGUL_RE = /[\uac00-\ud7a3\u1100-\u11ff\u3130-\u318f]/
 function canEvaluateText(text) {
   const t = String(text || '')
   if (KANA_RE.test(t)) return false
   if (VI_RE.test(t)) return false
+  if (HANGUL_RE.test(t)) return false
   return getEvalPlugin() != null
 }
 

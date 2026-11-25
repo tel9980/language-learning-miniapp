@@ -49,11 +49,12 @@ jobs:
           fi
           node deploy/export-data.js
           cp deploy/data.json deploy/cf/data.json
-          mkdir -p deploy/cf/audio deploy/cf/audio-en deploy/cf/audio-vi
+          mkdir -p deploy/cf/audio deploy/cf/audio-en deploy/cf/audio-vi deploy/cf/audio-ko
           cp audio-src/ja/*.mp3 deploy/cf/audio/
           cp audio-src/en/*.mp3 deploy/cf/audio-en/
           cp audio-src/vi/*.mp3 deploy/cf/audio-vi/
-          echo "CDN 音频 日语 $(ls deploy/cf/audio | wc -l) 个 / 英语 $(ls deploy/cf/audio-en | wc -l) 个 / 越南语 $(ls deploy/cf/audio-vi | wc -l) 个"
+          cp audio-src/ko/*.mp3 deploy/cf/audio-ko/
+          echo "CDN 音频 日语 $(ls deploy/cf/audio | wc -l) 个 / 英语 $(ls deploy/cf/audio-en | wc -l) 个 / 越南语 $(ls deploy/cf/audio-vi | wc -l) 个 / 韩语 $(ls deploy/cf/audio-ko | wc -l) 个"
           npx --yes wrangler@3 pages deploy deploy/cf --project-name yuban-data --branch main --commit-dirty=true
           node -e '
             fetch("https://yb.qy663.de5.net/data.json", { headers: { "User-Agent": "ci-check" } })

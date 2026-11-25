@@ -12,17 +12,20 @@ const payload = {
   words: {
     en: words.WORDS.en,
     ja: words.WORDS.ja,
-    vi: words.WORDS.vi
+    vi: words.WORDS.vi,
+    ko: words.WORDS.ko
   },
   sentences: {
     en: sentences.SENTENCES.en,
     ja: sentences.SENTENCES.ja,
-    vi: sentences.SENTENCES.vi
+    vi: sentences.SENTENCES.vi,
+    ko: sentences.SENTENCES.ko
   },
   dialogues: {
     en: sentences.DIALOGUES.en,
     ja: sentences.DIALOGUES.ja,
-    vi: sentences.DIALOGUES.vi
+    vi: sentences.DIALOGUES.vi,
+    ko: sentences.DIALOGUES.ko
   }
 }
 

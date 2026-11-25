@@ -234,6 +234,52 @@ const REGION = {
       'vs063 vs064 vs065 vs066 vs067 vs068 vs069 vs070 vs071 vs072 vs073 vs074 vs075 vs076 vs077 vs078 ' +
       'vs079 vs080 vs081 vs082 vs083 vs084 vs085 vs086 vs087 vs088 vs089 vs090 vs091 vs092 vs093 vs094 ' +
       'vs095 vs096 vs097 vs098 vs099 vs100'
+  },
+  ko: {
+    remote: 'https://yb.qy663.de5.net/audio-ko/',
+    count: 497,
+    bytes: 3366304,
+    ids: 'kd001_1 kd001_2 kd001_3 kd001_4 kd001_5 kd002_1 kd002_2 kd002_3 kd002_4 kd003_1 kd003_2 kd003_3 ' +
+      'kd003_4 kd003_5 kd004_1 kd004_2 kd004_3 kd004_4 kd004_5 kd005_1 kd005_2 kd005_3 kd005_4 kd006_1 ' +
+      'kd006_2 kd006_3 kd006_4 kd007_1 kd007_2 kd007_3 kd007_4 kd007_5 kd008_1 kd008_2 kd008_3 kd008_4 ' +
+      'kd009_1 kd009_2 kd009_3 kd009_4 kd009_5 kd009_6 kd010_1 kd010_2 kd010_3 kd010_4 kd010_5 ko_001 ' +
+      'ko_001_ex ko_002 ko_002_ex ko_003 ko_003_ex ko_004 ko_004_ex ko_005 ko_005_ex ko_006 ko_006_ex ' +
+      'ko_007 ko_007_ex ko_008 ko_008_ex ko_009 ko_009_ex ko_010 ko_010_ex ko_011 ko_011_ex ko_012 ' +
+      'ko_012_ex ko_013 ko_013_ex ko_014 ko_014_ex ko_015 ko_015_ex ko_016 ko_016_ex ko_017 ko_017_ex ' +
+      'ko_018 ko_018_ex ko_019 ko_019_ex ko_020 ko_020_ex ko_021 ko_021_ex ko_022 ko_022_ex ko_023 ' +
+      'ko_023_ex ko_024 ko_024_ex ko_025 ko_025_ex ko_026 ko_026_ex ko_027 ko_027_ex ko_028 ko_028_ex ' +
+      'ko_029 ko_029_ex ko_030 ko_030_ex ko_031 ko_031_ex ko_032 ko_032_ex ko_033 ko_033_ex ko_034 ' +
+      'ko_034_ex ko_035 ko_035_ex ko_036 ko_036_ex ko_037 ko_037_ex ko_038 ko_038_ex ko_039 ko_039_ex ' +
+      'ko_040 ko_040_ex ko_041 ko_041_ex ko_042 ko_042_ex ko_043 ko_043_ex ko_044 ko_044_ex ko_045 ' +
+      'ko_045_ex ko_046 ko_046_ex ko_047 ko_047_ex ko_048 ko_048_ex ko_049 ko_049_ex ko_050 ko_050_ex ' +
+      'ko_051 ko_051_ex ko_052 ko_052_ex ko_053 ko_053_ex ko_054 ko_054_ex ko_055 ko_055_ex ko_056 ' +
+      'ko_056_ex ko_057 ko_057_ex ko_058 ko_058_ex ko_059 ko_059_ex ko_060 ko_060_ex ko_061 ko_061_ex ' +
+      'ko_062 ko_062_ex ko_063 ko_063_ex ko_064 ko_064_ex ko_065 ko_065_ex ko_066 ko_066_ex ko_067 ' +
+      'ko_067_ex ko_068 ko_068_ex ko_069 ko_069_ex ko_070 ko_070_ex ko_071 ko_071_ex ko_072 ko_072_ex ' +
+      'ko_073 ko_073_ex ko_074 ko_074_ex ko_075 ko_075_ex ko_076 ko_076_ex ko_077 ko_077_ex ko_078 ' +
+      'ko_078_ex ko_079 ko_079_ex ko_080 ko_080_ex ko_081 ko_081_ex ko_082 ko_082_ex ko_083 ko_083_ex ' +
+      'ko_084 ko_084_ex ko_085 ko_085_ex ko_086 ko_086_ex ko_087 ko_087_ex ko_088 ko_088_ex ko_089 ' +
+      'ko_089_ex ko_090 ko_090_ex ko_091 ko_091_ex ko_092 ko_092_ex ko_093 ko_093_ex ko_094 ko_094_ex ' +
+      'ko_095 ko_095_ex ko_096 ko_096_ex ko_097 ko_097_ex ko_098 ko_098_ex ko_099 ko_099_ex ko_100 ' +
+      'ko_100_ex ko_101 ko_101_ex ko_102 ko_102_ex ko_103 ko_103_ex ko_104 ko_104_ex ko_105 ko_105_ex ' +
+      'ko_106 ko_106_ex ko_107 ko_107_ex ko_108 ko_108_ex ko_109 ko_109_ex ko_110 ko_110_ex ko_111 ' +
+      'ko_111_ex ko_112 ko_112_ex ko_113 ko_113_ex ko_114 ko_114_ex ko_115 ko_115_ex ko_116 ko_116_ex ' +
+      'ko_117 ko_117_ex ko_118 ko_118_ex ko_119 ko_119_ex ko_120 ko_120_ex ko_121 ko_121_ex ko_122 ' +
+      'ko_122_ex ko_123 ko_123_ex ko_124 ko_124_ex ko_125 ko_125_ex ko_126 ko_126_ex ko_127 ko_127_ex ' +
+      'ko_128 ko_128_ex ko_129 ko_129_ex ko_130 ko_130_ex ko_131 ko_131_ex ko_132 ko_132_ex ko_133 ' +
+      'ko_133_ex ko_134 ko_134_ex ko_135 ko_135_ex ko_136 ko_136_ex ko_137 ko_137_ex ko_138 ko_138_ex ' +
+      'ko_139 ko_139_ex ko_140 ko_140_ex ko_141 ko_141_ex ko_142 ko_142_ex ko_143 ko_143_ex ko_144 ' +
+      'ko_144_ex ko_145 ko_145_ex ko_146 ko_146_ex ko_147 ko_147_ex ko_148 ko_148_ex ko_149 ko_149_ex ' +
+      'ko_150 ko_150_ex ks001 ks002 ks003 ks004 ks005 ks006 ks007 ks008 ks009 ks010 ks011 ks012 ks013 ks014 ' +
+      'ks015 ks016 ks017 ks018 ks019 ks020 ks021 ks022 ks023 ks024 ks025 ks026 ks027 ks028 ks029 ks030 ' +
+      'ks031 ks032 ks033 ks034 ks035 ks036 ks037 ks038 ks039 ks040 ks041 ks042 ks043 ks044 ks045 ks046 ' +
+      'ks047 ks048 ks049 ks050 ks051 ks052 ks053 ks054 ks055 ks056 ks057 ks058 ks059 ks060 ks061 ks062 ' +
+      'ks063 ks064 ks065 ks066 ks067 ks068 ks069 ks070 ks071 ks072 ks073 ks074 ks075 ks076 ks077 ks078 ' +
+      'ks079 ks080 ks081 ks082 ks083 ks084 ks085 ks086 ks087 ks088 ks089 ks090 ks091 ks092 ks093 ks094 ' +
+      'ks095 ks096 ks097 ks098 ks099 ks100 ks101 ks102 ks103 ks104 ks105 ks106 ks107 ks108 ks109 ks110 ' +
+      'ks111 ks112 ks113 ks114 ks115 ks116 ks117 ks118 ks119 ks120 ks121 ks122 ks123 ks124 ks125 ks126 ' +
+      'ks127 ks128 ks129 ks130 ks131 ks132 ks133 ks134 ks135 ks136 ks137 ks138 ks139 ks140 ks141 ks142 ' +
+      'ks143 ks144 ks145 ks146 ks147 ks148 ks149 ks150'
   }
 }
 

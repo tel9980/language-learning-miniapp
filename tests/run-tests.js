@@ -181,6 +181,23 @@ eq(viDlgIds.length, 44, 'Vietnamese dialogue lines = 44')
 eq(new Set(viDlgIds).size, viDlgIds.length, 'Vietnamese dialogue line ids unique')
 ok(viDlg.every(function (d) { return d.lines.length >= 3 }), 'each Vietnamese dialogue has >= 3 lines')
 
+// ---- 韩语素材（2026-11：150 词 + 150 句 + 10 组对话）----
+const koSent = sentences.getSentences('ko')
+const koDlg = sentences.getDialogues('ko')
+eq(koSent.length, 150, 'Korean sentences = 150')
+eq(koDlg.length, 10, 'Korean dialogues = 10')
+const koSentIds = koSent.map(function (x) { return x.id })
+eq(new Set(koSentIds).size, koSentIds.length, 'Korean sentence ids unique')
+ok(koSent.every(function (x) { return x.text && x.cn && x.scene && x.level }), 'Korean sentences all complete')
+ok(koSent.some(function (x) { return x.level === 'A1' }) && koSent.some(function (x) { return x.level === 'B2' }),
+  'Korean sentences span A1..B2')
+const koDlgIds = []
+koDlg.forEach(function (d) { d.lines.forEach(function (l) { koDlgIds.push(l.id) }) })
+eq(koDlgIds.length, 47, 'Korean dialogue lines = 47')
+eq(new Set(koDlgIds).size, koDlgIds.length, 'Korean dialogue line ids unique')
+ok(koDlg.every(function (d) { return d.lines.length >= 3 }), 'each Korean dialogue has >= 3 lines')
+ok(koSent.every(function (x) { return /[\uac00-\ud7a3]/.test(x.text) }), 'Korean sentences contain Hangul')
+
 // ---- nav（tabBar 跳转必须走 switchTab，且能跨 tab 传意图） ----
 global.wx = global.wx || {}
 let lastSwitch = null, lastNav = null
@@ -252,6 +269,8 @@ eq(sc.countWords(''), 0, 'countWords empty = 0')
 eq(sc.canEvaluate('en'), false, 'no eval plugin in test env')
 eq(sc.canEvaluate('ja'), false, 'ja never uses eval plugin')
 eq(sc.canEvaluate('vi'), false, 'vi never uses eval plugin（智聆只支持中英文）')
+eq(sc.canEvaluate('ko'), false, 'ko never uses eval plugin（智聆只支持中英文）')
+eq(sc.canEvaluateText('안녕하세요'), false, 'korean text is not sent to the eval plugin')
 eq(sc.canEvaluateText('xin chào'), false, 'vietnamese text is not sent to the eval plugin')
 eq(sc.supportsLang('en'), true, 'en supported by eval plugin')
 eq(sc.supportsLang('ja'), false, 'ja unsupported by eval plugin')
@@ -595,10 +614,12 @@ const words = require('../utils/words')
 const EN_WORDS = words.WORDS.en
 const JA_WORDS = words.WORDS.ja
 const VI_WORDS = words.WORDS.vi
+const KO_WORDS = words.WORDS.ko
 eq(EN_WORDS.length, 800, 'english word count = 800')
 eq(JA_WORDS.length, 110, 'japanese word count = 110')
 eq(VI_WORDS.length, 80, 'vietnamese word count = 80')
-const allWords = EN_WORDS.concat(JA_WORDS, VI_WORDS)
+eq(KO_WORDS.length, 150, 'korean word count = 150')
+const allWords = EN_WORDS.concat(JA_WORDS, VI_WORDS, KO_WORDS)
 const idSet = {}
 let dupId = 0
 allWords.forEach(w => { if (idSet[w.id]) dupId++; idSet[w.id] = 1 })
@@ -616,6 +637,7 @@ function dupWordsIn(list) {
 eq(dupWordsIn(EN_WORDS), 0, 'no duplicate english word forms')
 eq(dupWordsIn(JA_WORDS), 0, 'no duplicate japanese word forms')
 eq(dupWordsIn(VI_WORDS), 0, 'no duplicate vietnamese word forms')
+eq(dupWordsIn(KO_WORDS), 0, 'no duplicate korean word forms')
 // 英语 800 词全部带第二例句/译文/常见搭配（词卡背面展示，不作选择题干扰项）
 const enrichFields = ['ex2', 'ex2c', 'col']
 let enrichEmpty = 0
@@ -632,6 +654,16 @@ const viCats = words.getExamCategories('vi').map(c => c.name)
 const enCats = words.getExamCategories('en').map(c => c.name)
 ;['四级', '六级', '考研', '雅思托福', '日常', '情绪', '工作', '科技', '旅行', '健康', '饮食', '社交'].forEach(c => {
   ok(enCats.indexOf(c) >= 0, `category "${c}" is selectable`)
+})
+// 韩语词条也带第二例句/译文/常见搭配（和英语一样丰富词卡）
+let koEnrichEmpty = 0
+KO_WORDS.forEach(w => { enrichFields.forEach(f => { if (!w[f] || !String(w[f]).trim() || String(w[f]).trim().toLowerCase() === 'none') koEnrichEmpty++ }) })
+eq(koEnrichEmpty, 0, 'every korean word has ex2/ex2c/col non-empty')
+ok(KO_WORDS.every(w => w.ex2 !== w.example), '韩语第二例句与第一例句不同')
+ok(KO_WORDS.every(function (w) { return /^[\uac00-\ud7a3]/.test(w.word) }), '韩语词形以谚文开头')
+const koCats = words.getExamCategories('ko').map(c => c.name)
+;['问候', '日常', '家庭', '食物', '数字', '时间', '动词', '形容词', '交通', '购物', '天气', '身体', '学校', '工作', '社交', '旅行', '饮食', '健康'].forEach(c => {
+  ok(koCats.indexOf(c) >= 0, `korean category "${c}" is selectable`)
 })
 const jaCats = words.getExamCategories('ja').map(c => c.name)
 ;['问候', '日常', '食物', '数字', '时间', '动词'].forEach(c => {
@@ -678,7 +710,7 @@ eq(localAudio.remoteFor('dl_d003_1'), 'https://yb.qy663.de5.net/audio-en/d003_1.
 
 // 对话听写（pages/dictation 的 dlg 模式）按「dl_ + 台词 id」取音频，
 // 每条台词都必须能找到音频，否则真机上那一句必然读不出来。
-;['en', 'ja', 'vi'].forEach(function (lg) {
+;['en', 'ja', 'vi', 'ko'].forEach(function (lg) {
   let lines = 0
   let missing = []
   sentences.getDialogues(lg).forEach(function (d) {
@@ -703,7 +735,7 @@ const noAudio = audioIds.filter(function (id) { return !localAudio.has(id) })
 eq(noAudio.length, 0, 'every Japanese item has bundled audio (missing: ' + noAudio.slice(0, 5).join(',') + ')')
 
 // 素材 id → 仓库里的音频文件（audio-src/<语种>/<原始id>.mp3）
-const AUDIO_DIR = { ja: 'audio-src/ja', en: 'audio-src/en', vi: 'audio-src/vi' }
+const AUDIO_DIR = { ja: 'audio-src/ja', en: 'audio-src/en', vi: 'audio-src/vi', ko: 'audio-src/ko' }
 function audioFile(id) {
   const lang = localAudio.langOf(id)
   if (!lang) return ''
@@ -751,6 +783,22 @@ const viMissing = viAudioIds.filter(function (id) { return !localAudio.has(id) }
 eq(viMissing.length, 0, '每个越南语条目都有离线音频（缺: ' + viMissing.slice(0, 5).join(',') + '）')
 eq(badMp3(viAudioIds).length, 0, '越南语音频都是真 mp3')
 ok(localAudio.countOf('vi') === viAudioIds.length, 'vietnamese audio index count matches (' + localAudio.countOf('vi') + ')')
+
+// 韩语：整句没有在线源，单词/例句/句子/台词全部必须预生成（和越南语同等要求）
+eq(localAudio.remoteFor('ks001'), 'https://yb.qy663.de5.net/audio-ko/ks001.mp3', '韩语素材指向 CDN 的 audio-ko 目录')
+eq(localAudio.langOf('kd001_1'), 'ko', 'langOf maps a Korean dialogue line to its region')
+const koAudioIds = []
+koSent.forEach(function (x) { koAudioIds.push(x.id) })
+koDlg.forEach(function (d) { d.lines.forEach(function (l) { koAudioIds.push(l.id) }) })
+KO_WORDS.forEach(function (w) {
+  koAudioIds.push(w.id)
+  if (w.example) koAudioIds.push(w.id + '_ex')
+})
+eq(koAudioIds.length, 497, '韩语音频应有 497 条（150 句 + 47 台词 + 150 词 + 150 例句）')
+const koMissing = koAudioIds.filter(function (id) { return !localAudio.has(id) })
+eq(koMissing.length, 0, '每个韩语条目都有离线音频（缺: ' + koMissing.slice(0, 5).join(',') + '）')
+eq(badMp3(koAudioIds).length, 0, '韩语音频都是真 mp3')
+ok(localAudio.countOf('ko') === koAudioIds.length, 'korean audio index count matches (' + localAudio.countOf('ko') + ')')
 
 // 英语：800 词 + 800 例句 + 120 句 + 28 台词全部预生成（单词发音不再依赖有道/百度在线源）
 const enAudioIds = []
@@ -1805,6 +1853,10 @@ async function runTailTests() {
   ok(/stream\(\)/.test(audioSrc), '下载失败退回流播（不比以前差）')
   ok(/ttsCache\.forget\(url\)/.test(audioSrc), '缓存文件坏了要丢掉，否则这句永远播不出来')
   ok(/prefetch/.test(audioSrc.split('module.exports')[1] || ''), 'prefetch 已导出')
+  ok(/function isKoreanText/.test(audioSrc), 'audio 能识别韩语文本')
+  ok(/isKoreanText\(text\) \? '&le=ko'/.test(audioSrc), '韩语单词发音必须带 le=ko（不带是有道返回的空音）')
+  ok(/isKoreanText\(raw\)\) \{\s*\/\/[\s\S]{0,120}sources = \(words > 2\) \? \[\] : \[yd, ydBackup\]/.test(audioSrc),
+    '韩语整句没有在线源，不撞注定失败的请求')
   // 开发者工具里 operateAudio:fail:access denied 很常见：本地文件（缓存/临时）播不了。
   // 一条坏缓存不该让这个词永远读不出来 —— 丢掉缓存 + 自动流播一次。
   ok(/let triedStream = false/.test(audioSrc), '本地播放失败可以流播兜一次')

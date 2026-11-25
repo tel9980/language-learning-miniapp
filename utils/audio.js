@@ -29,8 +29,10 @@ function needJapaneseVoice(text) {
 }
 function ttsUrl(text, slow, lang) {
   const ja = needJapaneseVoice(text)
+  // 韩语必须带 le=ko：不带的话有道返回的是 0.1 秒的空音（200 但没声音）
+  const le = ja ? '&le=jap' : (isKoreanText(text) ? '&le=ko' : '')
   return 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) +
-    '&type=' + (slow ? 1 : 2) + (ja ? '&le=jap' : '')
+    '&type=' + (slow ? 1 : 2) + le
 }
 
 // 百度翻译发音地址（整句兜底）
@@ -56,6 +58,13 @@ function isJapaneseText(text) {
 const VI_RE = /[ăâđêôơưĂÂĐÊÔƠƯ]|[àáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]/i
 function isVietnameseText(text) {
   return VI_RE.test(String(text || ''))
+}
+
+// 韩语：整句同样没有在线源（有道 500、百度 lan=kor 对整句失败），只能靠预生成 mp3；
+// 单个词有道能读，但必须带 le=ko（见 ttsUrl）。用谚文范围判断，不看用户设置的语言。
+const HANGUL_RE = /[\uac00-\ud7a3\u1100-\u11ff\u3130-\u318f]/
+function isKoreanText(text) {
+  return HANGUL_RE.test(String(text || ''))
 }
 
 // 同声传译 TTS 是否可用（注意：智聆插件没有 textToSpeech，不能算）
@@ -311,6 +320,9 @@ function speak(text, slow, handlers) {
       // 百度 lan=jap 是 403；同声传译的 textToSpeech 只支持中英文。
       // 所以整句不去撞必然失败的请求，直接交给插件兜底、插件不行就报错让页面提示。
       sources = (words > 2) ? [] : [yd, ydBackup]
+    } else if (isKoreanText(raw)) {
+      // 韩语整句没有在线源，别去撞必然失败的请求；单个词有道带 le=ko 能读
+      sources = (words > 2) ? [] : [yd, ydBackup]
     } else if (words > 2) {
       sources = [bd, yd, ydBackup]
     } else {
@@ -486,4 +498,4 @@ function speak(text, slow, handlers) {
   }
 }
 
-module.exports = { ttsUrl, baiduUrl, isJapaneseText, needJapaneseVoice, isVietnameseText, createPlayer, speak, prefetch, DOWNLOAD_TIMEOUT }
+module.exports = { ttsUrl, baiduUrl, isJapaneseText, needJapaneseVoice, isVietnameseText, isKoreanText, createPlayer, speak, prefetch, DOWNLOAD_TIMEOUT }

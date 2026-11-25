@@ -25,7 +25,10 @@ const REGION = {
   ja: { dir: 'audio-src/ja', remote: 'https://yb.qy663.de5.net/audio/' },
   en: { dir: 'audio-src/en', remote: 'https://yb.qy663.de5.net/audio-en/' },
   // 越南语没有任何在线合成源，单词、例句、句子、台词全部要预生成
-  vi: { dir: 'audio-src/vi', remote: 'https://yb.qy663.de5.net/audio-vi/' }
+  vi: { dir: 'audio-src/vi', remote: 'https://yb.qy663.de5.net/audio-vi/' },
+  // 韩语整句没有在线源（有道 500、百度失败），单词有道能读但也要 le=ko，
+  // 所以和越南语一样全部预生成
+  ko: { dir: 'audio-src/ko', remote: 'https://yb.qy663.de5.net/audio-ko/' }
 }
 
 // 每个语种要合成的素材 id（英语现在也含单词和例句：800 词全部预生成离线音频）
@@ -33,7 +36,7 @@ function itemsOf(lang) {
   const ids = []
   s.getSentences(lang).forEach(x => ids.push(x.id))
   s.getDialogues(lang).forEach(d => d.lines.forEach(l => ids.push(l.id)))
-  // 三个语种的单词都预生成：免得每次发音都靠网络（日语/越南语本来就有，英语这次补齐）
+  // 所有语种的单词都预生成：免得每次发音都靠网络
   w.getWords(lang).forEach(x => {
     ids.push(x.id)
     if (x.example) ids.push(x.id + '_ex')

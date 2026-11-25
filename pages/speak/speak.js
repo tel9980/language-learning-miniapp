@@ -262,9 +262,13 @@ Page({
         const long = ja && String(text).trim().length > 6
         // 越南语没有任何在线合成源，只有内置素材的预生成音频
         const vi = audio.isVietnameseText(text)
+        // 韩语整句也没有在线源（有道 500、百度失败），单词才有
+        const ko = audio.isKoreanText(text)
         wx.showToast({
           title: vi ? '越南语只支持内置素材的发音，这句读不出来'
-            : (long ? '日语整句暂无合成发音，可点单词单独听' : '这句暂时读不出来，点一下再试'),
+            : (ko && String(text).trim().split(/\s+/).length > 2
+              ? '韩语整句暂无合成发音，可点单词单独听'
+              : (long ? '日语整句暂无合成发音，可点单词单独听' : '这句暂时读不出来，点一下再试')),
           icon: 'none'
         })
         that.stopHighlight()

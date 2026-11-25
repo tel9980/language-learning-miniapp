@@ -27,7 +27,7 @@ const CACHE_TTL = 60 * 60 * 24 * 30   // 30 天
 const DAILY_LIMIT = 300         // 每个出口 IP（一家人共用一个 WiFi 时共享这一份额度）
 const DEVICE_DAILY_LIMIT = 120  // 每台设备：避免同一 WiFi 下一台机器把全家的额度吃光
 const LIMIT_TTL = 60 * 60 * 24 * 2
-const UA_OK = ['en', 'ja', 'vi']
+const UA_OK = ['en', 'ja', 'vi', 'ko']
 
 // 发音评测（/eval）：把用户的一段录音发给多模态模型，让它说人话式的定性反馈。
 // 只给小程序的日语/越南语用户用——这两种语言没有可用的客观评测插件（智聆只支持中英文）。
@@ -96,10 +96,11 @@ async function takeQuota(env, request, prefix, ipLimit, devLimit) {
   return { allowed: true }
 }
 
-const LANG_NAME = { en: '英语', ja: '日语', vi: '越南语' }
+const LANG_NAME = { en: '英语', ja: '日语', vi: '越南语', ko: '韩语' }
 function buildPrompt(q, lang) {
   const isJa = lang === 'ja'
   const isVi = lang === 'vi'
+  const isKo = lang === 'ko'
   const langName = LANG_NAME[lang] || '英语'
   return [
     '你是一位严谨的' + langName + '老师，正在为一个中国学习者解释一个词。',
@@ -108,7 +109,7 @@ function buildPrompt(q, lang) {
     '{',
     '  "found": true 或 false（这个词是否真实存在、不是你编的）,',
     '  "word": "规范写法（' + langName + '原文）",',
-    '  "phonetic": "音标或读音（' + (isJa ? '罗马音' : (isVi ? '带声调符号的越南语写法 + 近似 IPA' : 'IPA，带斜杠')) + '）",',
+    '  "phonetic": "音标或读音（' + (isJa ? '罗马音' : (isVi ? '带声调符号的越南语写法 + 近似 IPA' : (isKo ? '韩国官方罗马字转写 Revised Romanization' : 'IPA，带斜杠'))) + '）",',
     '  "meaning": "中文释义，词性缩写开头，最多 40 字",',
     '  "examples": [{"text": "' + langName + '例句", "cn": "中文翻译"}],  // 恰好 2 条，日常场景',
     '  "tip": "一条最容易犯的错或用法提醒，中文，最多 50 字"',
@@ -194,7 +195,7 @@ function normalize(obj, q, lang) {
 // 多模态模型听一段录音能给「哪里不对」的具体话，这比一个假分数有用得多。
 // 明确不做的事：不给 0-100 分——模型不懂音素对齐，打出来的分比没有更糟。
 
-const EVAL_LANG_NAME = { en: '英语', ja: '日语', vi: '越南语' }
+const EVAL_LANG_NAME = { en: '英语', ja: '日语', vi: '越南语', ko: '韩语' }
 
 function evalPrompt(text, lang) {
   return [

@@ -9,7 +9,10 @@ const LANGS = {
   // 越南语没有任何可用的在线合成（有道/百度都没越南语音色、同声传译只支持中英文），
   // 全部发音走预生成 mp3（utils/local-audio.js），所以 tts 字段实际上用不到，
   // 留着只是为了结构统一。
-  vi: { name: '越南语', flag: '🇻🇳', tts: 'vi-VN', voice: 'vi_VN' }
+  vi: { name: '越南语', flag: '🇻🇳', tts: 'vi-VN', voice: 'vi_VN' },
+  // 韩语：单词能用有道（必须带 le=ko，不带返回 0.1 秒空音），整句有道 500、百度失败，
+  // 所以句子全部走预生成 mp3。同声传译只支持中英文，tts 字段实际用不到。
+  ko: { name: '韩语', flag: '🇰🇷', tts: 'ko-KR', voice: 'ko_KR' }
 }
 
 const LANG_KEYS = Object.keys(LANGS)
