@@ -108,6 +108,27 @@
       <view class="tool-btn {{abLoop?'on':''}}" bindtap="toggleAB">🔁 A-B复读<text wx:if="{{abLoop}}"> ×{{abCount}}</text></view>
       <view class="tool-btn {{rolePlay?'on':''}}" bindtap="toggleRolePlay" wx:if="{{track==='dialogue'}}">🎭 角色扮演</view>
       <view class="tool-btn" bindtap="revealLine" wx:if="{{rolePlay && track==='dialogue' && !revealed}}">👁 显示台词</view>
+      <view class="tool-btn {{trainMode?'on':''}}" bindtap="toggleTrain" wx:if="{{track==='dialogue'}}">🗣 对练</view>
+    </view>
+
+    <!-- 对练：我说中文，给我这个场景里怎么说。只放在情景对话里，不做独立翻译页 -->
+    <view class="train" wx:if="{{trainMode && track==='dialogue'}}">
+      <view class="train-head">
+        <text class="train-title">说一句中文，给你怎么说</text>
+        <text class="train-scene" wx:if="{{sceneNames.length}}">{{sceneNames[sceneIndex]}}</text>
+      </view>
+      <view class="train-hint" wx:if="{{current.meaning}}">比如：{{current.meaning}}</view>
+      <view class="train-btn {{trainRecording?'rec':''}} {{trainBusy?'busy':''}}" bindtap="trainTap">
+        {{trainRecording ? '🔴 说完了，点这里' : (trainBusy ? '🤔 正在想怎么说…' : '🎤 点一下开始说')}}
+      </view>
+      <view class="train-err" wx:if="{{trainErr}}">{{trainErr}}</view>
+      <view class="train-card" wx:if="{{trainResult}}">
+        <view class="train-src" wx:if="{{trainResult.text}}">你说：{{trainResult.text}}</view>
+        <view class="train-out">{{trainResult.translation}}</view>
+        <view class="train-note" wx:if="{{trainResult.note}}">💡 {{trainResult.note}}</view>
+        <view class="train-play" bindtap="playTrain">🔊 再听一遍</view>
+      </view>
+      <view class="train-foot">录音会发给我们自己的服务器转写，不保存、不用于训练</view>
     </view>
 
     <view class="example-box" wx:if="{{current.example && current.example !== current.word && !rolePlay}}">

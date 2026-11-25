@@ -1949,4 +1949,76 @@ async function runTailTests() {
   stVp.setVoiceprintAgreed(false)
   ok(stVp.getVoiceprintAgreed() === false, '撤回后状态为未同意')
   eq(stVp.getSettings().voiceprintAgreedAt, '', '撤回后清空同意日期')
+
+  // K. 对练（我说中文，给我目标语言的说法）
+  // 关键约束：只放在情景对话里，不做独立翻译页（个人主体 + 教育类目，
+  // 独立翻译入口容易被判成工具类应用，插件类目已经因此被驳过一次）。
+  const appJsonTr = JSON.parse(read('app.json'))
+  const trPages = appJsonTr.pages.filter(function (p) { return /translat|fanyi/.test(p) })
+  eq(trPages.length, 0, '不新增独立翻译页（避免被判定为工具类应用）')
+  eq((appJsonTr.tabBar && appJsonTr.tabBar.list || []).filter(function (t) {
+    return /翻译|对练|translate/.test(t.text || '')
+  }).length, 0, 'tabBar 里没有「翻译」入口')
+
+  const { sayWhat, mimeOf, explain } = require('../utils/translate')
+  eq(mimeOf('a/b/c.mp3'), 'audio/mpeg', '录音后缀 → mime 映射')
+  eq(mimeOf('x.m4a'), 'audio/mp4', 'm4a 走 audio/mp4')
+  eq(mimeOf(''), 'audio/mpeg', '认不出后缀时按 mp3')
+  ok(/明天再来/.test(explain('rate-limited')), '限流错误翻成中文')
+  ok(/没听清/.test(explain('unclear')), '没听清时提示重说')
+
+  // 没有录音时必须直接拒绝，不能让页面以为成功了
+  return sayWhat({ to: 'ko', scene: '咖啡店' }).then(function (r) {
+    ok(r.ok === false && r.error === 'no-recording', '没录音就明确失败')
+
+    // 成功路径：用一个假的 wx.request 抓请求体，确认发对了地址与字段
+    const realReq = wx.request
+    let sent = null
+    wx.request = function (opt) {
+      sent = opt
+      opt.success({ statusCode: 200, data: { ok: true, text: '我想要一杯冰美式', translation: '아이스 아메리카노 한 잔 주세요', note: '更口语的说法' } })
+    }
+    return sayWhat({ text: '我要一杯冰美式', to: 'ko', scene: '咖啡店' }).then(function (r2) {
+      wx.request = realReq
+      ok(r2.ok === true, '对练能拿到译文')
+      eq(r2.translation, '아이스 아메리카노 한 잔 주세요', '译文原样返回')
+      ok(r2.note.length > 0, 'note 带回来')
+      ok(sent && sent.method === 'POST', '走 POST')
+      ok(/\/translate$/.test(sent.url), '打到 /translate')
+      eq(sent.data.to, 'ko', '目标语种传下去了')
+      eq(sent.data.scene, '咖啡店', '场景名传下去了（脱离场景的翻译没用）')
+      ok(sent.header['x-device-id'], '带设备号，额度按设备分摊')
+
+      // 429 要把 Worker 的中文文案原样透出，不要替换成通用错误
+      wx.request = function (opt) {
+        opt.success({ statusCode: 429, data: { ok: false, error: 'rate-limited', message: '这台设备今天的对练次数用完了（每台每天 60 次），明天再来。' } })
+      }
+      return sayWhat({ text: '你好', to: 'ja' }).then(function (r3) {
+        wx.request = realReq
+        ok(r3.ok === false && r3.error === 'rate-limited', '限流被识别')
+        ok(/60 次/.test(r3.message), '限流文案用 Worker 给的具体数字')
+
+        // 页面接线：按钮、录音、授权卡点、自动朗读
+        const spk = read('pages/speak/speak.js')
+        ok(/toggleTrain\(/.test(spk) && /trainTap\(/.test(spk), '口语页有对练开关与录音')
+        ok(/trainMode && track==='dialogue'/.test(read('pages/speak/speak.wxml')), '对练面板只在情景对话里出现')
+        ok(/bindtap="trainTap"/.test(read('pages/speak/speak.wxml')), 'wxml 上挂了录音按钮')
+        ok(/translate\.sayWhat\(/.test(spk), '页面调用翻译模块')
+        ok(/_playTrainText\(res\.translation\)/.test(spk), '拿到译文就念出来')
+        // 对练也开麦克风，必须同样先过声纹授权
+        // 注意 _trainDo 在 _ensureRecorder 里先出现过一次，不能直接 indexOf
+        const trainStart = spk.indexOf('  trainTap() {')
+        const trainBody = spk.slice(trainStart, spk.indexOf('  _trainDo(', trainStart))
+        ok(/getVoiceprintAgreed/.test(trainBody), '对练录音前同样检查声纹授权')
+        // Worker 侧：新端点 + 独立额度池（不能和 /eval 抢同一份）
+        const wsrc = read('deploy/ai/worker.js')
+        ok(/url\.pathname === '\/translate'/.test(wsrc), 'Worker 有 /translate 路由')
+        ok(/TR_DAILY_LIMIT/.test(wsrc) && /'tr:'/.test(wsrc), '对练有独立额度池')
+        ok(/对练次数用完了/.test(wsrc), '限流文案分设备/网络两版')
+        ok(/inlineData/.test(wsrc.slice(wsrc.indexOf('function askTranslate'))), '对练走多模态（能听音频）')
+        // 协议正文必须覆盖对练这条新用途，否则又是「不实描述」
+        ok(/对练/.test(read('pages/voiceprint/voiceprint.wxml')), '声纹协议写明对练用途')
+      })
+    })
+  })
 }

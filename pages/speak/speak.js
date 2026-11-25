@@ -15,6 +15,7 @@ const { getLangMeta } = require('../../utils/lang')
 const sentenceProgress = require('../../utils/sentence-progress')
 const session = require('../../utils/speak-session')
 const shadowTip = require('../../utils/shadow-tip')
+const translate = require('../../utils/translate')
 
 // 跟读模式：word=单词 | sentence=句子 | dialogue=情景对话 | custom=自建素材
 Page({
@@ -42,6 +43,8 @@ Page({
     abLoop: false, abCount: 0,
     // 角色扮演
     rolePlay: false, revealed: false, otherLine: null,
+    // 对练（只在情景对话里）：我说中文 → 给我目标语言的说法
+    trainMode: false, trainRecording: false, trainBusy: false, trainResult: null, trainErr: '',
     // 新手引导
     showGuide: false,
     // 儿童模式星星奖励
@@ -171,7 +174,7 @@ Page({
   switchTrack(e) {
     const track = e.currentTarget.dataset.track
     this.stopAll()
-    this.setData({ track, sceneIndex: 0, rolePlay: false, revealed: false }, () => {
+    this.setData({ track, sceneIndex: 0, rolePlay: false, revealed: false, trainMode: false, trainResult: null }, () => {
       this.refreshScenes()
       this.buildQueueAndLoad()
     })
@@ -179,7 +182,7 @@ Page({
   switchScene(e) {
     const idx = Number(e.detail.value)
     this.stopAll()
-    this.setData({ sceneIndex: idx, revealed: false }, () => this.buildQueueAndLoad())
+    this.setData({ sceneIndex: idx, revealed: false, trainResult: null }, () => this.buildQueueAndLoad())
   },
 
   // 进度显示：条目少时用圆点，条目多（几十上百）时改用进度条，
@@ -196,6 +199,7 @@ Page({
     this._lastScore = null
     this._lastRecognized = ''
     this._abPlaying = false
+    this._trainRec = false
     const tokens = w ? karaoke.tokenize(w.word) : []
     // 角色扮演：取上一条对方台词作为提示
     let otherLine = null
@@ -211,6 +215,7 @@ Page({
       score: null, recognized: '', playingMine: false, scoreDetail: null, wrongWords: [],
       comparing: false, shadowTip: '',
       aiLoading: false, aiFeedback: null,
+      trainRecording: false, trainBusy: false, trainResult: null, trainErr: '',
       showLine: 0, revealed: false, otherLine,
       karaokeOn: false, karaokeIdx: -1, karaokeTokens: karaoke.toPlain(tokens), abCount: 0
     }, this._progress(this.data.index, this._queue.length)))
@@ -518,6 +523,31 @@ Page({
     })
   },
 
+  // wx.getRecorderManager() 是全局单例，跟读录音和对练录音共用同一套回调，
+  // 用 _trainRec 区分是谁开的（同一时刻只可能有一个在录）。
+  _ensureRecorder() {
+    if (this._recManager) return this._recManager
+    const that = this
+    this._recManager = wx.getRecorderManager()
+    this._recManager.onStop(res => {
+      if (that._trainRec) {
+        that._trainRec = false
+        that._trainDo(res && res.tempFilePath)
+        return
+      }
+      that._recFilePath = res.tempFilePath
+      that.setData({ hasRecording: true, recording: false })
+      that._saveRecording(res.tempFilePath)
+      wx.showToast({ title: '录好了，点「听我的」对比', icon: 'none' })
+    })
+    this._recManager.onError(() => {
+      that._trainRec = false
+      that.setData({ recording: false, trainRecording: false })
+      wx.showToast({ title: '录音失败，请检查麦克风权限', icon: 'none' })
+    })
+    return this._recManager
+  },
+
   toggleRecord() {
     if (this.data.recording) { this.stopRecord(); return }
     // 声纹授权：微信审核要求「取得用户授权同意后，才能获取用户声纹信息」。
@@ -586,19 +616,7 @@ Page({
     }
 
     // 路径 B：自带录音器（若同声传译可用，并行做文字识别算相似度）
-    if (!this._recManager) {
-      this._recManager = wx.getRecorderManager()
-      this._recManager.onStop(res => {
-        that._recFilePath = res.tempFilePath
-        that.setData({ hasRecording: true, recording: false })
-        that._saveRecording(res.tempFilePath)
-        wx.showToast({ title: '录好了，点「听我的」对比', icon: 'none' })
-      })
-      this._recManager.onError(() => {
-        that.setData({ recording: false })
-        wx.showToast({ title: '录音失败，请检查麦克风权限', icon: 'none' })
-      })
-    }
+    this._ensureRecorder()
     if (cur && speechScore.isSupported(lang)) {
       this._recognizer = speechScore.createRecognizer({
         targetText: cur.word,
@@ -638,6 +656,83 @@ Page({
       this.setData({ recording: false })
     }
     if (this._recognizer) { this._recognizer.stop() }
+  },
+
+  // ---------- 对练：我说中文，给我目标语言的说法 ----------
+  // 只出现在情景对话里。为什么不做独立翻译页：个人主体 + 教育类目，
+  // 独立翻译入口容易被判成工具类应用（插件类目那条驳回已经吃过一次亏）。
+  toggleTrain() {
+    const on = !this.data.trainMode
+    this.stopAudio()
+    this.setData({
+      trainMode: on, trainResult: null, trainErr: '',
+      trainRecording: false, trainBusy: false
+    })
+    if (on) wx.showToast({ title: '点话筒，说一句中文', icon: 'none' })
+  },
+
+  _sceneName() {
+    const names = this.data.sceneNames || []
+    return names[this.data.sceneIndex] || ''
+  },
+
+  trainTap() {
+    if (this.data.trainBusy) return
+    if (this.data.trainRecording) {
+      try { this._recManager.stop() } catch (e) {}
+      return
+    }
+    // 和跟读录音同一条要求：微信审核要求先取得声纹授权，才允许开麦克风
+    if (!storage.getVoiceprintAgreed()) { this.askVoiceprint(); return }
+    if (this.data.recording) this.stopRecord()
+    this.stopAudio()
+    this._ensureRecorder()
+    this._trainRec = true
+    try {
+      this._recManager.start({ duration: 15000, format: 'mp3', sampleRate: 16000, numberOfChannels: 1 })
+      this.setData({ trainRecording: true, trainResult: null, trainErr: '' })
+    } catch (e) {
+      this._trainRec = false
+      wx.showToast({ title: '录音启动失败，请检查麦克风权限', icon: 'none' })
+    }
+  },
+
+  _trainDo(filePath) {
+    const that = this
+    this.setData({ trainRecording: false, trainBusy: true, trainErr: '' })
+    if (!filePath) {
+      this.setData({ trainBusy: false, trainErr: '没拿到录音，再试一次' })
+      return
+    }
+    translate.sayWhat({
+      filePath: filePath,
+      to: storage.getCurrentLang(),
+      scene: this._sceneName()
+    }).then(function (res) {
+      if (!res.ok) {
+        that.setData({ trainBusy: false, trainErr: res.message || translate.explain(res.error) })
+        return
+      }
+      that.setData({
+        trainBusy: false, trainErr: '',
+        trainResult: { text: res.text, translation: res.translation, note: res.note || '' }
+      })
+      // 拿到就念一遍：学会说之前先听清楚怎么说
+      that._playTrainText(res.translation)
+    })
+  },
+
+  _playTrainText(text) {
+    if (!text) return
+    audio.speak(text, false, {
+      lang: getLangMeta(storage.getCurrentLang()).voice,
+      onError() { wx.showToast({ title: '这句读不出来，点一下再试', icon: 'none' }) }
+    })
+  },
+
+  playTrain() {
+    const r = this.data.trainResult
+    if (r && r.translation) this._playTrainText(r.translation)
   },
 
   // ---------- 复习调度 ----------

@@ -194,3 +194,60 @@
 .theme-dark .ai-tip { color: #C4B5FD; }
 .theme-dark .ai-note { color: #7E7699; }
 
+
+/* 对练：我说中文，给我这个场景里的说法（只在情景对话里出现） */
+.train {
+  margin-top: 16rpx;
+  padding: 22rpx;
+  background: #F5FAF7;
+  border: 1rpx solid #D8EEE1;
+  border-radius: 16rpx;
+}
+.train-head { display: flex; align-items: baseline; justify-content: space-between; }
+.train-title { font-size: 27rpx; font-weight: 600; color: #1F6B45; }
+.train-scene { font-size: 22rpx; color: #6E9A83; }
+.train-hint { margin-top: 10rpx; font-size: 24rpx; color: #6E9A83; line-height: 1.6; }
+.train-btn {
+  margin-top: 16rpx;
+  padding: 20rpx 0;
+  text-align: center;
+  font-size: 28rpx;
+  color: #1F6B45;
+  background: #E4F4EB;
+  border-radius: 12rpx;
+}
+.train-btn.rec { color: #B42318; background: #FDECEA; }
+.train-btn.busy { color: #8A9A93; background: #EFF4F1; }
+.train-err { margin-top: 12rpx; font-size: 24rpx; color: #B42318; }
+.train-card {
+  margin-top: 14rpx;
+  padding: 20rpx 22rpx;
+  background: #FFFFFF;
+  border-radius: 14rpx;
+}
+.train-src { font-size: 24rpx; color: #8A9A93; line-height: 1.6; }
+.train-out { margin-top: 8rpx; font-size: 32rpx; line-height: 1.5; color: #16324A; font-weight: 600; }
+.train-note { margin-top: 10rpx; font-size: 24rpx; color: #4A7C60; line-height: 1.6; }
+.train-play {
+  margin-top: 14rpx;
+  display: inline-block;
+  padding: 12rpx 28rpx;
+  font-size: 25rpx;
+  color: #1F6B45;
+  background: #E4F4EB;
+  border-radius: 999rpx;
+}
+.train-foot { margin-top: 14rpx; font-size: 21rpx; color: #9BB0A5; line-height: 1.6; }
+.theme-dark .train { background: #1B2A22; border-color: #2A3D33; }
+.theme-dark .train-title { color: #7DD3A0; }
+.theme-dark .train-scene, .theme-dark .train-hint { color: #7FA592; }
+.theme-dark .train-btn { color: #7DD3A0; background: #25382E; }
+.theme-dark .train-btn.rec { color: #FCA5A5; background: #3A2222; }
+.theme-dark .train-btn.busy { color: #8AA096; background: #22302A; }
+.theme-dark .train-err { color: #FCA5A5; }
+.theme-dark .train-card { background: #22302A; }
+.theme-dark .train-src { color: #8AA096; }
+.theme-dark .train-out { color: #E3EEF7; }
+.theme-dark .train-note { color: #9FC9B3; }
+.theme-dark .train-play { color: #7DD3A0; background: #25382E; }
+.theme-dark .train-foot { color: #6E8477; }

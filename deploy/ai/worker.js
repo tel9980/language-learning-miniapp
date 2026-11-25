@@ -272,6 +272,124 @@ function normalizeEval(obj) {
   }
 }
 
+// ---------- 对练（/translate）----------
+// 用户说一句中文，返回目标语言里最自然的说法。和 /eval 一样把录音交给多模态模型，
+// 区别在输出是「这句话怎么说」而不是「你读得准不准」。
+// 只挂在「口语练习 → 情景对话」的对练模式里，不做独立翻译页（个人主体 + 教育类目，
+// 独立翻译入口容易被判成工具类应用而驳回）。
+const TR_DAILY_LIMIT = 120
+const TR_DEVICE_LIMIT = 60
+const TR_MAX_B64 = 400 * 1024
+const TR_MAX_TEXT = 200
+
+function trPrompt(to, scene, hint) {
+  const toName = LANG_NAME[to] || '英语'
+  return [
+    '你是口语陪练。用户在学' + toName + '，刚才说了一句话（通常是中文，也可能夹外语或带口音）。',
+    scene ? '当前场景：' + scene : '',
+    hint ? '这个场景的标准台词是：' + hint : '',
+    '请只输出一个 JSON 对象，不要 markdown，不要任何解释文字。字段：',
+    '{',
+    '  "text": "用户刚才说的原话（转写成中文，去掉「嗯、那个」这类口头语）",',
+    '  "translation": "这句话在' + toName + '里最自然的说法（口语，别用书面语，一句话）",',
+    '  "note": "一条提醒：指出中式表达、或给出更地道的选项，中文，最多 40 字；没有就留空字符串"',
+    '}',
+    '如果实在听不清，返回 {"text": "", "translation": "", "note": "没听清"}，不要编。'
+  ].filter(Boolean).join('\n')
+}
+
+async function askTranslate(env, b64, mime, to, scene, hint) {
+  // 没传录音时只发文本（体测/调试用）；传了录音就带上 inlineData 让模型听。
+  // 名字别用 parts：循环体里解析响应已经有 const parts，同块内会撞 TDZ
+  const reqParts = [{ text: trPrompt(to, scene, hint) }]
+  if (b64) reqParts.push({ inlineData: { mimeType: mime, data: b64 } })
+  let lastErr = null
+  for (let i = 0; i < MODELS.length; i++) {
+    const MODEL = MODELS[i]
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+      MODEL + ':generateContent?key=' + encodeURIComponent(env.GEMINI_API_KEY)
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: reqParts }],
+        generationConfig: { temperature: 0.3, responseMimeType: 'application/json' }
+      })
+    })
+    if (!res.ok) {
+      const body = await res.text()
+      lastErr = new Error('gemini ' + res.status + ': ' + body.slice(0, 160))
+      if (/ 404| 429| 503|NOT_FOUND|overloaded|high demand/i.test(' ' + res.status + ' ' + body)) continue
+      throw lastErr
+    }
+    const data = await res.json()
+    const parts = (data.candidates && data.candidates[0] && data.candidates[0].content &&
+      data.candidates[0].content.parts) || []
+    const raw = parts.map(function (p) { return p.text || '' }).join('')
+    if (!raw) { lastErr = new Error('gemini returned empty text'); continue }
+    let obj
+    try { obj = JSON.parse(raw) } catch (e) {
+      const m = raw.match(/\{[\s\S]*\}/)
+      if (!m) { lastErr = new Error('gemini returned non-json'); continue }
+      try { obj = JSON.parse(m[0]) } catch (e2) { lastErr = new Error('gemini returned bad json'); continue }
+    }
+    return normalizeTr(obj)
+  }
+  throw lastErr || new Error('no model available')
+}
+
+function normalizeTr(obj) {
+  const text = cut(obj && obj.text, 80)
+  const translation = cut(obj && obj.translation, 120)
+  // 模型听不清时会返回空 translation —— 这不是错误，如实告诉用户重说一次，
+  // 别把「没听清」当成「翻译不出来」。
+  if (!translation) {
+    return { ok: false, error: 'unclear', message: '这句没听清，靠近一点再说一次', source: 'ai' }
+  }
+  return {
+    ok: true,
+    text: text,
+    translation: translation,
+    note: cut(obj && obj.note, 50),
+    source: 'ai'
+  }
+}
+
+async function handleTranslate(request, env) {
+  if (!env.GEMINI_API_KEY) return json({ ok: false, error: 'not-configured' }, 503)
+  let body
+  try { body = await request.json() } catch (e) { return json({ ok: false, error: 'bad-body' }, 400) }
+  const b64 = String((body && body.audio) || '')
+  const text = String((body && body.text) || '').trim()
+  const to = UA_OK.indexOf(body && body.to) >= 0 ? body.to : 'en'
+  const scene = cut(body && body.scene, 20)
+  const hint = cut(body && body.hint, 60)
+  let mime = String((body && body.mime) || 'audio/mpeg')
+  if (EVAL_MIME.indexOf(mime) < 0) mime = 'audio/mpeg'
+  if (!b64 && !text) return json({ ok: false, error: 'empty' }, 400)
+  if (b64 && b64.length > TR_MAX_B64) return json({ ok: false, error: 'audio-too-long', message: '说太长啦，一句就够' }, 413)
+  if (text.length > TR_MAX_TEXT) return json({ ok: false, error: 'text-too-long' }, 400)
+
+  const limit = await takeQuota(env, request, 'tr:', TR_DAILY_LIMIT, TR_DEVICE_LIMIT)
+  if (!limit.allowed) {
+    return json({
+      ok: false,
+      error: 'rate-limited',
+      message: limit.scope === 'device'
+        ? '这台设备今天的对练次数用完了（每台每天 ' + limit.limit + ' 次），明天再来。'
+        : '今天这个网络的对练次数用完了（同一网络每天 ' + limit.limit + ' 次），明天再来。'
+    }, 429, { 'Cache-Control': 'no-store' })
+  }
+
+  let payload
+  try {
+    payload = await askTranslate(env, b64, mime, to, scene, hint)
+  } catch (e) {
+    return json({ ok: false, error: 'upstream', detail: String(e && e.message || e).slice(0, 200) }, 502)
+  }
+  return json(payload, 200, { 'Cache-Control': 'no-store' })
+}
+
 async function handleEval(request, env) {
   if (!env.GEMINI_API_KEY) return json({ ok: false, error: 'not-configured' }, 503)
   let body
@@ -320,7 +438,8 @@ export default {
         note: '这是接口地址，没有网页可看。小程序里不需要打开它。',
         endpoints: [
           { path: '/lookup?q=invoice&lang=en', method: 'GET', what: '查词（en / ja / vi）：释义 + 音标 + 例句' },
-          { path: '/eval', method: 'POST', what: 'AI 听音：上传一段录音，返回定性反馈（不打分）' }
+          { path: '/eval', method: 'POST', what: 'AI 听音：上传一段录音，返回定性反馈（不打分）' },
+          { path: '/translate', method: 'POST', what: '对练：上传一段中文录音，返回目标语言怎么说' }
         ],
         cache: !!env.AI_CACHE,
         configured: !!env.GEMINI_API_KEY
@@ -330,6 +449,10 @@ export default {
     if (url.pathname === '/eval') {
       if (request.method !== 'POST') return json({ ok: false, error: 'method-not-allowed' }, 405)
       return handleEval(request, env)
+    }
+    if (url.pathname === '/translate') {
+      if (request.method !== 'POST') return json({ ok: false, error: 'method-not-allowed' }, 405)
+      return handleTranslate(request, env)
     }
     if (url.pathname !== '/lookup') {
       return json({ ok: false, error: 'not-found' }, 404)

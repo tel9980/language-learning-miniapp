@@ -14,13 +14,14 @@
       <view class="li"><text class="n">1</text><text class="t"><text class="b">客观评分</text>（默认开启）把录音交给腾讯云「智聆口语评测」，换回发音分和逐词对错。</text></view>
       <view class="li"><text class="n">2</text><text class="t"><text class="b">本地回放</text>（默认开启）录音存在你手机的微信本地空间，供你回听、和标准音对比。</text></view>
       <view class="li"><text class="n">3</text><text class="t"><text class="b">AI 听音</text>（默认关闭，需你单独点同意）把录音上传到我们的服务器转发给 Google Gemini，换回一句文字点评。</text></view>
+      <view class="li"><text class="n">4</text><text class="t"><text class="b">对练</text>（默认关闭，需你单独点同意）你说一句中文，把这段录音上传到我们的服务器，换回这个场景里外语怎么说。</text></view>
     </view>
 
     <view class="block">
       <view class="h">三、存在哪里、留多久</view>
       <view class="li"><text class="n">·</text><text class="t">评分用的那份：随请求发给腾讯云智聆，评分完成后不在我们这边保存。本项目没有自己的数据库，也没有任何服务器留存录音。</text></view>
       <view class="li"><text class="n">·</text><text class="t">本地回放的那份：只存在你这台手机的微信本地空间，最多保留最近 30 条，超出后自动删最旧的。换手机、清缓存、卸载小程序都会一起消失。</text></view>
-      <view class="li"><text class="n">·</text><text class="t">AI 听音的那份：随请求发出，不落盘、不缓存，用完即弃。</text></view>
+      <view class="li"><text class="n">·</text><text class="t">AI 听音、对练的那两份：随请求发出，不落盘、不缓存，用完即弃。</text></view>
     </view>
 
     <view class="block">
