@@ -5,6 +5,7 @@ const speaking = require('../../utils/speaking')
 const profile = require('../../utils/profile')
 const family = require('../../utils/family')
 const { getLangMeta, LANG_KEYS } = require('../../utils/lang')
+const modePicker = require('../../utils/mode-picker')
 
 const app = getApp()
 
@@ -22,6 +23,15 @@ Page({
     storage.init()
     this.refresh()
   },
+  // 首页直接改当前档案的显示模式（儿童模式找不到入口，就因为它只在「家人档案」里）
+  openMode() {
+    const that = this
+    modePicker.pick(function () {
+      that.syncTheme()
+      that.refresh()
+    })
+  },
+
   refresh() {
     const p = profile.currentProfile() || { name: '我', avatar: '😀', mode: 'normal' }
     const modeNames = { normal: '标准', kid: '儿童', elder: '长辈' }

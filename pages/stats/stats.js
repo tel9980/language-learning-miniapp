@@ -8,6 +8,7 @@ const familyBackup = require('../../utils/family-backup')
 const ttsCache = require('../../utils/tts-cache')
 const onlineData = require('../../utils/online-data')
 const { getWords } = require('../../utils/words')
+const modePicker = require('../../utils/mode-picker')
 
 const app = getApp()
 
@@ -101,13 +102,20 @@ Page({
         (unlockedCount ? '，解锁 ' + unlockedCount + ' 枚徽章' : '') + '，一起来练英语口语吧'
       : '来和我一起练英语口语｜语伴'
 
+    const practiceMin = Math.round(storage.getPracticeSeconds() / 60)
     this.setData({
       stats, accuracy, levels, days, speak, fluency,
       calendar: cal, badges, unlockedCount, shareTitle: shareTitle,
       mastered: mastered,
       dailyGoal: settings.dailyGoal || 20,
       feedbackEnabled: settings.feedbackEnabled !== false,
-      voiceprintAgreed: !!settings.voiceprintAgreed
+      voiceprintAgreed: !!settings.voiceprintAgreed,
+      practiceMin: practiceMin,
+      todayLearned: (storage.getToday() || {}).learned || 0,
+      kidAiUnlocked: storage.getKidAiUnlocked(),
+      kidTip: practiceMin >= 30 ? '今天够啦，休息一下，明天再来。'
+        : (practiceMin >= 15 ? '已经 15 分钟了，看看远处，让眼睛歇一会儿。'
+          : '慢慢来，每天十分钟就很好。')
     }, () => { this.drawChart(); this.drawFluencyChart() })
   },
   // 设备像素比只取一次：wx.getSystemInfoSync 已废弃，且每次重画都调一次是浪费。
@@ -284,6 +292,54 @@ Page({
           }
         }
       }
+    })
+  },
+
+  // 儿童模式的 AI 开关：默认关闭，要家长亲手确认一次才解锁（孩子点不出来）
+  openKidAi() {
+    const that = this
+    if (!this.data.isKid) {
+      wx.showModal({
+        title: 'AI 功能默认开启',
+        content: 'AI 查词、AI 听音、对练会把文字或一段录音发到境外服务器。切到儿童模式后会自动关闭。',
+        showCancel: false, confirmText: '知道了'
+      })
+      return
+    }
+    if (this.data.kidAiUnlocked) {
+      wx.showModal({
+        title: '关掉儿童模式的 AI 功能',
+        content: '关掉后 AI 听音与对练会从口语页消失，只剩本机录音和自评。',
+        confirmText: '关掉', cancelText: '留着',
+        success(r) {
+          if (!r.confirm) return
+          storage.setKidAiUnlocked(false)
+          that.refresh()
+          wx.showToast({ title: '已关闭', icon: 'none' })
+        }
+      })
+      return
+    }
+    wx.showModal({
+      title: '请家长确认',
+      content: '开启后，孩子在口语页可以用 AI 听音与对练：会把一段录音发到境外 AI 服务，不保存、不用于训练。请确认你是孩子的家长或监护人。',
+      confirmText: '我是家长', cancelText: '不开启',
+      success(r) {
+        if (!r.confirm) return
+        storage.setGuardianAgreed(true)
+        const ok = storage.setKidAiUnlocked(true)
+        that.refresh()
+        wx.showToast({ title: ok ? '已解锁，去口语页试试' : '没能解锁，再点一次', icon: 'none' })
+      }
+    })
+  },
+
+  // 当前档案的显示模式（儿童模式入口就放在设置里，和字体大小挨着）
+  openMode() {
+    const that = this
+    modePicker.pick(function () {
+      that.syncTheme()
+      that.refresh()
     })
   },
 

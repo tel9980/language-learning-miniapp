@@ -108,7 +108,8 @@
       <view class="tool-btn {{abLoop?'on':''}}" bindtap="toggleAB">🔁 A-B复读<text wx:if="{{abLoop}}"> ×{{abCount}}</text></view>
       <view class="tool-btn {{rolePlay?'on':''}}" bindtap="toggleRolePlay" wx:if="{{track==='dialogue'}}">🎭 角色扮演</view>
       <view class="tool-btn" bindtap="revealLine" wx:if="{{rolePlay && track==='dialogue' && !revealed}}">👁 显示台词</view>
-      <view class="tool-btn {{trainMode?'on':''}}" bindtap="toggleTrain" wx:if="{{track==='dialogue'}}">🗣 对练</view>
+      <!-- 对练会把孩子的录音发到境外 AI：儿童模式默认不出现，家长解锁后才显示 -->
+      <view class="tool-btn {{trainMode?'on':''}}" bindtap="toggleTrain" wx:if="{{track==='dialogue' && aiAllowed}}">🗣 对练</view>
     </view>
 
     <!-- 对练：我说中文，给我这个场景里怎么说。只放在情景对话里，不做独立翻译页 -->
@@ -170,7 +171,7 @@
       <view class="shadow-tip" wx:if="{{shadowTip}}">{{shadowTip}}</view>
 
       <!-- 智聆只评中英文；日语/越南语用它换一段「哪里不对」的人话 -->
-      <view class="ai-eval" wx:if="{{hasRecording}}">
+      <view class="ai-eval" wx:if="{{hasRecording && aiAllowed}}">
         <view class="ai-btn {{aiLoading?'loading':''}}" bindtap="aiListen">{{aiLoading ? '🤖 AI 正在听…' : '🤖 AI 听听哪里不对'}}</view>
         <view class="ai-card" wx:if="{{aiFeedback}}">
           <view class="ai-verdict">{{aiFeedback.verdict}}</view>
@@ -184,9 +185,10 @@
     <view class="rate-area" wx:if="{{hasRecording}}">
       <view class="rate-title">说得怎么样？</view>
       <view class="rate-btns">
-        <view class="rate-btn again" data-q="0" bindtap="rate">🔁 再练练</view>
-        <view class="rate-btn ok" data-q="1" bindtap="rate">👍 基本流利</view>
-        <view class="rate-btn great" data-q="2" bindtap="rate">🌟 很流利</view>
+        <!-- 「流利」是成人抽象词，二年级以下没有这个概念，儿童模式换成即时可感的评价 -->
+        <view class="rate-btn again" data-q="0" bindtap="rate">{{isKid ? '🔁 再读一次' : '🔁 再练练'}}</view>
+        <view class="rate-btn ok" data-q="1" bindtap="rate">{{isKid ? '👍 读得不错' : '👍 基本流利'}}</view>
+        <view class="rate-btn great" data-q="2" bindtap="rate">{{isKid ? '🌟 读得真好' : '🌟 很流利'}}</view>
       </view>
     </view>
 

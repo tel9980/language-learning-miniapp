@@ -90,20 +90,16 @@ Page({
     })
   },
 
-  changeMode(e) {
+  // 三个 chip 直接点，不再走 ActionSheet（旧的还写着「字大、简单」，而“简单”并不存在）
+  pickMode(e) {
     const id = e.currentTarget.dataset.id
-    const p = profile.get(id)
-    if (!p) return
-    const that = this
-    wx.showActionSheet({
-      itemList: ['标准模式', '儿童模式（字大、简单）', '长辈模式（超大字）'],
-      success(r) {
-        const mode = ['normal', 'kid', 'elder'][r.tapIndex] || 'normal'
-        profile.setMode(id, mode)
-        that.refresh()
-        wx.showToast({ title: '已设为' + MODE_NAMES[mode], icon: 'none' })
-      }
-    })
+    const mode = e.currentTarget.dataset.mode
+    if (!profile.get(id) || !mode) return
+    if (profile.get(id).mode === mode) return
+    profile.setMode(id, mode)
+    this.syncTheme()
+    this.refresh()
+    wx.showToast({ title: '已设为' + (MODE_NAMES[mode] || '') + '模式', icon: 'none' })
   },
 
   remove(e) {

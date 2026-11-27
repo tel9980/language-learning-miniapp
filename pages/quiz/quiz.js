@@ -4,6 +4,8 @@ const { getWords } = require('../../utils/words')
 const quiz = require('../../utils/quiz')
 const sentences = require('../../utils/sentences')
 const sentenceProgress = require('../../utils/sentence-progress')
+const practiceTimer = require('../../utils/practice-timer')
+const kidMode = require('../../utils/kid-mode')
 
 Page({
   behaviors: [theme],
@@ -19,16 +21,22 @@ Page({
   },
   onShow() {
     this.syncTheme()
+    // 儿童模式统计练习时长（15 / 30 分钟休息提醒），只计前台时间
+    practiceTimer.start(this.data.isKid)
     // 做了一半就接着做：以前每次 onShow 都 buildQuiz() 重新随机 10 题，
     // 做完 9 题切去查词页再回来，题目全换成新的，等于白做。
     if (this.data.queue.length && !this.data.finished) return
     this.buildQuiz()
   },
-  onHide() { storage.flushAll() },
-  onUnload() { storage.flushAll() },
+  onHide() { practiceTimer.stop(); storage.flushAll() },
+  onUnload() { practiceTimer.stop(); storage.flushAll() },
   buildQuiz() {
     const lang = storage.getCurrentLang()
-    const all = getWords(lang)
+    let all = getWords(lang)
+    // 儿童模式不考四级/六级/考研/财务/工作/科技那些词，出题范围跟学习页保持一致
+    if (this.data.isKid) {
+      all = all.filter(function (w) { return !kidMode.hideCategory(w.category) })
+    }
     const prog = storage.getProgress()
     const now = Date.now()
     // 句子题占 3 题（有句子素材时才出），其余是单词题：

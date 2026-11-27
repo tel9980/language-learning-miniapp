@@ -2111,6 +2111,94 @@ async function runTailTests() {
     eq(read('app.json').indexOf('"color": "#8A94A6"') > 0, true, 'tabBar 文字色没被改坏')
     ok(fsx.existsSync(pth.join(ROOT, 'tools/gen-tabbar-icons.py')), '图标可再生（脚本进仓库）')
   }
+  // L. 儿童模式：入口、放大、边界、时长
+  // 背景：儿童模式原来只有 fontScale 1.18，只放大标题类 5 个元素，
+  // 例句正文/按钮/选项/进度一个字都没变，而且入口藏在「家人档案 → 模式」里，
+  // 也没有任何内容或上传边界。这组用例锁住新行为，别再退回去。
+  {
+    const profSrc = read('utils/profile.js')
+    ok(/kid:\s*\{[^}]*kid:\s*true/.test(profSrc), '儿童模式在 MODES 里带 kid 标记')
+    ok(/darkMode:\s*null/.test(profSrc), '儿童模式不再强行关掉用户开的深色')
+    ok(/function isKid\(/.test(profSrc), 'profile 提供 isKid()')
+
+    const kidMode = require('../utils/kid-mode')
+    eq(kidMode.KID_DEFAULT_CAT, '日常', '儿童模式默认落在「日常」分类')
+    const fake = [{ name: '日常' }, { name: '四级' }, { name: '财务' }, { name: '科技' }, { name: '食物' }]
+    eq(kidMode.filterCategories(fake).map(c => c.name).join(','), '日常,食物', '考试/职场分类在儿童模式下被藏掉')
+    eq(kidMode.hideCategory('财务'), true, 'hideCategory 认得财务')
+    eq(kidMode.hideCategory('日常'), false, 'hideCategory 不误伤日常')
+
+    // 字体：儿童模式必须放大例句正文与选项，而不是只放大标题
+    const appWxss = read('app.wxss')
+    ok(/\.theme-kid \.example/.test(appWxss), '儿童模式放大例句正文')
+    ok(/\.theme-kid \.option/.test(appWxss), '儿童模式放大选项')
+    ok(/\.theme-kid \.stage-word\.sentence/.test(appWxss), '儿童模式单独处理句子大字（否则被页面样式盖掉）')
+    ok(/ theme-kid/.test(read('utils/theme.js')), 'theme 会给 root 加 theme-kid')
+
+    // 入口：首页左边改模式、右边换人；统计页设置里也有一行
+    const idxWxml = read('pages/index/index.wxml')
+    ok(/bindtap="openMode"/.test(idxWxml), '首页能直接改模式')
+    ok(/👪 换人/.test(idxWxml), '首页把「换人」和「改模式」拆开')
+    ok(/openMode\(\)/.test(read('pages/index/index.js')), '首页有 openMode')
+    const stWxml2 = read('pages/stats/stats.wxml')
+    ok(/bindtap="openMode"/.test(stWxml2), '统计页设置里能改模式')
+    ok(/bindtap="openKidAi"/.test(stWxml2), '统计页有 AI 开关')
+    ok(/kid-card/.test(stWxml2), '统计页有儿童小结卡片')
+    ok(/openKidAi\(\)/.test(read('pages/stats/stats.js')), '统计页有 openKidAi')
+
+    // 档案页：三个 chip 直接点，不再藏在 ActionSheet 里
+    const prWxml = read('pages/profiles/profiles.wxml')
+    ok(/mode-chip/.test(prWxml) && /data-mode/.test(prWxml), '档案页用三个 chip 选模式')
+    eq(/bindtap="changeMode"/.test(prWxml), false, '旧的「模式」按钮已撤掉')
+    ok(/pickMode\(e\)/.test(read('pages/profiles/profiles.js')), '档案页有 pickMode')
+    // 文案不许再虚标「简单」——儿童模式本来就没做简化，现在做的是字更大 + 分类过滤
+    const pickerSrc = read('utils/mode-picker.js')
+    // 只看文案行，注释里说明「以前写过简单的」不算
+    const pickerLabels = pickerSrc.replace(/\/\/[^\n]*/g, '')
+    eq(/简单/.test(pickerLabels), false, '模式文案不再写没做过的「简单」')
+    ok(/字更大、只留基础分类/.test(pickerSrc), '模式文案如实说明做了什么')
+
+    // 边界：儿童模式默认零上传
+    const spkSrc = read('pages/speak/speak.js')
+    ok(/_evalAvailable\(cur\) \{[\s\S]{0,200}if \(this\.data\.isKid\) return false/.test(spkSrc),
+      '儿童模式不调智聆评测（录音不发腾讯云）')
+    ok(/!this\.data\.isKid && speechScore\.isSupported/.test(spkSrc), '儿童模式不启用同声传译识别')
+    const spkWxml = read('pages/speak/speak.wxml')
+    ok(/track==='dialogue' && aiAllowed/.test(spkWxml), '儿童模式默认看不到对练')
+    ok(/hasRecording && aiAllowed/.test(spkWxml), '儿童模式默认看不到 AI 听音')
+    ok(/isKid \? '🔁 再读一次'/.test(spkWxml), '自评按钮在儿童模式下换成孩子听得懂的话')
+
+    // 出题范围跟学习页一致
+    ok(/kidMode\.hideCategory/.test(read('pages/quiz/quiz.js')), '儿童模式测验不出考试/职场词')
+    ok(/kidMode\.filterCategories/.test(read('pages/learn/learn.js')), '儿童模式学习页过滤分类')
+    ok(/KID_DEFAULT_CAT/.test(read('pages/learn/learn.js')), '儿童模式学习页默认日常分类')
+
+    // 时长与休息提醒
+    const timerSrc = read('utils/practice-timer.js')
+    ok(/storage\.addPracticeSeconds\(sec\)/.test(timerSrc), '计时结束写回练习时长')
+    ok(/sec < 3/.test(timerSrc), '误触（<3 秒）不记时长')
+    ok(/restDue\(\)/.test(timerSrc), '儿童模式到点提醒休息')
+    ;['pages/learn/learn.js', 'pages/quiz/quiz.js', 'pages/speak/speak.js'].forEach((f) => {
+      ok(/practiceTimer\.start\(/.test(read(f)), f + ' 开始计练习时长')
+      ok(/practiceTimer\.stop\(/.test(read(f)), f + ' 离开时结算练习时长')
+    })
+
+    // storage 侧的开关（前面用例可能已写过这些键，所以先归零再断言）
+    const stKid = require('../utils/storage')
+    stKid.setGuardianAgreed(false)
+    stKid.setKidAiUnlocked(false)
+    const secBefore = stKid.getPracticeSeconds()
+    stKid.addPracticeSeconds(90)
+    eq(stKid.getPracticeSeconds(), secBefore + 90, '练习时长能累加')
+    eq(stKid.getKidAiUnlocked(), false, '没做监护人确认时 AI 解锁为假')
+    eq(stKid.setKidAiUnlocked(true), false, '没做监护人确认时解锁会被拒绝')
+    stKid.setGuardianAgreed(true)
+    eq(stKid.setKidAiUnlocked(true), true, '家长确认后能解锁')
+    eq(stKid.getKidAiUnlocked(), true, '解锁后状态为真')
+    stKid.setGuardianAgreed(false)
+    eq(stKid.getKidAiUnlocked(), false, '撤回监护人同意连带关掉解锁')
+  }
+
   // K. 对练（我说中文，给我目标语言的说法）
   // 关键约束：只放在情景对话里，不做独立翻译页（个人主体 + 教育类目，
   // 独立翻译入口容易被判成工具类应用，插件类目已经因此被驳过一次）。

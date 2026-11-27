@@ -9,9 +9,11 @@ const KEY_LIST = 'lp_profiles_v1'
 const KEY_CURRENT = 'lp_profile_current_v1'
 const DEFAULT_ID = 'p_default'
 
+// darkMode 传 null = 不动用户的深色设置（儿童模式以前写死 false，晚上切过去屏幕会突然变白）
+// kid: true 是给 theme.js 看的：它会加上 .theme-kid 类，整页放大（见 app.wxss）
 const MODES = {
   normal: { name: '标准', fontScale: 1, darkMode: false },
-  kid:    { name: '儿童', fontScale: 1.18, darkMode: false },
+  kid:    { name: '儿童', fontScale: 1, darkMode: null, kid: true },
   elder:  { name: '长辈', fontScale: 1.35, darkMode: false }
 }
 
@@ -106,7 +108,7 @@ function applyMode(id) {
   try {
     const theme = require('./storage')
     theme.setFontScale(m.fontScale)
-    theme.setDarkMode(m.darkMode)
+    if (typeof m.darkMode === 'boolean') theme.setDarkMode(m.darkMode)
   } catch (e) {}
 }
 
@@ -172,10 +174,16 @@ function migrateLegacy(baseKeys) {
 
 function modes() { return MODES }
 
+// 当前档案是不是儿童模式（页面用它决定隐藏 AI 入口、过滤分类）
+function isKid(id) {
+  const p = get(id || current())
+  return !!(p && p.mode === 'kid')
+}
+
 // 外部（全家包导入等）直接改了 KEY_LIST / KEY_CURRENT 后必须调用，避免缓存陈旧
 function invalidate() { _listCache = null; _currentCache = null }
 
 module.exports = {
-  list, current, get, currentProfile, switchTo, add, rename, setMode, remove,
+  list, current, get, currentProfile, switchTo, add, rename, setMode, remove, isKid,
   nsKey, migrateLegacy, modes, DEFAULT_ID, invalidate
 }

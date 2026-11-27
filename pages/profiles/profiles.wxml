@@ -16,8 +16,14 @@
     </view>
     <view class="actions" catchtap="noop">
       <view class="mini-btn" catchtap="rename" data-id="{{item.id}}">改名</view>
-      <view class="mini-btn" catchtap="changeMode" data-id="{{item.id}}">模式</view>
       <view class="mini-btn danger" wx:if="{{!item.isCurrent}}" catchtap="remove" data-id="{{item.id}}">删除</view>
+    </view>
+    <!-- 模式直接摊开成三个 chip：以前藏在一个「模式」按钮 + ActionSheet 里，
+         一次只能看一项，还容易点错人。 -->
+    <view class="mode-row" catchtap="noop">
+      <view wx:for="{{modes}}" wx:key="key" wx:for-item="m"
+            class="mode-chip {{item.mode === m.key ? 'on' : ''}}"
+            catchtap="pickMode" data-id="{{item.id}}" data-mode="{{m.key}}">{{m.name}}</view>
     </view>
   </view>
 

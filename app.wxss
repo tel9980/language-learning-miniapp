@@ -43,6 +43,44 @@ page {
 .theme-xl .title, .theme-xl .stage-word { font-size: 125%; }
 .theme-xl .muted, .theme-xl .subtitle, .theme-xl .stage-meaning { font-size: 125%; }
 
+/* 儿童模式：整页放大，而不是只放大标题。
+   以前儿童模式只把 5 类元素放大 12%，例句正文、按钮、选项、进度一个字都没变——
+   而例句恰好是孩子最需要看清的地方。这里按三个练习页里承载正文的类逐个放大，
+   由 utils/theme.js 在档案是儿童模式时把 .theme-kid 加到 root view 上。
+   注意 .stage-word.sentence 必须单独写：它和 .stage-word 同优先级，页面样式在后会盖掉。 */
+.theme-kid .word { font-size: 82rpx; }
+.theme-kid .stage-word { font-size: 72rpx; }
+.theme-kid .stage-word.sentence { font-size: 42rpx; }
+.theme-kid .meaning { font-size: 44rpx; }
+.theme-kid .stage-meaning { font-size: 34rpx; }
+.theme-kid .phonetic,
+.theme-kid .stage-phonetic { font-size: 34rpx; }
+.theme-kid .example,
+.theme-kid .example-en { font-size: 33rpx; }
+.theme-kid .example-cn { font-size: 30rpx; }
+.theme-kid .q-prompt { font-size: 42rpx; }
+.theme-kid .q-hint { font-size: 34rpx; }
+.theme-kid .option { font-size: 33rpx; }
+.theme-kid .spell-input { font-size: 36rpx; }
+.theme-kid .play-btn,
+.theme-kid .speak-btn,
+.theme-kid .play-example,
+.theme-kid .play-mine { font-size: 32rpx; }
+.theme-kid .rate-btn,
+.theme-kid .rate-title,
+.theme-kid .mode-tab,
+.theme-kid .tool-btn,
+.theme-kid .record-label,
+.theme-kid .scene-picker { font-size: 30rpx; }
+.theme-kid .progress-line,
+.theme-kid .progress-text,
+.theme-kid .muted,
+.theme-kid .subtitle,
+.theme-kid .setting-label,
+.theme-kid .setting-value { font-size: 28rpx; }
+.theme-kid .known-skip,
+.theme-kid .known-undo { font-size: 28rpx; }
+
 .theme-dark { background: #1A1F2B; color: #E8EAF0; }
 .theme-dark .card,
 .theme-dark .header,

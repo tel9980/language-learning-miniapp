@@ -26,7 +26,7 @@ function defaults() {
   return {
     progress: {},
     stats: { totalLearned: 0, totalReviews: 0, totalCorrect: 0, streak: 0, lastActive: '', firstDay: '' },
-    settings: { lang: 'en', dailyGoal: 20, feedbackEnabled: true, guideSeen: false, aiEvalAgreed: false, voiceprintAgreed: false, voiceprintAgreedAt: '' },
+    settings: { lang: 'en', dailyGoal: 20, feedbackEnabled: true, guideSeen: false, aiEvalAgreed: false, voiceprintAgreed: false, voiceprintAgreedAt: '', guardianAgreed: false, guardianAgreedAt: '', kidAiUnlocked: false, kidAiUnlockedAt: '', kidRest: '' },
     daily: {},
     custom: [],
     theme: { fontScale: 1, darkMode: false }
@@ -509,6 +509,62 @@ function getToday() {
   return d[todayKey()] || { learned: 0, reviewed: 0, correct: 0, total: 0 }
 }
 
+// ---------- 练习时长（儿童模式的休息提醒要用） ----------
+// 每日数据里原来只有 learned/reviewed/correct/total，没有时长，所以做不了「练了多久」。
+// 只累加秒数，不记任何内容；写入同样走延迟落盘，不新增同步写。
+function addPracticeSeconds(sec) {
+  const n = Math.max(0, Math.round(Number(sec) || 0))
+  if (!n) return 0
+  const daily = getDaily()
+  const tk = todayKey()
+  const d = daily[tk] || { learned: 0, reviewed: 0, correct: 0, total: 0 }
+  d.practiceSec = (d.practiceSec || 0) + n
+  daily[tk] = d
+  writeDeferred(KEY_DAILY, daily)
+  return d.practiceSec
+}
+
+function getPracticeSeconds() {
+  const d = getDaily()[todayKey()]
+  return (d && d.practiceSec) || 0
+}
+
+// ---------- 儿童模式的边界 ----------
+// 默认零上传：儿童模式不碰智聆评测、不做语音识别、不用 AI 听音/对练。
+// 家长确实要用，得先做「监护人确认」再单独解锁（见 pages/stats 的设置行）。
+function getGuardianAgreed() {
+  return !!getSettings().guardianAgreed
+}
+function setGuardianAgreed(v) {
+  const s = getSettings()
+  s.guardianAgreed = !!v
+  s.guardianAgreedAt = v ? todayKey() : ''
+  if (!v) { s.kidAiUnlocked = false; s.kidAiUnlockedAt = '' }
+  write(KEY_SETTINGS, s)
+}
+function getKidAiUnlocked() {
+  const s = getSettings()
+  return !!(s.kidAiUnlocked && s.guardianAgreed)
+}
+function setKidAiUnlocked(v) {
+  const s = getSettings()
+  if (v && !s.guardianAgreed) return false
+  s.kidAiUnlocked = !!v
+  s.kidAiUnlockedAt = v ? todayKey() : ''
+  write(KEY_SETTINGS, s)
+  return true
+}
+// 休息提醒今天是否已经弹过（'15' / '30' 两个节点各弹一次）
+function kidRestSeen(step) {
+  const s = getSettings()
+  return s.kidRest === todayKey() + ':' + step
+}
+function markKidRestSeen(step) {
+  const s = getSettings()
+  s.kidRest = todayKey() + ':' + step
+  writeDeferred(KEY_SETTINGS, s)
+}
+
 // 掌握度：level>=4 视为掌握
 function getMasteredCount(lang) {
   const prog = getProgress()
@@ -576,6 +632,7 @@ function importData(data) {
 module.exports = {
   init, todayKey, getSettings, setLang, getCurrentLang, setDailyGoal,
   setFeedbackEnabled, setGuideSeen, setLearnCat, setAiEvalAgreed, getVoiceprintAgreed, setVoiceprintAgreed, getTheme, setFontScale, setDarkMode,
+  addPracticeSeconds, getPracticeSeconds, getGuardianAgreed, setGuardianAgreed, getKidAiUnlocked, setKidAiUnlocked, kidRestSeen, markKidRestSeen,
   getCustomItems, addCustomItems, removeCustomItem,
   getProgress, getStats, getDaily, getDueWords, getNewWords, getToday,
   review, quizAnswer, getMasteredCount, INTERVALS,

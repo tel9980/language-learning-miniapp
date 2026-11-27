@@ -12,6 +12,15 @@
 .actions { display: flex; flex-direction: column; gap: 8rpx; margin-left: 12rpx; }
 .mini-btn { font-size: 20rpx; color: #4A6CF7; border: 1rpx solid #C9D4FF; border-radius: 8rpx; padding: 4rpx 12rpx; text-align: center; }
 .mini-btn.danger { color: #E5484D; border-color: #FFC9CB; }
+/* 模式 chip：三个并排，谁都能一眼看清「这个人现在是哪种模式」 */
+.profile { flex-wrap: wrap; }
+.mode-row { display: flex; gap: 12rpx; width: 100%; margin-top: 18rpx; padding-top: 18rpx; border-top: 1rpx solid #F0F3FA; }
+.mode-chip { flex: 1; text-align: center; font-size: 22rpx; color: #5A6474; background: #F4F6FC; border-radius: 999rpx; padding: 10rpx 0; }
+.mode-chip.on { color: #fff; background: #4A6CF7; font-weight: 600; }
+.profile.current .mode-chip.on { background: #4A6CF7; }
+.theme-dark .mode-row { border-top-color: #333C50; }
+.theme-dark .mode-chip { color: #9AA3B5; background: #2A3244; }
+.theme-dark .mode-chip.on { color: #0F1420; background: #8FA8FF; }
 .add-btn { background: #4A6CF7; color: #fff; text-align: center; padding: 24rpx; border-radius: 16rpx; font-size: 30rpx; font-weight: 600; margin: 12rpx 0 24rpx; }
 .tip-card { background: #F7F9FD; }
 .tip { line-height: 1.6; }

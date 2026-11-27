@@ -4,6 +4,8 @@ const storage = require('../../utils/storage')
 const { getWords, getLangMeta, getExamCategories } = require('../../utils/words')
 const audio = require('../../utils/audio')
 const localAudio = require('../../utils/local-audio')
+const kidMode = require('../../utils/kid-mode')
+const practiceTimer = require('../../utils/practice-timer')
 
 Page({
   behaviors: [theme],
@@ -15,6 +17,8 @@ Page({
   },
   onShow() {
     this.syncTheme()
+    // 儿童模式要统计练习时长（15 / 30 分钟休息提醒），只计前台时间
+    practiceTimer.start(this.data.isKid)
     // 离线音频优先流播 CDN（见 utils/audio.js），不预载分包——
     // 预载要拉 1–3MB，而真机上读分包文件还可能失败，不如按需。
     const intent = nav.takeIntent('pages/learn/learn')
@@ -39,12 +43,20 @@ Page({
     const meta = getLangMeta(lang)
     const dueWords = storage.getDueWords(lang)
     // 分类下拉：全部 + 当前语种的词库分类（新词可以按类学，不用从头排到尾）
-    const cats = getExamCategories(lang)
+    // 儿童模式只留适龄分类：四级/六级/考研/雅思托福/财务/工作/科技 全藏起来。
+    // 之前孩子一进来排在最前面的是 abandon / accommodate，纯粹是被分类顺序坑了。
+    const isKid = !!this.data.isKid
+    const cats = isKid ? kidMode.filterCategories(getExamCategories(lang)) : getExamCategories(lang)
     const catNames = ['全部分类'].concat(cats.map(c => c.name + '(' + c.count + ')'))
     this._catValues = [''].concat(cats.map(c => c.name))
     const saved = storage.getSettings().learnCat || ''
     let catIndex = this._catValues.indexOf(saved)
-    if (catIndex < 0) catIndex = 0
+    if (catIndex < 0) {
+      // 儿童模式默认落在「日常」；家长以前存过的分类若被藏掉，也退回日常而不是全部
+      const pref = isKid ? kidMode.KID_DEFAULT_CAT : ''
+      const i = this._catValues.indexOf(pref)
+      catIndex = i >= 0 ? i : 0
+    }
     this.setData({
       langName: meta.name, tts: meta.tts,
       totalWords: getWords(lang).length,
@@ -157,8 +169,9 @@ Page({
     if (!this.data.flipped) { this.setData({ flipped: true }); return }
     this.rate({ currentTarget: { dataset: { q: dx > 0 ? 5 : 0 } } })
   },
-  onHide() { storage.flushAll() },
+  onHide() { practiceTimer.stop(); storage.flushAll() },
   onUnload() {
+    practiceTimer.stop()
     // 评分是延迟落盘的，离开页面前必须冲一次，否则最后几张卡会丢
     storage.flushAll()
     if (this._player && this._player.destroy) this._player.destroy()

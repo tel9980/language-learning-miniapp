@@ -5,6 +5,7 @@ const audio = require('../../utils/audio')
 const aiEval = require('../../utils/ai-eval')
 const localAudio = require('../../utils/local-audio')
 const speechScore = require('../../utils/speech-score')
+const practiceTimer = require('../../utils/practice-timer')
 const recordings = require('../../utils/recordings')
 const karaoke = require('../../utils/karaoke')
 const feedback = require('../../utils/feedback')
@@ -75,9 +76,17 @@ Page({
     this.syncTheme()
     // 离线音频优先流播 CDN（见 utils/audio.js），不预载分包——
     // 预载要拉 1–3MB，而真机上读分包文件还可能失败，不如按需。
-    this.setData({ scoreSupported: speechScore.isSupported(storage.getCurrentLang()) })
     const p = profile.currentProfile() || {}
-    this.setData({ isKid: p.mode === 'kid', stars: storage.getStats().totalCorrect || 0 })
+    const kid = p.mode === 'kid'
+    // 儿童模式默认零上传：不开智聆（录音发腾讯云）、不出现 AI 听音与对练（发境外 AI）。
+    // aiAllowed 只在家长做过监护人确认并单独解锁后为 true。
+    this.setData({
+      isKid: kid,
+      aiAllowed: !kid || storage.getKidAiUnlocked(),
+      scoreSupported: !kid && speechScore.isSupported(storage.getCurrentLang()),
+      stars: storage.getStats().totalCorrect || 0
+    })
+    practiceTimer.start(kid)
     const intent = nav.takeIntent('pages/speak/speak')
     // 从搜索页点「去跟读这句」进来：只练这一条，练完回正常队列
     if (intent && intent.item) {
@@ -114,8 +123,8 @@ Page({
   },
 
   // 评分/录音记录是延迟落盘的，离开页面前必须冲一次
-  onHide() { this.stopAll(); storage.flushAll() },
-  onUnload() { this.stopAll(); storage.flushAll() },
+  onHide() { practiceTimer.stop(); this.stopAll(); storage.flushAll() },
+  onUnload() { practiceTimer.stop(); this.stopAll(); storage.flushAll() },
 
   closeGuide() {
     this.setData({ showGuide: false })
@@ -480,6 +489,8 @@ Page({
   // 所以走插件时不再自己开录音器。
   _evalAvailable(cur) {
     if (!cur) return false
+    // 儿童模式不评测：智聆要把录音上传到腾讯云，孩子没有「同意上传」的能力
+    if (this.data.isKid) return false
     // 按文本判断，不看用户设置的语言：切到日语但素材是英文时照样能评测
     return speechScore.canEvaluateText(cur.word)
   },
@@ -625,7 +636,8 @@ Page({
 
     // 路径 B：自带录音器（若同声传译可用，并行做文字识别算相似度）
     this._ensureRecorder()
-    if (cur && speechScore.isSupported(lang)) {
+    // 同声传译识别同样是把录音发出去，儿童模式一并关掉（只留本机录音 + 自评）
+    if (cur && !this.data.isKid && speechScore.isSupported(lang)) {
       this._recognizer = speechScore.createRecognizer({
         targetText: cur.word,
         lang: getLangMeta(lang).voice,
@@ -775,7 +787,9 @@ Page({
     this._reviewItem(cur.id, schedQ)
     if (q === 0) feedback.warn(); else feedback.success()
 
-    const msg = ['已加入重点复练 💪', '不错，继续！', '很流利，赞！'][q] || '已记录'
+    const msg = this.data.isKid
+      ? (['已加入重点复练 💪', '读得不错！', '读得真好！'][q] || '已记录')
+      : (['已加入重点复练 💪', '不错，继续！', '很流利，赞！'][q] || '已记录')
     wx.showToast({ title: msg, icon: 'none' })
 
     // 儿童模式：答好给星星动画奖励

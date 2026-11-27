@@ -7,10 +7,12 @@
       </view>
       <view class="lang-badge" bindtap="switchLang">{{langFlag}} {{langName}} ▾</view>
     </view>
-    <view class="profile-bar" bindtap="goProfiles">
+    <!-- 拆成两件事：左边改「显示模式」，右边才是「换人」。
+         以前整条都是一个「切换家人档案」，用户根本想不到改模式要先去换人。 -->
+    <view class="profile-bar">
       <view class="avatar">{{myAvatar}}</view>
-      <view class="profile-name">{{myName}} · {{modeName}}模式</view>
-      <view class="muted">切换家人档案 ›</view>
+      <view class="profile-name" bindtap="openMode">{{myName}} · {{modeName}}模式 ›</view>
+      <view class="muted switch-people" bindtap="goProfiles">👪 换人</view>
     </view>
     <view class="hero-stats">
       <view class="hero-stat">

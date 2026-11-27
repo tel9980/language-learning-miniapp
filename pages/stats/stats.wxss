@@ -78,3 +78,11 @@
   background: #F1F4F9; color: #4B5563; font-size: 28rpx; }
 .share-tip { margin-top: 16rpx; }
 .theme-dark .share-copy { background: #232A36; color: #CBD3E1; }
+
+/* 儿童模式小结：不谈排名、不谈连续天数，只报「今天练了多久、学了几词」 */
+.kid-card .kid-line { font-size: 30rpx; color: #1F2430; margin-top: 8rpx; }
+.kid-card .kid-num { font-size: 40rpx; font-weight: 700; color: #4A6CF7; margin: 0 4rpx; }
+.kid-card .kid-tip { font-size: 24rpx; color: #8A94A6; margin-top: 10rpx; }
+.theme-dark .kid-card .kid-line { color: #E6EBF5; }
+.theme-dark .kid-card .kid-num { color: #8FA8FF; }
+.theme-dark .kid-card .kid-tip { color: #9AA3B5; }

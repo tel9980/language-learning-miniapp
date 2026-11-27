@@ -1,4 +1,5 @@
 const storage = require('./storage')
+const profile = require('./profile')
 
 // 无障碍主题 Behavior：页面引入后，root view 用 class="container {{themeClass}}" 即可生效。
 // 字号通过 CSS 类覆盖常用文本尺寸；深色模式通过 .theme-dark 全局覆盖配色。
@@ -6,7 +7,9 @@ module.exports = Behavior({
   data: {
     themeClass: '',
     fontScale: 1,
-    darkMode: false
+    darkMode: false,
+    // 儿童模式：页面用它隐藏 AI 入口、过滤分类（见 utils/profile.js 的 MODES.kid）
+    isKid: false
   },
   methods: {
     syncTheme() {
@@ -17,7 +20,10 @@ module.exports = Behavior({
       else if (s >= 1.14) cls += ' theme-lg'
       else if (s <= 0.9) cls += ' theme-sm'
       if (t.darkMode) cls += ' theme-dark'
-      this.setData({ themeClass: cls.trim(), fontScale: s, darkMode: !!t.darkMode })
+      let kid = false
+      try { kid = profile.isKid() } catch (e) {}
+      if (kid) cls += ' theme-kid'
+      this.setData({ themeClass: cls.trim(), fontScale: s, darkMode: !!t.darkMode, isKid: kid })
     }
   }
 })
