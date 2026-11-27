@@ -1,6 +1,7 @@
 const theme = require('../../utils/theme')
 const storage = require('../../utils/storage')
 const { getWords } = require('../../utils/words')
+const kidMode = require('../../utils/kid-mode')
 const sentences = require('../../utils/sentences')
 const sentenceProgress = require('../../utils/sentence-progress')
 const { getLangMeta } = require('../../utils/lang')
@@ -58,7 +59,8 @@ Page({
         return { id: it.id, word: it.word, meaning: it.meaning, kind: 'sentence', example: it.word }
       })
     } else {
-      const all = getWords(lang)
+      // 儿童模式只从适龄分类出题（不然会听写「财务」「考研」的词）
+      const all = kidMode.allowedWords(getWords(lang), kidMode.isKidOf(this))
       const prog = storage.getProgress()
       queue = quiz.pickWords(all, prog, now, ROUND).map(function (w) {
         return { id: w.id, word: w.word, meaning: w.meaning, kind: 'word', example: w.example }

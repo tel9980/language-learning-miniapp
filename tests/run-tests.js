@@ -2169,7 +2169,7 @@ async function runTailTests() {
     ok(/isKid \? '🔁 再读一次'/.test(spkWxml), '自评按钮在儿童模式下换成孩子听得懂的话')
 
     // 出题范围跟学习页一致
-    ok(/kidMode\.hideCategory/.test(read('pages/quiz/quiz.js')), '儿童模式测验不出考试/职场词')
+    ok(/kidMode\.allowedWords/.test(read('pages/quiz/quiz.js')), '儿童模式测验不出考试/职场词')
     ok(/kidMode\.filterCategories/.test(read('pages/learn/learn.js')), '儿童模式学习页过滤分类')
     ok(/KID_DEFAULT_CAT/.test(read('pages/learn/learn.js')), '儿童模式学习页默认日常分类')
 
@@ -2197,6 +2197,54 @@ async function runTailTests() {
     eq(stKid.getKidAiUnlocked(), true, '解锁后状态为真')
     stKid.setGuardianAgreed(false)
     eq(stKid.getKidAiUnlocked(), false, '撤回监护人同意连带关掉解锁')
+  }
+
+  // M. 第七轮：儿童边界补齐、麦克风用途、预取省流量、额度按档案、转发带上下文
+  {
+    const kidMode2 = require('../utils/kid-mode')
+    const ws = [{ id: 'en_1', category: '日常' }, { id: 'en_2', category: '财务' }, { id: 'en_3', category: '科技' }]
+    eq(kidMode2.allowedWords(ws, true).map(w => w.id).join(','), 'en_1', 'allowedWords 在儿童模式只留适龄分类')
+    eq(kidMode2.allowedWords(ws, false).length, 3, 'allowedWords 非儿童模式原样返回')
+    eq(kidMode2.isKidOf({ data: { isKid: true } }), true, 'isKidOf 读页面 data')
+    eq(kidMode2.isKidOf(null), false, 'isKidOf 对空页面不崩')
+
+    // 上一次儿童模式只过滤了学习页和测验，听写/今日待练/总数全漏了
+    ok(/kidMode\.allowedWords/.test(read('pages/dictation/dictation.js')), '听写按适龄分类取词')
+    ok(/kidMode\.allowedWords/.test(read('pages/today/today.js')), '今日待练按适龄分类取词')
+    ok(/allowedWords\(getWords\(lang\), isKid\)/.test(read('pages/learn/learn.js')), '学习页总数跟着过滤走')
+    ok(/kidMode\.allowedWords/.test(read('pages/quiz/quiz.js')), '测验统一走 allowedWords')
+
+    // A. 麦克风用途说明
+    const appJ = JSON.parse(read('app.json'))
+    ok(!!(appJ.permission && appJ.permission['scope.record']), 'app.json 声明了 scope.record')
+    ok((appJ.permission['scope.record'].desc || '').length >= 8, '麦克风用途写得够具体')
+
+    // B. 预取只在 WiFi
+    const audioSrc = read('utils/audio.js')
+    ok(/networkType === 'wifi'/.test(audioSrc), '预取只在 WiFi 下做')
+    ok(/getNetworkType/.test(audioSrc), '预取会先问网络类型')
+
+    // C. AI 额度按档案分摊
+    const dev = require('../utils/device')
+    ok(typeof dev.scopedId === 'function', 'device 提供 scopedId')
+    const sid = dev.scopedId()
+    ok(/^[a-z0-9]{6,40}(-[a-z0-9]{1,8})?$/i.test(sid), 'scopedId 形态合法（设备号 + 档案序号）')
+    ok(/device\.scopedId\(\)/.test(read('utils/ai-lookup.js')), '查词走按档案的额度键')
+    ok(/device\.scopedId\(\)/.test(read('utils/ai-eval.js')), 'AI 听音走按档案的额度键')
+    ok(/\^\[a-z0-9-\]\{6,48\}\$/.test(read('deploy/ai/worker.js')), 'Worker 接受带连字符的设备键')
+
+    // D. 口语页转发带上下文
+    const spk = read('pages/speak/speak.js')
+    ok(/onShareAppMessage\(\)/.test(spk), '口语页能转发')
+    ok(/\?item=/.test(spk), '转发路径带上这一条')
+    ok(/_pendingItem/.test(spk), '带 ?item= 打开时会直接练这一条')
+    ok(/langOfId/.test(spk), '素材 id 能反推语种（换语种也点得开）')
+    const langLib = require('../utils/lang')
+    eq(langLib.langOfId('ja_012'), 'ja', 'ja_ 前缀 → 日语')
+    eq(langLib.langOfId('st_vs003'), 'vi', 'st_vs 前缀 → 越南语')
+    eq(langLib.langOfId('dl_kd010_2'), 'ko', 'dl_kd 前缀 → 韩语')
+    eq(langLib.langOfId('st_s007'), 'en', 'st_s 前缀 → 英语')
+    eq(langLib.langOfId(''), '', '认不出的 id 返回空串')
   }
 
   // K. 对练（我说中文，给我目标语言的说法）

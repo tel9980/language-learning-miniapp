@@ -17,4 +17,18 @@ function id() {
   return v
 }
 
-module.exports = { id }
+// 按档案分摊：一台手机四个家人档案，以前共用一份额度，
+// 一个人查 60 个词，另外三个人当天就没额度了。额度应该跟「谁在用」走。
+// 仍然不含任何身份信息——只是设备号后面拼一个本机档案序号。
+function scopedId() {
+  const base = id()
+  let pid = ''
+  try {
+    const profile = require('./profile')
+    const p = profile.currentProfile && profile.currentProfile()
+    if (p && p.id) pid = String(p.id).replace(/[^a-z0-9]/gi, '').slice(0, 8)
+  } catch (e) {}
+  return pid ? base + '-' + pid : base
+}
+
+module.exports = { id, scopedId }

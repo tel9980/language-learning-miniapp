@@ -12,7 +12,7 @@ const feedback = require('../../utils/feedback')
 const theme = require('../../utils/theme')
 const profile = require('../../utils/profile')
 const nav = require('../../utils/nav')
-const { getLangMeta } = require('../../utils/lang')
+const { getLangMeta, langOfId } = require('../../utils/lang')
 const sentenceProgress = require('../../utils/sentence-progress')
 const session = require('../../utils/speak-session')
 const shadowTip = require('../../utils/shadow-tip')
@@ -66,10 +66,25 @@ Page({
   _highlighter: null,
   _abPlaying: false,
 
-  onLoad() {
+  onLoad(options) {
     this.setData({ scoreSupported: speechScore.isSupported(storage.getCurrentLang()) })
     const s = storage.getSettings()
     if (!s.guideSeen) this.setData({ showGuide: true })
+    // 别人从转发卡片点进来时带 ?item=xxx：进来直接练这一条（onShow 里消费）
+    this._pendingItem = (options && options.item) || ''
+  },
+
+  // 转发给朋友：带上当前这一条，对方点开就练同一句
+  //（朋友圈不做——单页模式拿不到本机进度，看到的会是空数据）
+  onShareAppMessage() {
+    const cur = this.data.current
+    const id = cur && cur.id ? String(cur.id) : ''
+    let label = (cur && (cur.word || cur.meaning)) || ''
+    if (label.length > 16) label = label.slice(0, 16)
+    return {
+      title: label ? '我在练这句：' + label : '一起练口语，读错了有人告诉你',
+      path: '/pages/speak/speak' + (id ? '?item=' + encodeURIComponent(id) : '')
+    }
   },
 
   onShow() {
@@ -88,10 +103,12 @@ Page({
     })
     practiceTimer.start(kid)
     const intent = nav.takeIntent('pages/speak/speak')
-    // 从搜索页点「去跟读这句」进来：只练这一条，练完回正常队列
-    if (intent && intent.item) {
+    // 从搜索页点「去跟读这句」、或从转发卡片带 ?item= 进来：只练这一条，练完回正常队列
+    const oneId = (intent && intent.item) || this._pendingItem
+    if (oneId) {
+      this._pendingItem = ''
       this.refreshScenes()
-      this.startOne(intent.item)
+      this.startOne(oneId)
       return
     }
     if (intent && intent.focus) {
@@ -836,8 +853,18 @@ Page({
   // ---------- 重点复练 ----------
   // 单条练习：搜索页点「去跟读这句」进来的，队列里就这一条
   startOne(id) {
-    const lang = storage.getCurrentLang()
-    const item = this.allItems(lang).filter(function (it) { return it.id === id })[0]
+    let lang = storage.getCurrentLang()
+    let item = this.allItems(lang).filter(function (it) { return it.id === id })[0]
+    if (!item) {
+      // 转发卡片可能来自别的语种：按 id 前缀切过去，别直接告诉对方「找不到」
+      const want = langOfId(id)
+      if (want && want !== lang) {
+        storage.setLang(want)
+        lang = want
+        this.refreshScenes()
+        item = this.allItems(lang).filter(function (it) { return it.id === id })[0]
+      }
+    }
     if (!item) {
       wx.showToast({ title: '这条素材找不到了', icon: 'none' })
       return

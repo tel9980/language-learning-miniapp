@@ -20,6 +20,20 @@ function hideCategory(name) {
   return KID_HIDE.indexOf(name) >= 0
 }
 
+// 页面统一走这里拿词：儿童模式下只返回适龄分类。
+// 上次只过滤了学习页和测验，漏了听写、今日待练和学习页的总数，
+// 「只留基础分类」就成了空话——所以收敛成一个函数，新页面照抄不会漏。
+function allowedWords(words, isKid) {
+  const list = words || []
+  if (!isKid) return list
+  return list.filter(function (w) { return w && !hideCategory(w.category) })
+}
+
+// 从页面推断当前是不是儿童模式（页面都有 theme behavior 给的 isKid）
+function isKidOf(page) {
+  return !!(page && page.data && page.data.isKid)
+}
+
 // 练了这么久，要不要提醒休息？返回要弹的分钟数（0 = 不用弹）
 function restDue() {
   const mins = Math.floor(storage.getPracticeSeconds() / 60)
@@ -39,5 +53,7 @@ module.exports = {
   REST_STEPS: REST_STEPS,
   filterCategories: filterCategories,
   hideCategory: hideCategory,
+  allowedWords: allowedWords,
+  isKidOf: isKidOf,
   restDue: restDue
 }

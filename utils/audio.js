@@ -235,11 +235,20 @@ function prefetch(id, lang) {
   if (!url) return
   if (ttsCache.fileOf(url)) return
   if (typeof wx.downloadFile !== 'function') return
-  wx.downloadFile({
-    url: url,
-    success(res) {
-      if (res.statusCode === 200 && res.tempFilePath) ttsCache.store(url, res.tempFilePath)
-    },
+  const downloadNow = function () {
+    wx.downloadFile({
+      url: url,
+      success(res) {
+        if (res.statusCode === 200 && res.tempFilePath) ttsCache.store(url, res.tempFilePath)
+      },
+      fail() {}
+    })
+  }
+  // 只在 WiFi 下预取：平均每条 6.4KB，一场 100 张就是 640KB 用户流量，
+  // 而预取只是「提前一点」——点播本来就是按需下载，不值得替用户花这笔钱。
+  if (typeof wx.getNetworkType !== 'function') { downloadNow(); return }
+  wx.getNetworkType({
+    success(res) { if (res && res.networkType === 'wifi') downloadNow() },
     fail() {}
   })
 }

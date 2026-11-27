@@ -35,7 +35,8 @@ Page({
 
   refresh() {
     const lang = this.data.lang
-    const words = getWords(lang)
+    // 儿童模式：待练清单也只放适龄的词，别把考试词推给孩子
+    const words = kidMode.allowedWords(getWords(lang), kidMode.isKidOf(this))
     const prog = storage.getProgress()
     const now = Date.now()
     const items = []

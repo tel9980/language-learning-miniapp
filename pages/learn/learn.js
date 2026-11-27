@@ -59,7 +59,8 @@ Page({
     }
     this.setData({
       langName: meta.name, tts: meta.tts,
-      totalWords: getWords(lang).length,
+      // 儿童模式下总数也要跟着分类过滤走，否则会显示「共 800 词」但只学得到一半
+      totalWords: kidMode.allowedWords(getWords(lang), isKid).length,
       dueCount: dueWords.length,
       catNames: catNames, catIndex: catIndex, catValue: this._catValues[catIndex],
       knownCount: storage.getKnownIds().length,

@@ -32,11 +32,8 @@ Page({
   onUnload() { practiceTimer.stop(); storage.flushAll() },
   buildQuiz() {
     const lang = storage.getCurrentLang()
-    let all = getWords(lang)
     // 儿童模式不考四级/六级/考研/财务/工作/科技那些词，出题范围跟学习页保持一致
-    if (this.data.isKid) {
-      all = all.filter(function (w) { return !kidMode.hideCategory(w.category) })
-    }
+    const all = kidMode.allowedWords(getWords(lang), this.data.isKid)
     const prog = storage.getProgress()
     const now = Date.now()
     // 句子题占 3 题（有句子素材时才出），其余是单词题：

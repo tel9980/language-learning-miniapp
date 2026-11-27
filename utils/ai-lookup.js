@@ -61,7 +61,7 @@ function lookup(word, lang, cb) {
     method: 'GET',
     timeout: TIMEOUT,
     // 设备标识：服务端用它分摊额度（同一 WiFi 下几台手机不至于互相挤占）
-    header: { 'x-device-id': device.id() },
+    header: { 'x-device-id': device.scopedId() },
     success(res) {
       const d = res && res.data
       if (res.statusCode !== 200 || !d || !d.ok) {

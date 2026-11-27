@@ -79,7 +79,7 @@ function clientIp(request) {
 // 不含任何用户信息，也不落日志。格式不合法的直接当没有。
 function deviceId(request) {
   const raw = request.headers.get('x-device-id') || ''
-  return /^[a-z0-9]{6,40}$/i.test(raw) ? raw : ''
+  return /^[a-z0-9-]{6,48}$/i.test(raw) ? raw : ''
 }
 
 // 额度：先看设备，再看出口 IP。

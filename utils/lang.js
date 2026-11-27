@@ -26,4 +26,19 @@ function normalizeLang(lang) {
   return LANGS[lang] ? lang : 'en'
 }
 
-module.exports = { LANGS, LANG_KEYS, getLangMeta, normalizeLang }
+// 从素材 id 前缀反推语种：转发卡片可能来自别的语种设置，
+// 「找不到这条」比「自动切过去」糟得多。
+//   en_001 / st_s001 / dl_d008_4  → en
+//   ja_001 / st_js001 / dl_jd008  → ja
+//   vi_001 / st_vs001 / dl_vd008  → vi
+//   ko_001 / st_ks001 / dl_kd010  → ko
+function langOfId(id) {
+  const s = String(id || '')
+  if (/^(ja_|st_js|dl_jd)/.test(s)) return 'ja'
+  if (/^(vi_|st_vs|dl_vd)/.test(s)) return 'vi'
+  if (/^(ko_|st_ks|dl_kd)/.test(s)) return 'ko'
+  if (/^(en_|st_s|dl_d)/.test(s)) return 'en'
+  return ''
+}
+
+module.exports = { LANGS, LANG_KEYS, getLangMeta, normalizeLang, langOfId }

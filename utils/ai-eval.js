@@ -71,7 +71,7 @@ function evaluate(opts) {
         url: ENDPOINT,
         method: 'POST',
         timeout: TIMEOUT,
-        header: { 'content-type': 'application/json', 'x-device-id': device.id() },
+        header: { 'content-type': 'application/json', 'x-device-id': device.scopedId() },
         data: { audio: b64, mime: mimeOf(opts.filePath), text: text, lang: opts.lang || 'en' },
         success(res) {
           const data = res && res.data
