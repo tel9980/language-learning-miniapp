@@ -15,6 +15,7 @@ const { getLangMeta } = require('../../utils/lang')
 const sentenceProgress = require('../../utils/sentence-progress')
 const session = require('../../utils/speak-session')
 const shadowTip = require('../../utils/shadow-tip')
+const mic = require('../../utils/mic')
 const translate = require('../../utils/translate')
 
 // 跟读模式：word=单词 | sentence=句子 | dialogue=情景对话 | custom=自建素材
@@ -543,22 +544,29 @@ Page({
     this._recManager.onError(() => {
       that._trainRec = false
       that.setData({ recording: false, trainRecording: false })
-      wx.showToast({ title: '录音失败，请检查麦克风权限', icon: 'none' })
+      // 不再只说「请检查麦克风权限」——用户不知道去哪检查。
+      // mic.guide 会在确认权限被拒时弹「去开启」直接跳 wx.openSetting。
+      mic.guide && mic.guide()
     })
     return this._recManager
   },
 
+  // 三层拦截，顺序不能换：
+  //   1. 声纹授权（审核要求「取得同意后才能获取声纹」）
+  //   2. 智聆 20802 限流（连点两下必踩）
+  //   3. 麦克风权限（被拒过一次就永远失败，必须能一键去设置找回）
   toggleRecord() {
     if (this.data.recording) { this.stopRecord(); return }
-    // 声纹授权：微信审核要求「取得用户授权同意后，才能获取用户声纹信息」。
-    // 所以必须卡在「真正开录音之前」这一行，而不是进页面时弹窗（那属于强制授权）。
     if (!storage.getVoiceprintAgreed()) { this.askVoiceprint(); return }
-    // 智聆后台对同一个小程序的调用有频率限制（错误码 20802），用户连点两下很容易踩到，
-    // 而且报出来的是一句看不懂的英文错误。这里先拦一道：两次评测之间至少隔 2 秒。
     if (this._evalAvailable(this.data.current) && this._lastEvalAt && Date.now() - this._lastEvalAt < 2000) {
       wx.showToast({ title: '慢一点，刚评过一次', icon: 'none' })
       return
     }
+    const that = this
+    mic.check(function (ok) { if (ok) that._startRecord() })
+  },
+
+  _startRecord() {
     const that = this
     this.stopAudio()
     feedback.tap()
@@ -684,6 +692,11 @@ Page({
     }
     // 和跟读录音同一条要求：微信审核要求先取得声纹授权，才允许开麦克风
     if (!storage.getVoiceprintAgreed()) { this.askVoiceprint(); return }
+    const that = this
+    mic.check(function (ok) { if (ok) that._startTrain() })
+  },
+
+  _startTrain() {
     if (this.data.recording) this.stopRecord()
     this.stopAudio()
     this._ensureRecorder()
@@ -693,7 +706,7 @@ Page({
       this.setData({ trainRecording: true, trainResult: null, trainErr: '' })
     } catch (e) {
       this._trainRec = false
-      wx.showToast({ title: '录音启动失败，请检查麦克风权限', icon: 'none' })
+      mic.guide && mic.guide()
     }
   },
 

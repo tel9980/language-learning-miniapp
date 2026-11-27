@@ -41,16 +41,19 @@ const _cache = {}
 // 只拷外层的话条目仍然与缓存共享引用，调用方写 prog[id].level = x 会静默改脏缓存
 // （改了却没落盘，下次读到的和磁盘上不一致）。所以对值/元素再拷一层。
 function clone(v) {
+  // 注意：这里原来对嵌套值只做 Object.assign({}, x)，数组会被摊成 {'0':…,'1':…}
+  // 的普通对象 —— 于是 settings.knownIds 这类「对象里的数组」读出来就不是数组了，
+  // Array.isArray 判假，表现为「写进去了但读不到」。改为递归，数组仍是数组。
   if (Array.isArray(v)) {
     return v.map(function (x) {
-      return (x && typeof x === 'object') ? Object.assign({}, x) : x
+      return (x && typeof x === 'object') ? clone(x) : x
     })
   }
   if (v && typeof v === 'object') {
     const out = {}
     Object.keys(v).forEach(function (k) {
       const x = v[k]
-      out[k] = (x && typeof x === 'object') ? Object.assign({}, x) : x
+      out[k] = (x && typeof x === 'object') ? clone(x) : x
     })
     return out
   }
@@ -366,6 +369,78 @@ function getNewWords(lang, limit, category) {
   return out
 }
 
+// 「早就认识」：不是「这次记得」，而是「这词我压根不用学」。
+// 学新词的时候给一个不评分的出口 —— 800 词里 book/keep/street 这类词，
+// 用户必须点一次「记得」才能过卡，等于被迫做无意义的复习，这也是「学不下去」的主因之一。
+// 做法：直接推到最远间隔，并记进 settings.knownIds 以便撤销。
+// 这个入口只在新词模式出现，所以被标记的词一定还没被考过，撤销时删掉进度是安全的。
+const KNOWN_AHEAD_DAYS = 180
+const KNOWN_MAX = 3000
+
+function knownIdsOf(settings) {
+  const ids = (settings && settings.knownIds)
+  return Array.isArray(ids) ? ids : []
+}
+
+function markKnown(wordId) {
+  if (!wordId) return null
+  const prog = loadProgress()
+  const old = prog[wordId] || { level: 0, reps: 0, lapses: 0, ef: 2.5, dueAt: Date.now() }
+  const p = Object.assign({}, old)
+  p.level = 5
+  p.known = true
+  p.dueAt = Date.now() + KNOWN_AHEAD_DAYS * 24 * 3600 * 1000
+  prog[wordId] = p
+
+  // 进度仍然只写改动所在的那一片（与 review 同一条热路径策略）
+  const shard = shardIndexOf(wordId)
+  writeDeferred(shardKeyAt(shard), shardSliceOf(shard))
+
+  const s = getSettings()
+  const ids = knownIdsOf(s)
+  if (ids.indexOf(wordId) < 0) ids.push(wordId)
+  while (ids.length > KNOWN_MAX) ids.shift()
+  s.knownIds = ids
+  write(KEY_SETTINGS, s)      // 设置类必须马上生效，否则退出页面再进来会看不到撤销入口
+  return p
+}
+
+function getKnownIds() {
+  return knownIdsOf(getSettings()).slice()
+}
+
+// 撤销「早就认识」：把标记过的词退回「没学过」，下次学新词会重新出现。
+function restoreKnown() {
+  const s = getSettings()
+  const ids = knownIdsOf(s)
+  if (!ids.length) return 0
+  const prog = loadProgress()
+  const touched = {}
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i]
+    if (prog[id]) {
+      delete prog[id]
+      touched[shardIndexOf(id)] = true
+    }
+  }
+  // 只重写动过的分片；某一片被清空时要把 key 删掉，留个 "{}" 会白占空间
+  Object.keys(touched).forEach(function (k) {
+    const index = Number(k)
+    const slice = shardSliceOf(index)
+    const full = profile.nsKey(shardKeyAt(index))
+    if (Object.keys(slice).length) {
+      write(shardKeyAt(index), slice)
+    } else {
+      delete _cache[full]
+      delete _dirty[full]
+      try { wx.removeStorageSync(full) } catch (e) {}
+    }
+  })
+  s.knownIds = []
+  write(KEY_SETTINGS, s)
+  return ids.length
+}
+
 // 复习打分：quality 0=不记得 3=模糊 5=记得（兼容口语三档 0/1/2）
 function review(wordId, quality) {
   const prog = loadProgress()   // 直接用合并视图，避免 440 条整表克隆
@@ -504,6 +579,7 @@ module.exports = {
   getCustomItems, addCustomItems, removeCustomItem,
   getProgress, getStats, getDaily, getDueWords, getNewWords, getToday,
   review, quizAnswer, getMasteredCount, INTERVALS,
+  markKnown, getKnownIds, restoreKnown, KNOWN_AHEAD_DAYS,
   exportData, importData, migrateProgress, invalidate, flush,
   FLUSH_DELAY, flushAll, PROGRESS_SHARDS, writeProgressAll
 }

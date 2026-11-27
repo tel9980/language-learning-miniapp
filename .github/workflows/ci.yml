@@ -25,7 +25,7 @@ jobs:
       - name: 检查导出物与仓库一致（改词库后忘了重新导出会在这里失败）
         run: |
           node deploy/export-data.js
-          git diff --exit-code deploy/data.json
+          git diff --exit-code deploy/data.json deploy/version.json
 
   deploy:
     name: 发布在线词库到 Cloudflare Pages
@@ -49,6 +49,7 @@ jobs:
           fi
           node deploy/export-data.js
           cp deploy/data.json deploy/cf/data.json
+          cp deploy/version.json deploy/cf/version.json
           mkdir -p deploy/cf/audio deploy/cf/audio-en deploy/cf/audio-vi deploy/cf/audio-ko
           cp audio-src/ja/*.mp3 deploy/cf/audio/
           cp audio-src/en/*.mp3 deploy/cf/audio-en/
@@ -62,6 +63,15 @@ jobs:
                 if (r.status !== 200) { console.error("线上不是 200"); process.exit(1) }
                 const d = JSON.parse(t)
                 console.log("线上版本 " + d.version + "｜en " + d.words.en.length + " 词 / ja " + d.words.ja.length + " 词")
+                // 版本探针必须成对上线，否则小程序退回「每次拉整包」
+                return fetch("https://yb.qy663.de5.net/version.json", { headers: { "User-Agent": "ci-check" } })
+                  .then(r2 => r2.json().then(v => {
+                    if (v.version !== d.version) {
+                      console.error("version.json(" + v.version + ") 与 data.json(" + d.version + ") 不同版本")
+                      process.exit(1)
+                    }
+                    console.log("version.json 线上一致｜" + v.bytes + " B")
+                  }))
               }))
               .catch(e => { console.error(e.message); process.exit(1) })
           '

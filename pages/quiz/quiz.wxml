@@ -55,7 +55,8 @@
     <view class="result-sub">正确率</view>
     <view class="result-detail">答对 {{correctCount}} 题 · 共 {{total}} 题</view>
     <view class="result-detail" wx:if="{{learnedCount>0}}">{{learnedCount}} 题考的是学过的内容，已按答题结果调整下次复习时间{{wrongCount>0?'，答错的会进错词本':''}}</view>
-    <button class="btn-primary result-btn" bindtap="restart">再来一组</button>
+    <button class="btn-primary result-btn" wx:if="{{wrongCount>0}}" bindtap="retryWrong">重做错的 {{wrongCount}} 题</button>
+    <button class="btn-{{wrongCount>0?'ghost':'primary'}} result-btn" bindtap="restart">再来一组</button>
     <button class="btn-ghost result-btn" bindtap="goStats">查看统计</button>
   </view>
 </view>

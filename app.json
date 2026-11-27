@@ -34,23 +34,33 @@
     "list": [
       {
         "pagePath": "pages/index/index",
-        "text": "首页"
+        "text": "首页",
+        "iconPath": "images/tab-home.png",
+        "selectedIconPath": "images/tab-home-on.png"
       },
       {
         "pagePath": "pages/speak/speak",
-        "text": "口语"
+        "text": "口语",
+        "iconPath": "images/tab-speak.png",
+        "selectedIconPath": "images/tab-speak-on.png"
       },
       {
         "pagePath": "pages/learn/learn",
-        "text": "学习"
+        "text": "学习",
+        "iconPath": "images/tab-learn.png",
+        "selectedIconPath": "images/tab-learn-on.png"
       },
       {
         "pagePath": "pages/quiz/quiz",
-        "text": "测验"
+        "text": "测验",
+        "iconPath": "images/tab-quiz.png",
+        "selectedIconPath": "images/tab-quiz-on.png"
       },
       {
         "pagePath": "pages/stats/stats",
-        "text": "统计"
+        "text": "统计",
+        "iconPath": "images/tab-stats.png",
+        "selectedIconPath": "images/tab-stats-on.png"
       }
     ]
   },

@@ -1,6 +1,29 @@
-# Cloudflare Pages 响应头设置（Pages 自动处理 Content-Type 与缓存，这里只补跨域）
+# Cloudflare Pages 响应头设置（Pages 自动处理 Content-Type，这里补跨域与缓存）
+#
+# 缓存策略说明（实测过）：
+#   · 不带 Cache-Control 时 Pages 给的是 public, max-age=0, must-revalidate —— 等于每次都回源
+#   · 小程序侧靠 version.json 做版本探针，所以整包可以放心缓存 10 分钟，
+#     真的出了更新最多滞后 10 分钟 + 客户端 6 小时节流
 /data.json
   Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=600
 
-# 注意：Pages 对静态资源默认 Cache-Control: public, max-age=300（5 分钟）。
-# 词库靠「版本号变了才重写」来更新，所以最多滞后 5 分钟，不影响正确性。
+/version.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=60
+
+/audio/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=14400
+
+/audio-en/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=14400
+
+/audio-vi/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=14400
+
+/audio-ko/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=14400

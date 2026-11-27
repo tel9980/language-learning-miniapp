@@ -15,6 +15,14 @@ const DATA_URLS = [
   'https://yb.qy663.de5.net/data.json'
 ]
 
+// 版本探针（约 200 字节）。启动时先要它，版本没变就完全不碰上面那个 400KB 的整包。
+// 以前是每次检查（最多每 6 小时）都 GET 整包只为比一个 version 字段 ——
+// 实测 409165B / gzip 128KB，每用户每月白跑约 15MB，还和首屏抢带宽。
+// 探针拉不到（老 CDN / 换域名）自动退回「直接拉整包」，行为与以前一致，不会卡住更新。
+const VERSION_URLS = [
+  'https://yb.qy663.de5.net/version.json'
+]
+
 
 // 检查频率：每 6 小时最多联网一次。
 // 每次启动都拉一遍整包（约 134KB）只为比较一个版本号，纯浪费——线上是
@@ -58,6 +66,43 @@ function getOverride() {
 // 启动时异步检查更新；cb(result) 可选，result={ok,updated,reason,source}
 // 按 DATA_URLS 顺序逐个尝试：主源失败（网络/坏数据）自动换备源，全挂就静默降级。
 // opts.force = true 绕过节流（页面上的「立即检查」用这个）。
+function versionSources() {
+  return (VERSION_URLS || []).filter(function (u) {
+    return typeof u === 'string' && u.indexOf('https://') === 0
+  })
+}
+
+// 取线上版本号。成功返回字符串，失败返回 ''（调用方据此退回直接拉整包）。
+// 用 wx.request 而不是 downloadFile：只要几十字节，走 request 能省一次落盘。
+function probeVersion(next) {
+  const list = versionSources()
+  if (!list.length) { next(''); return }
+  let i = 0
+  function attempt() {
+    if (i >= list.length) { next(''); return }
+    const url = list[i++]
+    wx.request({
+      url: url,
+      method: 'GET',
+      timeout: 4000,
+      success(res) {
+        try {
+          if (res.statusCode !== 200 || !res.data) throw new Error('bad')
+          const d = res.data
+          const v = (typeof d === 'string') ? d : d.version
+          if (!v || typeof v !== 'string') throw new Error('bad')
+          next(v)
+        } catch (e) { attempt() }
+      },
+      fail() { attempt() }
+    })
+  }
+  attempt()
+}
+
+// 启动时异步检查更新；cb(result) 可选，result={ok,updated,reason,source}
+// 按 DATA_URLS 顺序逐个尝试：主源失败（网络/坏数据）自动换备源，全挂就静默降级。
+// opts.force = true 绕过节流（页面上的「立即检查」用这个）。
 function checkUpdate(cb, opts) {
   const list = sources()
   if (!list.length) { if (cb) cb({ ok: false, reason: 'not-configured' }); return }
@@ -70,6 +115,15 @@ function checkUpdate(cb, opts) {
   let i = 0
 
   function done(r) { if (cb) cb(r) }
+
+  // 只更新「上次检查时间」，不动数据（节流才有意义）
+  function touch(reason, source) {
+    const old = getCache()
+    if (old && old.data) {
+      saveCache({ data: old.data, fetchedAt: old.fetchedAt, checkedAt: Date.now(), source: source || old.source || '' })
+    }
+    done({ ok: true, updated: false, reason: reason, source: source || '' })
+  }
 
   function tryNext(lastReason) {
     if (i >= list.length) { done({ ok: false, reason: lastReason || 'network' }); return }
@@ -105,13 +159,21 @@ function checkUpdate(cb, opts) {
     })
   }
 
-  tryNext()
+  // 先问版本号：一致就收工（省掉 128KB），不一致或问不到才去拉整包
+  probeVersion(function (online) {
+    const old = getCache()
+    const local = (old && old.data && old.data.version) ? old.data.version : ''
+    if (online && local && online === local) { touch('same-version'); return }
+    tryNext()
+  })
 }
 
 // 清缓存，回到内置词库
 module.exports = {
   get DATA_URL() { return DATA_URLS[0] || '' },
+  get VERSION_URL() { return VERSION_URLS[0] || '' },
   DATA_URLS,
+  VERSION_URLS,
   sources,
   configured,
   CHECK_INTERVAL,

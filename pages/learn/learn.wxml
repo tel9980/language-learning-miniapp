@@ -14,7 +14,7 @@
 
   <!-- 卡片 -->
   <view class="card-wrap" wx:if="{{current}}">
-    <view class="flashcard {{flipped?'flipped':''}}" bindtap="flip">
+    <view class="flashcard {{flipped?'flipped':''}}" bindtap="flip" bindtouchstart="onTouchStart" bindtouchend="onTouchEnd">
       <view class="face front">
         <view class="category">{{current.category}}</view>
         <view class="word">{{current.word}}</view>
@@ -37,6 +37,12 @@
 
     <!-- 发音按钮 -->
     <view class="speak-btn" catchtap="speak" wx:if="{{flipped || mode==='new'}}">🔊 听发音</view>
+
+    <!-- 学新词时才需要「这词我不用学」的出口：待复习模式里这些词已经学过，
+         再让你标记等于改历史，所以只在学新词时出现 -->
+    <view class="known-skip" catchtap="markKnown" wx:if="{{mode==='new'}}">
+      ✓ 早就认识，别当新词推给我
+    </view>
 
     <!-- 评分按钮 -->
     <view class="rate-area" wx:if="{{flipped}}">
@@ -64,4 +70,9 @@
   </view>
 
   <view class="progress-line" wx:if="{{current}}">{{index+1}} / {{queueLen}} · {{langName}}{{catValue?' · '+catValue:''}}</view>
+
+  <!-- 误点「早就认识」的后悔药：标错了能一键退回来 -->
+  <view class="known-undo" wx:if="{{mode==='new' && knownCount>0}}" catchtap="restoreKnown">
+    已标记认识的词 {{knownCount}} 个 · 点这里恢复
+  </view>
 </view>

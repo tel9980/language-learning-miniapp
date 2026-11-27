@@ -1289,6 +1289,9 @@ async function runExtraTests() {
   let reqLog = []
   let replies = []
   global.wx.request = function (o) {
+    // 版本探针走单独分支并一律失败：本节测的是「探针拿不到时退回拉整包」的老路径，
+    // 探针自己的行为在第六轮那节用例里单独测。
+    if (/version\.json/.test(o.url)) { o.fail({ errMsg: 'request:fail' }); return }
     reqLog.push(o.url)
     const r = replies.shift() || { kind: 'fail' }
     if (r.kind === 'ok') o.success({ statusCode: 200, data: r.data })
@@ -1907,7 +1910,7 @@ async function runTailTests() {
   'deploy/cf/data.json 不进仓库（发布时复制）')
   ok(/cp \.\.\/data\.json data\.json/.test(read('deploy/cf/deploy.sh')), 'deploy.sh 发布前复制一份')
   ok(/cp deploy\/data\.json deploy\/cf\/data\.json/.test(read('.github/workflows/ci.yml')), 'CI 发布前复制一份')
-  ok(/git diff --exit-code deploy\/data\.json\n/.test(read('.github/workflows/ci.yml')), 'CI 只校验仓库里那份 data.json')
+  ok(/git diff --exit-code deploy\/data\.json deploy\/version\.json\n/.test(read('.github/workflows/ci.yml')), 'CI 只校验仓库里那两份（data.json + version.json）')
 
   // J. 声纹授权：审核要求「独立协议 + 取得同意后才能采集」
   // 卡点必须在 toggleRecord 里、且在真正开录音之前；进页面就弹窗属于强制授权，会被驳。
@@ -1950,6 +1953,164 @@ async function runTailTests() {
   ok(stVp.getVoiceprintAgreed() === false, '撤回后状态为未同意')
   eq(stVp.getSettings().voiceprintAgreedAt, '', '撤回后清空同意日期')
 
+  // ---- 第六轮优化：版本探测 / 麦克风引导 / 重做错题 / 早就认识 / tabBar 图标 ----
+  {
+    const fsx = require('fs')
+    const pth = require('path')
+    const ROOT = pth.join(__dirname, '..')
+
+    // A. 在线词库先问版本号，再决定要不要搬 400KB
+    //    以前每次检查（最多每 6 小时）都 GET 整包只为比一个 version 字段，
+    //    实测 409165B / gzip 128KB —— 每用户每月白跑约 15MB。
+    const odSrc = read('utils/online-data.js')
+    ok(/VERSION_URLS\s*=\s*\[[^\]]*version\.json/.test(odSrc), '在线数据有版本探针地址')
+    ok(/function probeVersion\(/.test(odSrc), '实现了 probeVersion')
+    const probeAt = odSrc.indexOf('probeVersion(function')
+    const fetchAt = odSrc.indexOf('function tryNext(')
+    ok(probeAt > 0 && fetchAt > 0 && probeAt > fetchAt, '先探版本号，再决定拉不拉整包')
+
+    const origReq = global.wx.request
+    const origGS = global.wx.getStorageSync
+    const origSS = global.wx.setStorageSync
+    const store = {}
+    global.wx.getStorageSync = k => (k in store ? store[k] : '')
+    global.wx.setStorageSync = (k, v) => { store[k] = v }
+    delete require.cache[require.resolve('../utils/online-data')]
+    const od = require('../utils/online-data')
+    const calls = []
+    global.wx.request = function (o) {
+      calls.push(o.url)
+      if (/version\.json/.test(o.url)) o.success({ statusCode: 200, data: { version: 'V1' } })
+      else o.success({ statusCode: 200, data: { version: 'V1', words: { en: [{ id: 't1', word: 'test', meaning: 'x', example: 'a', exampleCn: 'b', category: 'c' }] } } })
+    }
+    const runCheck = (opts) => new Promise((res) => { od.checkUpdate((r) => res(r), opts) })
+    await runCheck({ force: true })
+    eq(calls.length, 2, '第一次：先问版本（拿不到本地版本）→ 才拉整包')
+    calls.length = 0
+    const second = await runCheck({ force: true })
+    eq(calls.length, 1, '版本一致时只发 1 次请求，不碰 data.json')
+    eq(second.reason, 'same-version', '返回值说明是版本一致')
+    calls.length = 0
+    global.wx.request = function (o) {
+      calls.push(o.url)
+      if (/version\.json/.test(o.url)) o.fail({ errMsg: 'request:fail' })
+      else o.success({ statusCode: 200, data: { version: 'V2', sentences: { en: [] } } })
+    }
+    const third = await runCheck({ force: true })
+    ok(calls.some(u => /data\.json/.test(u)), '探针挂掉时退回直接拉整包（行为与旧版一致）')
+    ok(third.ok, '探针失败不影响更新流程')
+    global.wx.request = origReq
+    global.wx.getStorageSync = origGS
+    global.wx.setStorageSync = origSS
+
+    // 导出脚本要一起产出 version.json，否则探针永远 404
+    ok(/version\.json/.test(read('deploy/export-data.js')), '导出脚本产出 version.json')
+    ok(fsx.existsSync(pth.join(ROOT, 'deploy/version.json')), 'version.json 已生成')
+    const ver = JSON.parse(fsx.readFileSync(pth.join(ROOT, 'deploy/version.json'), 'utf8'))
+    ok(!!ver.version && ver.bytes > 1000, 'version.json 带版本号与体积')
+    ok(ver.words && ver.words.en > 0, 'version.json 带各语种条数')
+    eq(ver.bytes, fsx.statSync(pth.join(ROOT, 'deploy/data.json')).size, 'bytes 就是整包真实字节数')
+    ok(/version\.json/.test(read('deploy/cf/deploy.sh')), '发布脚本会把 version.json 一起传上去')
+    ok(/version\.json/.test(read('.github/workflows/ci.yml')), 'CI 校验 version.json 可复现')
+    const headers = read('deploy/cf/_headers')
+    ok(/\/version\.json[\s\S]{0,80}max-age=60/.test(headers), 'version.json 只缓存 60 秒')
+    ok(/\/data\.json[\s\S]{0,80}max-age=600/.test(headers), 'data.json 缓存 10 分钟（原来 max-age=0 等于每次都回源）')
+
+    // B. 麦克风被拒之后要能救回来（以前只 toast「请检查麦克风权限」，用户不知道该去哪查）
+    const mic = require('../utils/mic')
+    eq(mic.SCOPE, 'scope.record', '麦克风权限 scope 正确')
+    let modalTitle = ''
+    let openedSetting = false
+    const origGetSetting = global.wx.getSetting
+    const origOpenSetting = global.wx.openSetting
+    const origShowModal = global.wx.showModal
+    const origToast2 = global.wx.showToast
+    global.wx.showToast = function () {}
+    global.wx.getSetting = function (o) { o.success({ authSetting: { 'scope.record': false } }) }
+    global.wx.showModal = function (o) { modalTitle = o.title || ''; o.success({ confirm: true }) }
+    global.wx.openSetting = function (o) { openedSetting = true; o.success({ authSetting: { 'scope.record': true } }) }
+    const okDenied = await new Promise((res) => { mic.check(res) })
+    ok(/麦克风/.test(modalTitle), '明确拒绝过就弹「麦克风被关掉了」')
+    ok(openedSetting, '点「去开启」直接打开设置页')
+    eq(okDenied, true, '设置里打开后放行录音')
+
+    global.wx.getSetting = function (o) { o.success({ authSetting: {} }) }
+    modalTitle = ''
+    const okNever = await new Promise((res) => { mic.check(res) })
+    eq(okNever, true, '还没问过权限时直接放行（交给系统弹窗，不提前教育用户）')
+    eq(modalTitle, '', '还没问过就弹引导 = 骚扰，必须不弹')
+
+    let guideToast = ''
+    global.wx.getSetting = function (o) { o.success({ authSetting: { 'scope.record': true } }) }
+    global.wx.showToast = function (o) { guideToast = o.title || '' }
+    await new Promise((res) => { mic.guide(res) })
+    ok(/再点一次/.test(guideToast), '权限是开的还失败：提示重试，而不是误导他去查权限')
+    global.wx.getSetting = origGetSetting
+    global.wx.openSetting = origOpenSetting
+    global.wx.showModal = origShowModal
+    global.wx.showToast = origToast2
+
+    // 页面接线：录音前先过权限，录音失败走 guide
+    const spkSrc = read('pages/speak/speak.js')
+    ok(/mic\.check\(/.test(spkSrc), '录音前检查麦克风权限')
+    ok(/_startRecord\(\)/.test(spkSrc), '真正开录音的逻辑单独一层，便于先拦截再执行')
+    ok(/mic\.guide/.test(spkSrc), '录音失败走引导，而不是一句「请检查麦克风权限」')
+    ok(/mic\.check\(/.test(spkSrc.slice(spkSrc.indexOf('trainTap() {'))), '对练录音同样先查权限')
+
+    // C. 测验：错题进复习队列（早已实现）+ 现在可以「只重做错的这几题」
+    const quizSrc = read('pages/quiz/quiz.js')
+    const quizWxml = read('pages/quiz/quiz.wxml')
+    ok(/wrongList/.test(quizSrc), '记录答错的题')
+    ok(/retryWrong\(\)\s*\{/.test(quizSrc), '有「重做错的题」入口')
+    ok(/bindtap="retryWrong"/.test(quizWxml), '结果页挂了重做按钮')
+    ok(/wx:if="\{\{wrongCount>0\}\}"/.test(quizWxml), '全对时不显示重做按钮')
+    // 错词进复习队列这一条是早就有的，守住别被改回去
+    ok(/sentenceProgress\.review\(/.test(quizSrc), '答错的句子进句子复习队列')
+    ok(/storage\.review\(cur\.id/.test(quizSrc), '答错的学过词进单词复习队列')
+
+    // D. 学习页「早就认识」：800 词里 book/keep/street 这类词不该被逼着评一次
+    const learnWxml = read('pages/learn/learn.wxml')
+    const learnSrc = read('pages/learn/learn.js')
+    ok(/known-skip/.test(learnWxml) && /mode==='new'/.test(learnWxml), '「早就认识」只出现在学新词模式')
+    ok(/catchtap="markKnown"/.test(learnWxml), 'wxml 绑了 markKnown')
+    ok(/bindtouchstart="onTouchStart"/.test(learnWxml), '卡片支持滑动手势')
+    ok(/onTouchStart\(/.test(learnSrc) && /onTouchEnd\(/.test(learnSrc), '实现了滑动手势')
+    ok(/this\._swiped/.test(learnSrc), '滑完不会又被当成点击翻面')
+
+    const before = storage.getNewWords('en', 3)
+    const victim = before[0]
+    storage.markKnown(victim.id)
+    const pv = storage.getProgress()[victim.id]
+    eq(pv.level, 5, '标记认识 = 直接推到最高等级')
+    ok(pv.known === true, '进度里留了 known 标记')
+    const days = (pv.dueAt - Date.now()) / 86400000
+    ok(days > 179 && days < 181, '180 天后再见，不再天天冒出来')
+    ok(storage.getKnownIds().indexOf(victim.id) >= 0, '记进 knownIds 以便撤销')
+    // 顺带修掉的老 bug：clone() 原来把「对象里的数组」摊成 {'0':…} 的普通对象，
+    // 于是 settings.knownIds 写进去了却读不到（Array.isArray 判假）。
+    ok(Array.isArray(storage.getSettings().knownIds), '设置里的数组字段读出来仍是数组')
+    ok(!storage.getNewWords('en', 400).some(w => w.id === victim.id), '标记后不再当新词推')
+    const restored = storage.restoreKnown()
+    eq(restored, 1, '撤销返回恢复的条数')
+    ok(!storage.getProgress()[victim.id], '撤销后进度被清掉，回到「没学过」')
+    ok(storage.getNewWords('en', 400).some(w => w.id === victim.id), '撤销后重新出现在新词里')
+    eq(storage.getKnownIds().length, 0, 'knownIds 清空')
+
+    // E. tabBar 图标：一直是个空的 images/ 目录，五个灰字排一起太素
+    const appJson = JSON.parse(read('app.json'))
+    const tabList = appJson.tabBar.list
+    eq(tabList.length, 5, '五个 tab 都在')
+    tabList.forEach((t) => {
+      ok(!!t.iconPath && /\.png$/.test(t.iconPath), t.text + ' 有未选中图标')
+      ok(!!t.selectedIconPath && /\.png$/.test(t.selectedIconPath), t.text + ' 有选中图标')
+      const f1 = pth.join(ROOT, t.iconPath)
+      const f2 = pth.join(ROOT, t.selectedIconPath)
+      ok(fsx.existsSync(f1) && fsx.existsSync(f2), t.text + ' 两个图标文件都存在')
+      ok(fsx.statSync(f1).size < 40 * 1024, t.text + ' 图标体积 < 40KB')
+    })
+    eq(read('app.json').indexOf('"color": "#8A94A6"') > 0, true, 'tabBar 文字色没被改坏')
+    ok(fsx.existsSync(pth.join(ROOT, 'tools/gen-tabbar-icons.py')), '图标可再生（脚本进仓库）')
+  }
   // K. 对练（我说中文，给我目标语言的说法）
   // 关键约束：只放在情景对话里，不做独立翻译页（个人主体 + 教育类目，
   // 独立翻译入口容易被判成工具类应用，插件类目已经因此被驳过一次）。
@@ -2021,4 +2182,5 @@ async function runTailTests() {
       })
     })
   })
+
 }

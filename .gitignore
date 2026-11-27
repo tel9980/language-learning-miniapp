@@ -27,3 +27,4 @@ deploy/cf/audio-vi/
 
 # 发布时才由 deploy/data.json 复制过来（同一份数据不重复进 git）
 deploy/cf/data.json
+deploy/cf/version.json

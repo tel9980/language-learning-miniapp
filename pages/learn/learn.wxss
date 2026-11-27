@@ -30,6 +30,18 @@
 .ex2 { font-size: 24rpx; text-align: center; color: #3A4250; line-height: 1.5; margin-top: 16rpx; }
 .ex2-cn { font-size: 22rpx; text-align: center; color: #8A94A6; line-height: 1.5; margin-top: 6rpx; }
 .speak-btn { text-align: center; color: #4A6CF7; font-size: 28rpx; padding: 24rpx; }
+/* 「早就认识」：学新词时的免评分出口，视觉上要比三个评分键轻，别抢注意力 */
+.known-skip {
+  text-align: center; font-size: 24rpx; color: #8A94A6;
+  padding: 18rpx 24rpx; margin: 0 auto; max-width: 70%;
+  border: 1px dashed #D5DBE6; border-radius: 999rpx;
+}
+.known-skip:active { background: #F2F5FA; }
+/* 误点之后的撤销入口 */
+.known-undo { text-align: center; font-size: 22rpx; color: #8A94A6; margin-top: 12rpx; text-decoration: underline; }
+.theme-dark .known-skip { color: #9AA3B5; border-color: #3B455C; }
+.theme-dark .known-skip:active { background: #2A3244; }
+.theme-dark .known-undo { color: #9AA3B5; }
 .rate-area { margin-top: 12rpx; }
 .rate-title { text-align: center; font-size: 26rpx; color: #8A94A6; margin-bottom: 20rpx; }
 .rate-btns { display: flex; gap: 16rpx; }

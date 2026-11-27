@@ -11,7 +11,11 @@ Page({
     queue: [], index: 0, total: 10, current: null,
     selected: '', spellInput: '', revealed: false, isRight: false,
     correctCount: 0, wrongCount: 0, finished: false, accuracy: 0,
-    progress: 0, indexLetters: ['A', 'B', 'C', 'D'], learnedCount: 0
+    progress: 0, indexLetters: ['A', 'B', 'C', 'D'], learnedCount: 0,
+    // 答错的题按原样留一份，结果页可以「重做错的这 N 题」。
+    // 注意这跟「进错词本」是两件事：错词已经在 record() 里写回复习计划了，
+    // 这里只是把刚才那几道题再摆一遍，让人当场把它纠正过来（短时记忆窗口内重练最有效）。
+    wrongList: []
   },
   onShow() {
     this.syncTheme()
@@ -45,7 +49,7 @@ Page({
       queue, total: queue.length, index: 0, current: queue[0] || null,
       selected: '', spellInput: '', revealed: false, isRight: false,
       correctCount: 0, wrongCount: 0, finished: false, accuracy: 0, progress: 0,
-      learnedCount
+      learnedCount, wrongList: []
     })
   },
   choose(e) {
@@ -78,11 +82,18 @@ Page({
     } else {
       storage.quizAnswer(right)
     }
-    this.setData({
+    const patch = {
       revealed: true, isRight: right,
       correctCount: this.data.correctCount + (right ? 1 : 0),
       wrongCount: this.data.wrongCount + (right ? 0 : 1)
-    })
+    }
+    if (!right) {
+      const prev = this.data.wrongList || []
+      // 同一题重做又错，不要重复塞进去
+      const dup = prev.some(function (q) { return q && cur && q.type === cur.type && q.id === cur.id })
+      if (!dup) patch.wrongList = prev.concat([cur])
+    }
+    this.setData(patch)
   },
   nextQuestion() {
     const i = this.data.index + 1
@@ -98,5 +109,18 @@ Page({
     }
   },
   restart() { this.buildQuiz() },
+
+  // 只重做刚才答错的题，不再随机（重新随机等于把错的那几道又丢了）
+  retryWrong() {
+    const list = (this.data.wrongList || []).slice()
+    if (!list.length) return
+    this.setData({
+      queue: list, total: list.length, index: 0, current: list[0],
+      selected: '', spellInput: '', revealed: false, isRight: false,
+      correctCount: 0, wrongCount: 0, finished: false, accuracy: 0, progress: 0,
+      wrongList: [],
+      learnedCount: list.filter(function (q) { return q && q.learned }).length
+    })
+  },
   goStats() { wx.switchTab({ url: '/pages/stats/stats' }) }
 })

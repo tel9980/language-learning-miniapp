@@ -22,9 +22,10 @@ fi
 export CLOUDFLARE_API_TOKEN
 export CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-fb907fe08010a1b319f68be568331ce5}"
 
-echo "→ 先刷新词库 JSON（deploy/data.json，再复制成发布用的 deploy/cf/data.json）"
+echo "→ 先刷新词库 JSON（deploy/data.json + 版本探针 deploy/version.json，再复制成发布用的副本）"
 ( cd .. && node export-data.js )
 cp ../data.json data.json
+cp ../version.json version.json
 
 echo "→ 把预生成音频铺到 CDN（代码包里不再放 mp3，这里就是用户听到的那一份）"
 rm -rf audio audio-en audio-vi audio-ko && mkdir -p audio audio-en audio-vi audio-ko
@@ -50,6 +51,16 @@ fetch(u, { headers: { "User-Agent": "deploy-check" } })
     console.log("✅ " + u + " → " + d.version +
       "｜en " + d.words.en.length + " 词 / " + d.sentences.en.length + " 句" +
       "｜ja " + d.words.ja.length + " 词 / " + d.sentences.ja.length + " 句");
+    // 版本探针必须同时上线，否则小程序会退回「每次拉整包」的老行为
+    return fetch("https://yb.qy663.de5.net/version.json", { headers: { "User-Agent": "deploy-check" } })
+      .then(r2 => r2.json().then(v => {
+        if (r2.status !== 200) { console.log("❌ version.json HTTP " + r2.status); process.exit(1) }
+        if (v.version !== d.version) {
+          console.log("❌ version.json 是 " + v.version + "，data.json 是 " + d.version + "（没成对发布）");
+          process.exit(1)
+        }
+        console.log("✅ version.json → " + v.version + "｜" + v.bytes + " B（探针与整包同版本）");
+      }))
   }))
   .catch(e => { console.log("❌ 拉取失败：" + e.message); process.exit(1) });
 '

@@ -10,7 +10,8 @@ Page({
   data: {
     mode: 'due', dueCount: 0, current: null, flipped: false,
     queueLen: 0, index: 0, langName: '英语', tts: 'en-US', totalWords: 0,
-    catNames: ['全部分类'], catIndex: 0, catValue: '', catEmpty: false
+    catNames: ['全部分类'], catIndex: 0, catValue: '', catEmpty: false,
+    knownCount: 0
   },
   onShow() {
     this.syncTheme()
@@ -49,6 +50,7 @@ Page({
       totalWords: getWords(lang).length,
       dueCount: dueWords.length,
       catNames: catNames, catIndex: catIndex, catValue: this._catValues[catIndex],
+      knownCount: storage.getKnownIds().length,
       queueLen: 0, index: 0, current: null, flipped: false
     })
     this.buildQueue()
@@ -84,7 +86,11 @@ Page({
   setMode(e) {
     this.setData({ mode: e.currentTarget.dataset.mode }, () => this.buildQueue())
   },
-  flip() { this.setData({ flipped: !this.data.flipped }) },
+  flip() {
+    // 刚滑动过就不要当成点击（同一次抬手会先 touchend 再 tap）
+    if (this._swiped) return
+    this.setData({ flipped: !this.data.flipped })
+  },
   speak() {
     const w = this.data.current
     if (!w) return
@@ -103,6 +109,24 @@ Page({
     const w = this.data.current
     if (!w) return
     storage.review(w.id, q)
+    this._advance()
+  },
+  // 「早就认识」：这词不用学，直接推到最远间隔，别再当新词推给我
+  markKnown() {
+    const w = this.data.current
+    if (!w) return
+    storage.markKnown(w.id)
+    wx.showToast({ title: '已标记认识，不再出现在新词里', icon: 'none' })
+    this._advance()
+  },
+  // 撤销：把标记过的词退回没学过（统计页的入口也调这里）
+  restoreKnown() {
+    const n = storage.restoreKnown()
+    if (!n) { wx.showToast({ title: '没有标记过的词', icon: 'none' }); return }
+    wx.showToast({ title: '已恢复 ' + n + ' 个词', icon: 'none' })
+    this.load()
+  },
+  _advance() {
     const queue = this._queue || []
     const nextIndex = this.data.index + 1
     if (nextIndex < queue.length) {
@@ -112,6 +136,26 @@ Page({
       wx.showToast({ title: '本轮完成！', icon: 'success' })
       setTimeout(() => this.load(), 600)
     }
+  },
+  // ---- 滑动手势 ----
+  // 没翻面时左右滑 = 翻面（都表示「让我看看答案」）；
+  // 翻面后右滑 = 记得，左滑 = 不记得。和下面的三个按钮等价。
+  onTouchStart(e) {
+    const t = e.touches && e.touches[0]
+    this._touch0 = t ? { x: t.clientX, y: t.clientY } : null
+  },
+  onTouchEnd(e) {
+    const t0 = this._touch0
+    this._touch0 = null
+    const t = e.changedTouches && e.changedTouches[0]
+    if (!t0 || !t) return
+    const dx = t.clientX - t0.x
+    const dy = t.clientY - t0.y
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return   // 竖着划 / 幅度太小，当点击
+    this._swiped = true
+    setTimeout(() => { this._swiped = false }, 300)
+    if (!this.data.flipped) { this.setData({ flipped: true }); return }
+    this.rate({ currentTarget: { dataset: { q: dx > 0 ? 5 : 0 } } })
   },
   onHide() { storage.flushAll() },
   onUnload() {

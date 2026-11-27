@@ -46,6 +46,25 @@ const out = path.join(__dirname, 'data.json')
 fs.writeFileSync(out, json)
 console.log('✅ 已导出:', out)
 
+// 版本探针：只有几百字节，小程序启动时先拉它，版本没变就完全不用碰 400KB 的 data.json。
+// 以前是每次（最多每 6 小时）直接拉整包只为比一个字符串，实测 409165B / gzip 128KB。
+const versionPayload = {
+  version: payload.version,
+  bytes: Buffer.byteLength(json, 'utf8'),   // 注意是字节数不是字符数（中文占 3 字节）
+  words: {},
+  sentences: {},
+  dialogues: {}
+}
+Object.keys(payload.words).forEach(function (lang) {
+  versionPayload.words[lang] = (payload.words[lang] || []).length
+  versionPayload.sentences[lang] = (payload.sentences[lang] || []).length
+  versionPayload.dialogues[lang] = (payload.dialogues[lang] || []).length
+})
+const versionJson = JSON.stringify(versionPayload)
+const versionOut = path.join(__dirname, 'version.json')
+fs.writeFileSync(versionOut, versionJson)
+console.log('✅ 已导出:', versionOut, '(' + versionJson.length + ' B)')
+
 // Cloudflare Pages 的发布目录不再留一份副本（两份 181KB 的 JSON 各自进 git，
 // 迟早出现「仓库里一致、线上是旧的」）。发布时才复制：见 deploy/cf/deploy.sh 与 CI。
 console.log('   version:', payload.version)

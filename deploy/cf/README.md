@@ -1,11 +1,14 @@
 # 在线词库 · Cloudflare Pages（已上线）
 
-**线上地址：<https://yb.qy663.de5.net/data.json>** —— Cloudflare Pages + 已备案域名。
+**线上地址：<https://yb.qy663.de5.net/data.json>**（素材本体）与 **<https://yb.qy663.de5.net/version.json>**（版本探针，181B）—— Cloudflare Pages + 已备案域名。
+
+> 小程序启动时**先请求 `version.json`**（几百字节），版本一致就直接结束，不下载 409KB 的 `data.json`。
+> 所以两个文件必须一起发布（`deploy.sh` 与 CI 都会成对复制）。
 
 - Pages 项目名：`yuban-data`（默认域名 `yuban-data.pages.dev`）
-- 版本号是**内容指纹**（`c` + sha1 前 13 位）：词库没改就不变版本，用户不会白拉一份同样的 134KB
-- 响应头：`Access-Control-Allow-Origin: *`、`Cache-Control: public, max-age=0, must-revalidate` + ETag
-  （所以要更新是**立刻**生效，不需要等缓存过期）
+- 版本号是**内容指纹**（`c` + sha1 前 13 位）：词库没改就不变版本，用户不会白拉一份同样的 409KB
+- 响应头（写在 `_headers` 里）：`Access-Control-Allow-Origin: *`；`/version.json` 缓存 60 秒、
+  `/data.json` 缓存 600 秒、音频 4 小时。因为客户端先问 `version.json`，60 秒内发新版最坏等一分钟生效。
 - 与仓库 `deploy/data.json` **逐字节一致**（部署脚本最后一步会自己验一遍）
 
 ## 一条命令发布
@@ -14,7 +17,7 @@
 bash deploy/cf/deploy.sh
 ```
 
-它会：① 重新导出 `deploy/data.json`，再复制一份到 `deploy/cf/data.json`（这个副本不进 git）→ ② `wrangler pages deploy` →
+它会：① 重新导出 `deploy/data.json` 与 `deploy/version.json`，再各复制一份到 `deploy/cf/`（这两个副本不进 git）→ ② `wrangler pages deploy` →
 ③ 拉一次线上地址，打印版本号和各语种条数（版本不对会直接报错退出）。
 
 token 自动从 `~/.dsh/cf-token` 读，也可以用环境变量 `CLOUDFLARE_API_TOKEN` 覆盖。
@@ -23,7 +26,7 @@ token 自动从 `~/.dsh/cf-token` 读，也可以用环境变量 `CLOUDFLARE_API
 > ⚠️ Cloudflare 的规则：**修改一个已有 token 的权限，必须点「Roll / 重新生成」拿到新值才生效**，
 > 旧值仍然只带旧权限。本次就卡在这里（权限勾了、值没换 → 一直 403）。
 
-不想碰 token 也可以手动传：先 `node deploy/export-data.js && cp deploy/data.json deploy/cf/data.json`，再把 `deploy/cf/` 下的 `index.html`、`data.json`、`_headers`、`404.html`
+不想碰 token 也可以手动传：先 `node deploy/export-data.js && cp deploy/data.json deploy/version.json deploy/cf/`，再把 `deploy/cf/` 下的 `index.html`、`data.json`、`version.json`、`_headers`、`404.html`
 打包成 zip，控制台 → Workers & Pages → Create → **Pages → Upload assets** → 拖进去，项目名填 `yuban-data`。
 
 ## 目录内容
@@ -32,6 +35,7 @@ token 自动从 `~/.dsh/cf-token` 读，也可以用环境变量 `CLOUDFLARE_API
 deploy/cf/
 ├── index.html         ← 人看的说明页（读 data.json 显示版本与条数）
 ├── data.json          ← 词库本体（发布时从 ../data.json 复制过来；已 .gitignore，别手改）
+├── version.json       ← 版本探针 181B（同上，成对发布；客户端先问它）
 ├── 404.html           ← 自定义 404
 ├── _headers           ← Pages 响应头（只加 CORS，其它交给 Pages 默认）
 ├── deploy.sh          ← ⭐ 一条命令发布 + 自检
