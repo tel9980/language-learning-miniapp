@@ -70,7 +70,7 @@
 
 | 位置 | 内容 | 体积 |
 | --- | --- | --- |
-| 主包 | 只有代码（wxml/wxss/js/json + tabBar 图标） | 约 **959KB / 2048KB**（含 828 英语词 + 150 韩语词） |
+| 主包 | 只有代码（wxml/wxss/js/json + tabBar 图标） | 约 **962KB / 2048KB**（含 828 英语词 + 150 韩语词） |
 | Cloudflare Pages | 日语朗读 353 条（100 句 + 33 行台词 + 110 词 + 110 条例句） | 约 1.8MB（不进包） |
 | Cloudflare Pages | 英语朗读 1804 条（828 词 + 828 例句 + 120 句 + 28 行台词） | 约 11MB（不进包） |
 | Cloudflare Pages | 越南语朗读 304 条（100 句 + 44 行台词 + 80 词 + 80 条例句） | 约 1.5MB（不进包） |
@@ -305,7 +305,8 @@ node tools/validate.js           # 主包体积、页面四件套、JSON/JS 语�
 - **跳页后不再有幽灵定时器**：14 处 `setTimeout` 里 13 处没在 `onHide`/`onUnload` 清。典型后果：口语页评分后 700ms 自动下一题，用户中途返回 → 已卸载页面上 `setData`；档案页/统计页 600–900ms 后 `wx.reLaunch`，用户已手动返回却被拽走一次。现在统一走 `utils/page-timers.js`（`later(fn, ms)` 登记、离开页面 `clear`），覆盖 7 个页面。没有全局 patch `setTimeout`——`storage`/`speaking`/`sentence-progress` 的延迟落盘本来就该在页面销毁后跑完。
 - **提醒页不再让用户白设**：`TM_PLID` 是空串，订阅消息发不出去。原来只在页面底部用一段灰字说明，用户还是会去拨开关、以为设好了。现在标题直接写「（暂不支持推送）」，开头一块醒目的说明「现在设了也收不到通知」，开关旁标「仅记录」并做成弱化态。填了模板 ID 后这个页面会自动改口，不用再改文案。
 - **交通分类补到 12 个**：原来 5 个（turn / car / road / drive / street）。补 train / bus / bike / ticket / station / airport / traffic（词频取 ECDICT，station 841 最靠前），英语词库 800 → 821 → **828**，并补了 14 条预生成音频。
-- 已量过但**不做**的：`words.en.js` 拆字段（`ex2/ex2c/col` 占 35.4%，但 parse 只省 1ms）；`storage.init` 再压（剩的 22 次同步读是刚性）；分片 8→16（每张卡只省 3.6KB）；主包拆分包（959KB / 2048KB）；深色跟随系统（要重写 216 种硬编码色，还会和现有手动开关打架）；20MB mp3 移出 git（要改发布链路，风险中高）。
+- **本地播不出音频的环境现在也能出声**：有些环境不许 `InnerAudioContext` 播本地文件（`USER_DATA_PATH` 下的 `wxfile://usr/...`，以及开发者工具里的临时文件），报 `operateAudio:fail:access denied`。而这块代码原来的路径恰恰是「下载 → 复制进 `USER_DATA_PATH/tts/` → 播这个本地文件」，所以每个词都要先失败一次才兜底，日志里一片 `access denied`。更糟的是它把**好文件**当坏缓存 `ttsCache.forget()` 删了——下次再听还得重下。现在撞到这类错误就把「本地不可播」记在模块级（不持久化，换环境自动恢复），本次运行内直接流播 CDN、不再白试本地、也不再删缓存；顺便修了换源时旧 `InnerAudioContext` 从不 `destroy` 的泄漏（实测一次播放留下 2 个，全部没销毁）。
+- 已量过但**不做**的：`words.en.js` 拆字段（`ex2/ex2c/col` 占 35.4%，但 parse 只省 1ms）；`storage.init` 再压（剩的 22 次同步读是刚性）；分片 8→16（每张卡只省 3.6KB）；主包拆分包（962KB / 2048KB）；深色跟随系统（要重写 216 种硬编码色，还会和现有手动开关打架）；20MB mp3 移出 git（要改发布链路，风险中高）。
 
 - **异常兜底**：`app.js` 挂了 `onError` / `onUnhandledRejection` / `onPageNotFound`，页面出错不再静默白屏，页面路径失效会自动回首页；本地写入失败（空间满等）会明确提示用户先备份，不会让你以为进度已保存。
 
@@ -481,7 +482,7 @@ node tools/validate.js && node tests/run-tests.js && git push
 纯函数（FSRS/高亮/徽章/相似度/素材数据）有 Node 单元测试，另有页面冒烟测试：
 
 ```bash
-node tests/run-tests.js     # 1105 条，含下面的页面冒烟
+node tests/run-tests.js     # 1113 条，含下面的页面冒烟
 node tests/smoke-pages.js   # 只跑页面冒烟（17 页 onLoad/onShow + 模块引用守门）
 ```
 
@@ -577,7 +578,7 @@ node tests/smoke-pages.js   # 只跑页面冒烟（17 页 onLoad/onShow + 模块
 
 | # | 操作 | 期望结果 | 出问题时看哪里 |
 |---|---|---|---|
-| 1 | 冷启动进首页 | 2 秒内出来，首屏不白 | Console 有无 `SyntaxError`；主包是否 959KB |
+| 1 | 冷启动进首页 | 2 秒内出来，首屏不白 | Console 有无 `SyntaxError`；主包是否 962KB |
 | 2 | 口语页 →「标准发音」（英语句子） | 立刻有声，字幕跟随高亮 | 日志 `[audio] CDN 预生成音频播放失败` 或 `所有发音源都失败` |
 | 3 | 口语页切日语 →「标准发音」 | 有声（走 CDN） | 上面同一条日志；确认 `yb.qy663.de5.net` 在 request 域名里 |
 | 3b | 口语页切越南语 →「标准发音」 | 有声（走 CDN `audio-vi/`） | `[audio] CDN 离线音频播放失败`；越南语没有在线兜底，CDN 挂了就是没声音 |

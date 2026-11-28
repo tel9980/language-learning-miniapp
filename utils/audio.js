@@ -26,6 +26,16 @@ const ttsCache = require('./tts-cache')
 // 这个值要明显长于正常首包时间（实测整句 200~400ms、分包音频约 1s），又不能长到让人觉得卡死。
 const DOWNLOAD_TIMEOUT = 8000
 const KANJI_RE = /[\u4e00-\u9fff]/
+
+// 有些环境不允许 InnerAudioContext 播放本地文件（USER_DATA_PATH 下的、以及开发者工具里的临时文件），
+// 报 operateAudio:fail:access denied。这是环境限制，不是文件坏了。
+// 实测两个后果都必须处理：
+//   1) 原来一遇到就把缓存文件 forget 掉 —— 文件是好的，是被删除的白下；
+//   2) 每个词都要先失败一次再兜底，用户听到的是「点了没反应 / 这句读不出来」。
+// 所以一旦撞上就把「本地不可播」记在模块级，本次运行内直接流播 CDN，不再无谓地试本地。
+// 不持久化：换个环境（换手机、微信修复）该自动恢复，下次启动重新探测即可。
+let _localUnplayable = false
+const UNPLAYABLE_RE = /access denied|not allowed|permission denied|no permission/i
 function needJapaneseVoice(text) {
   return isJapaneseText(text) || KANJI_RE.test(text || '')
 }
@@ -140,6 +150,9 @@ function playRemote(url, slow, handlers, onFail) {
 
   function start(src, kind) {
     if (destroyed) return
+    // 换源前必须先销毁旧的：原来直接覆盖 lp，缓存播放失败 → 流播兜底这条路上
+    // 每次都会多留一个 InnerAudioContext 不销毁（实测一次播放留下 2 个，全部未 destroy）。
+    if (lp && lp.destroy) { try { lp.destroy() } catch (e) {} }
     lp = createPlayer({
       rate: slow ? 0.75 : 1,
       onPlay() { if (handlers.onPlay) handlers.onPlay() },
@@ -151,8 +164,14 @@ function playRemote(url, slow, handlers, onFail) {
         // 也可能是缓存文件被系统清掉了）：先当坏缓存丢掉，再直接流播 CDN 兜一次。
         // 不这么做的话，一条坏缓存会让这个词一直「读不出来」，直到手动清缓存。
         if (kind !== 'url') {
-          if (ttsCache.fileOf(url) === src) ttsCache.forget(url)
-          console.error('[audio] CDN 音频本地播放失败', kind, url, msg)
+          if (UNPLAYABLE_RE.test(msg)) {
+            // 环境读不了本地文件：文件本身没问题，千万别删；并且以后别再试本地
+            _localUnplayable = true
+          } else if (ttsCache.fileOf(url) === src) {
+            // 真播不了（文件损坏 / 被系统清掉）：丢掉这条缓存，下次重新下
+            ttsCache.forget(url)
+          }
+          console.error('[audio] 本地音频播放失败，改为流播 CDN', kind, url, msg)
           if (!triedStream && !destroyed) {
             triedStream = true
             start(url, 'url')
@@ -174,13 +193,15 @@ function playRemote(url, slow, handlers, onFail) {
   }
 
   function tryCache() {
+    // 已知这个环境播不了本地文件，就别再走一遍注定失败的路
+    if (_localUnplayable) return false
     const loc = ttsCache.fileOf(url)
     if (loc) { start(loc, 'cache'); return true }
     return false
   }
 
   function download() {
-    if (typeof wx.downloadFile !== 'function') { start(url, 'url'); return }
+    if (_localUnplayable || typeof wx.downloadFile !== 'function') { start(url, 'url'); return }
     let done = false
     dlTimer = setTimeout(function () {
       if (done) return
@@ -195,7 +216,8 @@ function playRemote(url, slow, handlers, onFail) {
         clearTimeout(dlTimer)
         if (destroyed) return
         if (res.statusCode === 200 && res.tempFilePath) {
-          const loc = ttsCache.store(url, res.tempFilePath)
+          // 本地播不了的环境里，复制一份进缓存只是白占 2.5MB 配额，直接播临时文件
+          const loc = _localUnplayable ? '' : ttsCache.store(url, res.tempFilePath)
           start(loc || res.tempFilePath, loc ? 'cache' : 'temp')
         } else {
           stream()
@@ -235,6 +257,7 @@ function playRemote(url, slow, handlers, onFail) {
 function prefetch(id, lang) {
   const url = id ? localAudio.remoteFor(id) : ''
   if (!url) return
+  if (_localUnplayable) return          // 本地播不了，预取下来也没用
   if (ttsCache.fileOf(url)) return
   if (typeof wx.downloadFile !== 'function') return
   const downloadNow = function () {
@@ -375,8 +398,24 @@ function speak(text, slow, handlers) {
       onPlay() { if (handlers.onPlay) handlers.onPlay() },
       onEnded() { if (handlers.onEnded) handlers.onEnded() },
       onDuration(ms) { if (handlers.onDuration) handlers.onDuration(ms) },
-      onError() {
+      onError(err) {
+        // 有些环境根本不许 InnerAudioContext 播本地文件（报 operateAudio:fail:access denied）。
+        // 这种情况下文件是好的，既不能删缓存、也不用再试别的本地文件，直接改成流播。
+        const msg = (err && (err.errMsg || err.message)) || ''
+        if (UNPLAYABLE_RE.test(msg)) {
+          _localUnplayable = true
+          console.warn('[audio] 这个环境不能播本地文件，改为直接流播', msg)
+          if (curSource) {
+            curCached = ''
+            triedDirect = true
+            player.play(curSource.url)
+            return
+          }
+          next()
+          return
+        }
         if (curCached) {
+          // 真播不出来（文件损坏 / 被系统清掉）：丢掉这条缓存，退回重下一遍
           ttsCache.forget(curCached)
           curCached = ''
           i = Math.max(0, i - 1)   // 退回上一个源，改成在线下载重试
@@ -435,6 +474,8 @@ function speak(text, slow, handlers) {
     function playSource(s) {
       curSource = s
       triedDirect = false
+      // 已知这个环境播不了本地文件：缓存和临时文件都不用试，直接流播这个源
+      if (_localUnplayable) { curCached = ''; player.play(s.url); return }
       const cached = ttsCache.fileOf(s.url)
       if (cached) {
         curCached = s.url
@@ -463,7 +504,8 @@ function speak(text, slow, handlers) {
         setLoading(false)
         if (res && res.statusCode === 200 && res.tempFilePath) {
           player.play(res.tempFilePath)
-          ttsCache.store(s.url, res.tempFilePath)
+          // 本地播不了的环境里，复制一份进缓存只是白占 2.5MB 配额
+          if (!_localUnplayable) ttsCache.store(s.url, res.tempFilePath)
         } else { directThenNext(s) }
       }
       try {

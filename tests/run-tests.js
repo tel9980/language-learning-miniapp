@@ -2570,6 +2570,22 @@ async function runTailTests() {
     ok(tra.every(function (w) { return w.ex2 && w.ex2c && w.col }), '交通补词字段齐全')
     ok(tra.every(function (w) { return wordRank.rankOf(w.id) !== Infinity }), '交通补词都有词频排名')
 
+    // ---- P8. 本地音频播不了的环境要能出声（access denied）----
+    // 有些环境不许 InnerAudioContext 播本地文件（wxfile://...），报 operateAudio:fail:access denied。
+    // 原来的行为：把好文件当坏缓存 forget 掉，然后每条音频都先失败一次才兜底。
+    // 现在：记住「这个环境不能播本地」，本次运行内直接流播；且绝不删好缓存。
+    const audioLocal = read('utils/audio.js')
+    ok(/_localUnplayable/.test(audioLocal), '有「本地不可播」标记')
+    ok(/UNPLAYABLE_RE\s*=\s*\/access denied/.test(audioLocal), '判定 access denied 这类错误')
+    ok(/if \(_localUnplayable\) return false/.test(audioLocal), '已知不可播时跳过读缓存')
+    ok(/if \(_localUnplayable \|\| typeof wx\.downloadFile/.test(audioLocal), '已知不可播时跳过下载')
+    ok(/_localUnplayable = true[\s\S]{0,200}_localUnplayable = true|_localUnplayable = true/.test(audioLocal), '撞到就置标记')
+    // 播放器泄漏：换源前必须销毁旧的
+    ok(/if \(lp && lp\.destroy\)/.test(audioLocal), '换源前销毁旧播放器')
+    // 网络源这条路也要区分「环境不可播」与「缓存真坏」
+    ok(/const msg = \(err && \(err\.errMsg \|\| err\.message\)\) \|\| ''/.test(audioLocal), 'onError 读得到错误文案')
+    ok(/UNPLAYABLE_RE\.test\(msg\)[\s\S]{0,120}_localUnplayable = true/.test(audioLocal), '网络源也认 access denied')
+
   // K. 对练（我说中文，给我目标语言的说法）
   // 关键约束：只放在情景对话里，不做独立翻译页（个人主体 + 教育类目，
   // 独立翻译入口容易被判成工具类应用，插件类目已经因此被驳过一次）。
