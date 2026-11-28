@@ -2612,6 +2612,63 @@ async function runTailTests() {
     ok(/const msg = \(err && \(err\.errMsg \|\| err\.message\)\) \|\| ''/.test(audioLocal), 'onError 读得到错误文案')
     ok(/UNPLAYABLE_RE\.test\(msg\)[\s\S]{0,120}_localUnplayable = true/.test(audioLocal), '网络源也认 access denied')
 
+  // Q. 儿童模式切换（m11005「切到儿童模式字库没跟着切换」）
+  // 这一组守的是「切模式之后，每个取词入口是不是立刻换成新模式的范围」。
+  // 全都是行为 bug，静态断言只能守形状，所以下面每条都对着具体的代码路径。
+  ;(function () {
+    const learnSrc = read('pages/learn/learn.js')
+    const quizSrc = read('pages/quiz/quiz.js')
+    const dictSrc = read('pages/dictation/dictation.js')
+    const pickerSrc = read('utils/mode-picker.js')
+    const indexSrc = read('pages/index/index.js')
+
+    // Q1 学习页的范围指纹必须含 isKid：否则「接着学」的早退分支会让分类下拉、
+    //    总词数和队列全部停在切模式之前那一轮。
+    const sigFn = (learnSrc.match(/_sig\(\) \{[\s\S]{0,400}?\}/) || [''])[0]
+    ok(/this\.data\.isKid \? 'kid' : 'std'/.test(sigFn), '学习页 _sig() 要把 isKid 算进指纹')
+
+    // Q2 到期队列两处都要过儿童模式（load 的统计 + buildQueue 的取词）
+    const dueFiltered = (learnSrc.match(/kidMode\.allowedWords\(storage\.getDueWords/g) || []).length
+    ok(dueFiltered >= 2, '学习页到期队列应有 2 处儿童模式过滤，实际 ' + dueFiltered)
+
+    // Q3 听写页必须先 syncTheme 再 build：onLoad 早于 onShow，直接 build 时 isKid 还是 false，
+    //    实测旧写法 10 题里有 4 题是四级/考研词。
+    ok(/onLoad\(\) \{[\s\S]{0,400}?this\.syncTheme\(\)[\s\S]{0,80}?this\.build\(\)/.test(dictSrc),
+      '听写页 onLoad 要先 syncTheme() 再 build()')
+    ok(dictSrc.indexOf('this.syncTheme()') < dictSrc.indexOf('this.build()'),
+      '听写页 syncTheme 必须在 build 之前')
+
+    // Q4 测验：记下出题时的模式；「做了一半接着做」只在模式没变时成立
+    ok(/this\._quizKid = !!this\.data\.isKid/.test(quizSrc), '测验 buildQuiz 要记住 _quizKid')
+    ok(/this\._quizKid === !!this\.data\.isKid/.test(quizSrc), '测验 onShow 的接着做守卫要比较 _quizKid')
+
+    // Q5 切模式后重建当前页面，让常驻的 tabBar 页面重新 onLoad
+    ok(/function reloadCurrent\(\)/.test(pickerSrc), 'mode-picker 要有 reloadCurrent()')
+    ok(/getCurrentPages\(\)/.test(pickerSrc) && /wx\.reLaunch\(\{ url: url \}\)/.test(pickerSrc),
+      'mode-picker 要按当前页面 reLaunch')
+    ok(/LABELS: LABELS, reloadCurrent: reloadCurrent/.test(pickerSrc), 'mode-picker 要导出 reloadCurrent')
+    ok(/wx\.showToast\b[\s\S]{0,600}?reloadCurrent\(\)/.test(pickerSrc), '切模式 toast 之后要重建页面')
+
+    // Q6 首页「N 待复习」跟学习页真正能练到的一致
+    ok(/kidMode\.allowedWords\(storage\.getDueWords\(lang\)/.test(indexSrc), '首页待复习数要过儿童模式')
+    ok(/const kidMode = require\('\.\.\/\.\.\/utils\/kid-mode'\)/.test(indexSrc), '首页要 require kid-mode')
+
+    // Q7 真的跑一遍：打完桩把档案切成儿童模式，三个取词入口都不许出现被藏的 7 个分类
+    const sp = require('child_process')
+    const nodePath = require('path')
+    const out = sp.execFileSync(process.execPath, [nodePath.join(__dirname, 'kid-check.js')], { encoding: 'utf8' })
+    const r = JSON.parse(out.trim().split('\n').pop())
+    ok(r.dict === 10, '儿童模式听写队列应有 10 题，实际 ' + r.dict)
+    eq(r.dictBad, 0, '儿童模式听写不该出现被藏分类的词')
+    const kidMod = require('../utils/kid-mode')
+    const enAll = require('../utils/words').getWords('en')
+    eq(r.learnTotal, kidMod.allowedWords(enAll, true).length,
+      '儿童模式学习页总词数应等于适龄词数')
+    eq(r.learnHasExam, false, '儿童模式学习页分类里不该有四级')
+    eq(r.quizBad, 0, '儿童模式测验不该出现被藏分类的词')
+    eq(r.stdTotal, enAll.length, '切回标准模式应为全部词数')
+  })()
+
   // K. 对练（我说中文，给我目标语言的说法）
   // 关键约束：只放在情景对话里，不做独立翻译页（个人主体 + 教育类目，
   // 独立翻译入口容易被判成工具类应用，插件类目已经因此被驳过一次）。

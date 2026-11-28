@@ -30,13 +30,17 @@ Page({
     practiceTimer.start(this.data.isKid)
     // 做了一半就接着做：以前每次 onShow 都 buildQuiz() 重新随机 10 题，
     // 做完 9 题切去查词页再回来，题目全换成新的，等于白做。
-    if (this.data.queue.length && !this.data.finished) return
+    // 但「接着做」只在模式没变时成立：切到儿童模式后，上一轮排好的成年题
+    // 不能再继续考，必须按新范围重出一套。
+    if (this.data.queue.length && !this.data.finished && this._quizKid === !!this.data.isKid) return
     this.buildQuiz()
   },
   onHide() { practiceTimer.stop(); storage.flushAll() },
   onUnload() { practiceTimer.stop(); storage.flushAll() },
   buildQuiz() {
     const lang = storage.getCurrentLang()
+    // 记下这套题是按哪种模式出的（见 onShow 的「接着做」判断）
+    this._quizKid = !!this.data.isKid
     // 儿童模式不考四级/六级/考研/财务/工作/科技那些词，出题范围跟学习页保持一致
     const all = kidMode.allowedWords(getWords(lang), this.data.isKid)
     const prog = storage.getProgress()

@@ -44,14 +44,20 @@ Page({
     }
     this.load()
   },
-  // 一轮的范围指纹：模式 / 语种 / 分类，任一变了才重新排队列
+  // 一轮的范围指纹：模式 / 语种 / 分类 / 是否儿童模式，任一变了才重新排队列。
+  // 儿童模式必须算进指纹：tabBar 页面实例是常驻的，在「家人档案 / 首页 / 统计」
+  // 里切到儿童模式再回到学习页，onShow 会走上面的「接着学」分支而跳过 load()，
+  // 结果分类下拉还摆着四级/六级/考研、右上角还写着「共 828 词」、
+  // 队列里还是上一轮排好的考试词——「字库没跟着切换」说的就是这个。
   _sig() {
-    return [this.data.mode, storage.getCurrentLang(), this.data.catValue || ''].join('|')
+    return [this.data.mode, storage.getCurrentLang(), this.data.catValue || '', this.data.isKid ? 'kid' : 'std'].join('|')
   },
   load() {
     const lang = storage.getCurrentLang()
     const meta = getLangMeta(lang)
-    const dueWords = storage.getDueWords(lang)
+    // 到期队列也要过儿童模式：大人学过四级/考研词，切到儿童档案后那些词会一直排在
+    // 「待复习」里，首页还显示「N 待复习」，点进去却一条都不该给孩子看。
+    const dueWords = kidMode.allowedWords(storage.getDueWords(lang), !!this.data.isKid)
     // 分类下拉：全部 + 当前语种的词库分类（新词可以按类学，不用从头排到尾）
     // 儿童模式只留适龄分类：四级/六级/考研/雅思托福/财务/工作/科技 全藏起来。
     // 之前孩子一进来排在最前面的是 abandon / accommodate，纯粹是被分类顺序坑了。
@@ -89,7 +95,7 @@ Page({
     const lang = storage.getCurrentLang()
     let list
     if (this.data.mode === 'due') {
-      list = storage.getDueWords(lang)
+      list = kidMode.allowedWords(storage.getDueWords(lang), !!this.data.isKid)
     } else {
       list = storage.getNewWords(lang, 5, this.data.catValue || '')
     }

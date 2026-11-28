@@ -6,6 +6,7 @@ const profile = require('../../utils/profile')
 const family = require('../../utils/family')
 const { getLangMeta, LANG_KEYS } = require('../../utils/lang')
 const modePicker = require('../../utils/mode-picker')
+const kidMode = require('../../utils/kid-mode')
 const shareCopy = require('../../utils/share-copy')
 const prompt = require('../../utils/prompt')
 
@@ -63,7 +64,9 @@ Page({
     const meta = getLangMeta(lang)
     const stats = storage.getStats()
     const today = storage.getToday()
-    const dueCount = storage.getDueWords(lang).length
+    // 儿童模式下首页的「N 待复习」要和学习页真正能练到的数量一致，
+    // 否则会写「5 待复习」、点进去一条都没有（见 utils/kid-mode.js）
+    const dueCount = kidMode.allowedWords(storage.getDueWords(lang), !!this.data.isKid).length
     const mastered = storage.getMasteredCount(lang)
     const dailyGoal = storage.getSettings().dailyGoal || 20
     const goalPercent = Math.min(100, Math.round(today.reviewed / dailyGoal * 100))

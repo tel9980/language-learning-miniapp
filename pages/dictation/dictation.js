@@ -25,7 +25,14 @@ Page({
     playing: false, hasAnswer: false
   },
 
-  onLoad() { this.build() },
+  onLoad() {
+    // ⚠️ 必须先 syncTheme 再 build。isKid 是 theme behavior 在 syncTheme 里写进 data 的，
+    // 而微信的生命周期是 onLoad → onShow——原先 onLoad 里直接 build()，
+    // 那一刻 isKid 还是 behavior 的默认 false，儿童模式的分类过滤等于没生效，
+    // 孩子第一次进听写照样抽到四级/考研词（切模式后才对，因为 switchMode 里 build 在 onShow 之后）。
+    this.syncTheme()
+    this.build()
+  },
   onShow() {
     this.syncTheme()
     practiceTimer.start(!!this.data.isKid)
