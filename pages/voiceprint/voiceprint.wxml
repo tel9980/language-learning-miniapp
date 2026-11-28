@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page {{themeClass}}">
   <view class="doc">
     <view class="doc-title">声纹授权协议</view>
     <view class="doc-sub">关于你的录音，我们做什么、不做什么</view>

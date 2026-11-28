@@ -8,10 +8,12 @@
 // 隐私边界：只有用户点了「AI 听听」并且同意上传，才会读录音文件发出去。
 // Worker 不落盘、不缓存（每次录音都不一样），上传的是 mp3 的 base64，约 20-40KB。
 const device = require('./device')
+const net = require('./net')
 
 const ENDPOINT = 'https://ai.qy663.de5.net/eval'
 const MAX_B64 = 400 * 1024      // 与 Worker 的 EVAL_MAX_B64 保持一致
-const TIMEOUT = 25000
+// 第九轮：25 秒太长，缩到 12 秒（正常 2–4 秒就回）
+const TIMEOUT = 12000
 
 const MIME = {
   mp3: 'audio/mpeg',
@@ -52,6 +54,7 @@ function explain(code, fallback) {
   if (code === 'audio-too-long') return '这段录音太长了，十秒以内最合适。'
   if (code === 'text-too-long') return '这句太长，AI 评测只支持短句。'
   if (code === 'not-configured') return 'AI 评测还没配好，先用自评吧。'
+  if (code === 'offline') return '现在没有网络，连上网后再试一次。'
   if (code === 'network') return '连不上 AI，检查网络后再试。'
   if (code === 'timeout') return 'AI 想太久没回话，再点一次试试。'
   return 'AI 这次没听明白，换个词再试试。'
@@ -63,6 +66,7 @@ function evaluate(opts) {
   const text = String(opts.text || '').trim()
   if (!text) return Promise.resolve(fail('empty-text', '这条没有可读的文本'))
   if (!opts.filePath) return Promise.resolve(fail('no-recording', '先录一遍再让 AI 听'))
+  if (!net.isOnline()) return Promise.resolve(fail('offline', explain('offline')))
   return readBase64(opts.filePath).then(function (b64) {
     if (!b64) return fail('no-recording', '录音文件读不出来，重录一次')
     if (b64.length > MAX_B64) return fail('audio-too-long', explain('audio-too-long'))

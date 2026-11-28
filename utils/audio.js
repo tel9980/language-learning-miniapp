@@ -16,6 +16,8 @@
 // 判定「要不要按日语合成」：有假名或有汉字 ⇒ 按日语读（「家」「部屋」这类纯汉字词
 // 不加 le 只会拿到 1920 字节的静音占位文件）。纯拉丁字母的文本一律按 lang 走，
 // 否则界面切到日语后练英文词（"hello"）会被读成日式口音。
+const logger = require('./logger')
+
 const localAudio = require('./local-audio')
 const ttsCache = require('./tts-cache')
 
@@ -359,7 +361,7 @@ function speak(text, slow, handlers) {
     function setLoading(on) {
       if (loading === on) return
       loading = on
-      if (handlers.onLoading) { try { handlers.onLoading(on) } catch (e) {} }
+      if (handlers.onLoading) { try { handlers.onLoading(on) } catch (e) { logger.warn('[audio] onLoading 回调抛错', e) } }
     }
     function clearDownloadTimer() {
       if (dlTimer) { clearTimeout(dlTimer); dlTimer = null }

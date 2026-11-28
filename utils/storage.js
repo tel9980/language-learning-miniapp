@@ -3,6 +3,7 @@ const { getWords } = require('./words')
 const wordRank = require('./word-rank')
 const fsrs = require('./fsrs')
 const profile = require('./profile')
+const logger = require('./logger')
 
 const KEY_PROGRESS = 'lp_progress_v1'   // { [wordId]: { level, ef, reps, lapses, dueAt } }
 const KEY_STATS    = 'lp_stats_v1'      // 累计统计
@@ -111,13 +112,13 @@ function writeProgressAll(map) {
     else {
       const k = profile.nsKey(shardKeyAt(i))
       if (k in _cache) delete _cache[k]
-      try { wx.removeStorageSync(k) } catch (e) {}
+      try { wx.removeStorageSync(k) } catch (e) { logger.warn('[storage] 清理分片失败', k, e) }
     }
   }
   // 老版本的单表 key 必须清掉，否则下次启动会把它当老数据再并进来
   const legacyKey = profile.nsKey(KEY_PROGRESS)
   if (legacyKey in _cache) delete _cache[legacyKey]
-  try { wx.removeStorageSync(legacyKey) } catch (e) {}
+  try { wx.removeStorageSync(legacyKey) } catch (e) { logger.warn('[storage] 清理老单表失败', e) }
 }
 function loadProgress() {
   if (_progress) return _progress
@@ -433,7 +434,7 @@ function restoreKnown() {
     } else {
       delete _cache[full]
       delete _dirty[full]
-      try { wx.removeStorageSync(full) } catch (e) {}
+      try { wx.removeStorageSync(full) } catch (e) { logger.warn('[storage] 删除空分片失败', full, e) }
     }
   })
   s.knownIds = []
@@ -574,16 +575,16 @@ function getMasteredCount(lang) {
 // 页面/App 只需要调这一个：把两个模块攒的脏数据一起落盘
 function flushAll() {
   flush()
-  try { require('./speaking').flush() } catch (e) {}
+  try { require('./speaking').flush() } catch (e) { logger.warn('[storage] 口语数据落盘失败', e) }
   // 句子进度是独立模块（utils/sentence-progress.js），一并落盘
-  try { require('./sentence-progress').flush() } catch (e) {}
+  try { require('./sentence-progress').flush() } catch (e) { logger.warn('[storage] 句子进度落盘失败', e) }
 }
 
 // 导出全部学习数据：返回可序列化的普通对象（v2 含口语数据）
 function exportData() {
   flush()
   let speak = null
-  try { speak = require('./speaking').exportData() } catch (e) {}
+  try { speak = require('./speaking').exportData() } catch (e) { logger.warn('[storage] 导出时读口语数据失败', e) }
   return {
     format: 'yuban-lang-backup',
     version: 3,
@@ -624,7 +625,7 @@ function importData(data) {
   if (data.theme) write(KEY_THEME, data.theme)
   // v2：恢复口语数据
   if (data.speak && data.version >= 2) {
-    try { require('./speaking').importData(data.speak) } catch (e) {}
+    try { require('./speaking').importData(data.speak) } catch (e) { logger.warn('[storage] 导入口语数据失败', e) }
   }
   return { ok: true, version: data.version || 1 }
 }

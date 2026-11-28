@@ -70,7 +70,7 @@
 
 | 位置 | 内容 | 体积 |
 | --- | --- | --- |
-| 主包 | 只有代码（wxml/wxss/js/json + tabBar 图标） | 约 **911KB / 2048KB**（含 800 英语词 + 150 韩语词） |
+| 主包 | 只有代码（wxml/wxss/js/json + tabBar 图标） | 约 **927KB / 2048KB**（含 800 英语词 + 150 韩语词） |
 | Cloudflare Pages | 日语朗读 353 条（100 句 + 33 行台词 + 110 词 + 110 条例句） | 约 1.8MB（不进包） |
 | Cloudflare Pages | 英语朗读 1748 条（800 词 + 800 例句 + 120 句 + 28 行台词） | 约 11MB（不进包） |
 | Cloudflare Pages | 越南语朗读 304 条（100 句 + 44 行台词 + 80 词 + 80 条例句） | 约 1.5MB（不进包） |
@@ -278,6 +278,16 @@ node tools/validate.js           # 主包体积、页面四件套、JSON/JS 语�
 - **分享文案跟着语种走**：以前 8 处写死「一起来练**英语**口语」，学日语的用户连续打卡 30 天，分享出去还是英语文案，对方点进来是日语界面，两边对不上。现在统一走 `utils/share-copy.js`（`title()` / `invite()`），语种名来自当前语种。
 - **词频表覆盖全部 800 词**：原来 41 个财务/工作词（loss、revenue、invoice、balance sheet…）不在词频表里，`rankOf()` 返回 `Infinity`，学「全部」时被推到最末尾。现在 36 个按 ECDICT 的 frq/bnc 补上真实排名（`loss` 788、`interest` 416），5 个连字符/多词词（check-in、cash flow…）ECDICT 本身也没有频次，兜底排在已知词之后依次递增。
 - **页面冒烟测试**：`tests/smoke-pages.js` 用打桩的 `wx` 把 17 个页面的 `onLoad` / `onShow` 真跑一遍，另有「页面用到的模块必须在本文件 require 过」的静态守门。起因是上一版 `pages/today/today.js` 用了 `kidMode` 却漏写 `require`——三处正则断言全绿、CI 全绿，线上点「今日待练」白屏。现在这类「少一行 require / 拼错方法名」的崩溃每次 CI 都会被抓到。
+- **字号模式修好了（原来方向是反的）**：`app.wxss` 的 `.theme-sm/.theme-lg/.theme-xl` 以前全用百分比（`.theme-xl .stage-word { font-size: 125% }`），而百分比是相对父元素算的，`page`/`.container` 都没设 `font-size`，于是继承默认 16px——「超大」模式把 32px 的大单词缩成 20px，正好反了。现在三档全部改成 rpx 绝对值（小 0.9 / 大 1.18 / 超大 1.35 倍），和儿童模式 `.theme-kid` 的写法一致，覆盖 `.word/.stage-word/.meaning/.example/.example-cn/.option/.q-prompt` 等正文类。
+- **声纹协议页的深色模式能生效了**：`pages/voiceprint/voiceprint.wxml` 根节点漏了 `{{themeClass}}`，导致该页 wxss 里写的 14 处 `.theme-dark` 全部不生效（晚上打开是一整页白底）。已挂上。
+- **深色模式补齐 5 个页面**：`quiz` / `index` / `today` / `wrong` / `family` 原来页面级 `.theme-dark` 是 0 处，靠 `app.wxss` 的全局兜底「勉强能看」，但页面自己的色块（测验选项 `#F5F7FF`、首页 7 个入口图标、待练统计色块、错词条、排行榜）在深色下都是亮块。现在逐页补齐。
+- **儿童练习时长补到 5 个页面**：`practice-timer` 原来只挂在口语 / 学习 / 测验三页，孩子一晚上都在做听写、刷待练清单，家长在统计页却看到「今天练了 0 分钟」。现在 `dictation` / `today` / `wrong` 也计时。
+- **首页「今日复习目标」卡片可以直接改目标**：以前这张每天都要看一眼的卡片完全没有 `bindtap`，改目标要绕进「统计 → 使用设置」。现在点一下就弹输入框。
+- **学完新词有下一步**：800 词全学完后空状态原来只有一句「新词都学完了」。现在给出三个出口——去练句子、复习到期的词、看统计。
+- **转发补齐 4 个页面**：`learn` / `quiz` / `dictation` / `today` 以前没有 `onShareAppMessage`，转发出去是微信默认标题。现在都走 `utils/share-copy.js`，标题带语种名和连续天数。
+- **待练清单可以标「会了」**：清单里能听但没法标记，听完想记「这个我会了」得跳去练习页重走一遍。现在每行（复习类）有「✓ 会了」，按满分评一次并立刻落盘。
+- **断网感知**：全项目以前没有任何 `wx.onNetworkStatusChange`，地铁里点 AI 查词要干等 15–25 秒才看到「再试一次」。现在 `app.js` 维护 `globalData.online`，`utils/net.js` 供三个 AI 模块在发请求前先问一句，断网直接说「现在没有网络」；同时把 AI 超时从 25s/15s 统一缩到 **12 秒**（Gemini 正常 2–4 秒就回）。
+- **关键路径的异常不再静默吞掉**：`utils/storage.js` / `utils/profile.js` / `utils/audio.js` 里落盘、迁移、播放回调这些关键 catch 补上了 `logger.warn`，写进微信实时日志；其余「读不到就返回默认值」的正常分支仍然保持静默（那些不是错误，报出来只会刷屏）。
 - 已量过但**不做**的：`getWords('en')` 预热是多余的——首页 `refresh()` → `getDueWords()` → `getWords()` 已经把 236KB 词库的解析付掉了（实测首次 8.26ms，之后都在缓存里），预热只会多一段没人等的代码。
 - **异常兜底**：`app.js` 挂了 `onError` / `onUnhandledRejection` / `onPageNotFound`，页面出错不再静默白屏，页面路径失效会自动回首页；本地写入失败（空间满等）会明确提示用户先备份，不会让你以为进度已保存。
 
@@ -448,7 +458,7 @@ node tools/validate.js && node tests/run-tests.js && git push
 纯函数（FSRS/高亮/徽章/相似度/素材数据）有 Node 单元测试，另有页面冒烟测试：
 
 ```bash
-node tests/run-tests.js     # 907 条，含下面的页面冒烟
+node tests/run-tests.js     # 982 条，含下面的页面冒烟
 node tests/smoke-pages.js   # 只跑页面冒烟（17 页 onLoad/onShow + 模块引用守门）
 ```
 
@@ -544,7 +554,7 @@ node tests/smoke-pages.js   # 只跑页面冒烟（17 页 onLoad/onShow + 模块
 
 | # | 操作 | 期望结果 | 出问题时看哪里 |
 |---|---|---|---|
-| 1 | 冷启动进首页 | 2 秒内出来，首屏不白 | Console 有无 `SyntaxError`；主包是否 911KB |
+| 1 | 冷启动进首页 | 2 秒内出来，首屏不白 | Console 有无 `SyntaxError`；主包是否 927KB |
 | 2 | 口语页 →「标准发音」（英语句子） | 立刻有声，字幕跟随高亮 | 日志 `[audio] CDN 预生成音频播放失败` 或 `所有发音源都失败` |
 | 3 | 口语页切日语 →「标准发音」 | 有声（走 CDN） | 上面同一条日志；确认 `yb.qy663.de5.net` 在 request 域名里 |
 | 3b | 口语页切越南语 →「标准发音」 | 有声（走 CDN `audio-vi/`） | `[audio] CDN 离线音频播放失败`；越南语没有在线兜底，CDN 挂了就是没声音 |

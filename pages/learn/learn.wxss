@@ -73,3 +73,13 @@
 .theme-dark .col { background: #333C50; color: #8FA8FF; }
 .theme-dark .ex2 { color: #C9D2E3; }
 .theme-dark .ex2-cn { color: #9AA3B5; }
+
+/* ===== 第九轮：学完新词后的下一步引导 ===== */
+.next-steps { margin-top: 40rpx; padding-top: 28rpx; border-top: 1rpx solid #EEF1FB; }
+.next-title { font-size: 26rpx; color: #8A94A6; margin-bottom: 20rpx; }
+.next-btn { font-size: 30rpx; color: #4A6CF7; background: #F3F6FF; border: 1rpx solid #DDE4FF; border-radius: 16rpx; padding: 24rpx 0; margin-bottom: 16rpx; }
+.next-btn:active { background: #E6ECFF; }
+.theme-dark .next-steps { border-top-color: #2E3648; }
+.theme-dark .next-title { color: #9AA3B5; }
+.theme-dark .next-btn { color: #8FA8FF; background: #232B45; border-color: #33406B; }
+.theme-dark .next-btn:active { background: #2A3350; }

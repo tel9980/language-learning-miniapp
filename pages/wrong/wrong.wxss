@@ -77,3 +77,32 @@
 .done-sub { font-size: 28rpx; color: #8A94A6; margin-top: 12rpx; }
 .done-view .primary-btn { margin-top: 48rpx; }
 .load-more { text-align: center; color: #4A6CF7; font-size: 26rpx; padding: 26rpx 0; }
+
+/* ===== 深色模式（第九轮补：本页原来 0 处） ===== */
+.theme-dark .card { background: #262D3D; box-shadow: none; }
+.theme-dark .header-title { color: #E8EAF0; }
+.theme-dark .header-sub,
+.theme-dark .hlabel,
+.theme-dark .word-phonetic,
+.theme-dark .word-meta,
+.theme-dark .review-phonetic,
+.theme-dark .review-hint,
+.theme-dark .empty,
+.theme-dark .done-sub { color: #9AA3B5; }
+.theme-dark .hnum { color: #8FA8FF; }
+.theme-dark .word-text,
+.theme-dark .detail-en,
+.theme-dark .review-word,
+.theme-dark .answer-example,
+.theme-dark .done-title { color: #E8EAF0; }
+.theme-dark .word-meaning { color: #C9D2E3; }
+.theme-dark .lapse-badge { background: #3A2124; color: #FF9A9A; }
+.theme-dark .word-detail { border-top-color: #2E3648; }
+.theme-dark .detail-cn,
+.theme-dark .answer-cn,
+.theme-dark .progress-info { color: #9AA3B5; }
+.theme-dark .progress-track { background: #2A3244; }
+.theme-dark .answer-meaning { color: #8FA8FF; }
+.theme-dark .answer-placeholder { color: #5A6478; }
+.theme-dark .primary-btn { background: #4A6CF7; }
+.theme-dark .load-more { color: #8FA8FF; }

@@ -67,6 +67,19 @@
     <button class="btn-primary empty-btn" bindtap="setMode" data-mode="{{mode==='due'?'new':'due'}}">
       {{mode==='due'?'去学新词':'查看复习'}}
     </button>
+
+    <!-- 第九轮：新词全学完后不能只有一句「都学完了」，得告诉我们下一步能干什么 -->
+    <view class="next-steps" wx:if="{{mode!=='due' && !catEmpty && nextDue>0}}">
+      <view class="next-title">接下来可以</view>
+      <view class="next-btn" bindtap="goSpeak">🎤 去练句子（口语跟读）</view>
+      <view class="next-btn" bindtap="setMode" data-mode="due">📖 复习到期的 {{nextDue}} 个词</view>
+      <view class="next-btn" bindtap="goStats">🏆 看看我的统计</view>
+    </view>
+    <view class="next-steps" wx:elif="{{mode!=='due' && !catEmpty}}">
+      <view class="next-title">接下来可以</view>
+      <view class="next-btn" bindtap="goSpeak">🎤 去练句子（口语跟读）</view>
+      <view class="next-btn" bindtap="goStats">🏆 看看我的统计</view>
+    </view>
   </view>
 
   <view class="progress-line" wx:if="{{current}}">{{index+1}} / {{queueLen}} · {{langName}}{{catValue?' · '+catValue:''}}</view>

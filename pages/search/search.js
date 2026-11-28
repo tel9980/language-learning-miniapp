@@ -216,7 +216,8 @@ Page({
     aiLookup.lookup(kw, this.data.lang, function (r) {
       if (!r.ok) {
         let msg = 'AI 查词失败，稍后再试'
-        if (r.reason === 'network') msg = '网络不通，稍后再试'
+        if (r.reason === 'offline') msg = '现在没有网络，连上网后再查'
+        else if (r.reason === 'network') msg = '网络不通，稍后再试'
         else if (r.reason === 'not-configured') msg = 'AI 查词还没配好'
         else if (r.reason === 'upstream') msg = 'AI 暂时没答上来，稍后再试'
         else if (r.reason === 'rate-limited') msg = '今天的 AI 查词次数用完了，明天再来（先看看词库里有没有）'

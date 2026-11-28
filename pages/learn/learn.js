@@ -1,4 +1,5 @@
 const theme = require('../../utils/theme')
+const shareCopy = require('../../utils/share-copy')
 const nav = require('../../utils/nav')
 const storage = require('../../utils/storage')
 const { getWords, getLangMeta, getExamCategories } = require('../../utils/words')
@@ -13,7 +14,7 @@ Page({
     mode: 'due', dueCount: 0, current: null, flipped: false,
     queueLen: 0, index: 0, langName: '英语', tts: 'en-US', totalWords: 0,
     catNames: ['全部分类'], catIndex: 0, catValue: '', catEmpty: false,
-    knownCount: 0
+    knownCount: 0, nextDue: 0
   },
   onShow() {
     this.syncTheme()
@@ -64,6 +65,7 @@ Page({
       dueCount: dueWords.length,
       catNames: catNames, catIndex: catIndex, catValue: this._catValues[catIndex],
       knownCount: storage.getKnownIds().length,
+      nextDue: dueWords.length,
       queueLen: 0, index: 0, current: null, flipped: false
     })
     this.buildQueue()
@@ -99,6 +101,9 @@ Page({
   setMode(e) {
     this.setData({ mode: e.currentTarget.dataset.mode }, () => this.buildQueue())
   },
+  // 第九轮：学完新词后的下一步出口
+  goSpeak() { nav.go('/pages/speak/speak') },
+  goStats() { nav.go('/pages/stats/stats') },
   flip() {
     // 刚滑动过就不要当成点击（同一次抬手会先 touchend 再 tap）
     if (this._swiped) return
@@ -177,5 +182,10 @@ Page({
     storage.flushAll()
     if (this._player && this._player.destroy) this._player.destroy()
     this._player = null
-  }
+  },
+  onShareAppMessage() {
+    const st = storage.getStats() || {}
+    const lang = storage.getCurrentLang()
+    return { title: shareCopy.title({ lang: lang, streak: st.streak, mastered: storage.getMasteredCount(lang) }), path: '/pages/learn/learn' }
+  },
 })

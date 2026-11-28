@@ -50,10 +50,10 @@
     <view class="arrow">›</view>
   </view>
 
-  <view class="goal card">
+  <view class="goal card" bindtap="editGoal">
     <view class="row between">
       <view class="title">今日复习目标</view>
-      <view class="muted">{{today.reviewed}} / {{dailyGoal}}</view>
+      <view class="muted">{{today.reviewed}} / {{dailyGoal}} ›</view>
     </view>
     <view class="progress-track">
       <view class="progress-fill" style="width:{{goalPercent}}%"></view>

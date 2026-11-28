@@ -46,3 +46,16 @@
 .entry-icon.share { background: #E8F4FF; }
 .entry-icon.remind { background: #E9F8F1; }
 .arrow { font-size: 44rpx; color: #C7CEDB; margin-left: 8rpx; }
+
+/* ===== 深色模式（第九轮补：本页原来 0 处，入口彩色图标/进度条/CTA 在深色下都是亮块） ===== */
+.theme-dark .speak-cta { background: #262D3D; border-color: #3B455C; }
+.theme-dark .cta-icon { background: #333C50; }
+.theme-dark .cta-title { color: #E8EAF0; }
+.theme-dark .today-cta { background: #232B45; border-color: #33406B; }
+.theme-dark .today-cta .cta-icon { background: #2E3A5C; }
+.theme-dark .progress-track { background: #2A3244; }
+.theme-dark .entry-icon { background: #2E3648; }
+.theme-dark .entry-title { color: #E8EAF0; }
+.theme-dark .arrow { color: #4A5568; }
+.theme-dark .family-section .section-label { color: #9AA3B5; }
+.theme-dark .goal-tip { color: #9AA3B5; }

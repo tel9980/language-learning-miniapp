@@ -35,3 +35,30 @@
 
 /* 清单行内的发音按钮：给足点击区（至少 60rpx 高），放在箭头左侧 */
 .item-play { font-size: 32rpx; padding: 0 12rpx; margin-left: auto; }
+
+/* ===== 深色模式（第九轮补：本页原来 0 处，统计色块与清单行在深色下都是亮块） ===== */
+.theme-dark .hero-title { color: #E8EAF0; }
+.theme-dark .hero-sub { color: #9AA3B5; }
+.theme-dark .stat-box.due { background: #232B45; }
+.theme-dark .stat-box.focus { background: #33291A; }
+.theme-dark .stat-box.wrong { background: #3A2124; }
+.theme-dark .stat-num { color: #8FA8FF; }
+.theme-dark .stat-box.focus .stat-num { color: #F0B45E; }
+.theme-dark .stat-box.wrong .stat-num { color: #FF9A9A; }
+.theme-dark .stat-label { color: #9AA3B5; }
+.theme-dark .section-title { color: #E8EAF0; }
+.theme-dark .item { border-bottom-color: #2E3648; }
+.theme-dark .item-badge.due { background: #232B45; color: #8FA8FF; }
+.theme-dark .item-badge.focus { background: #33291A; color: #F0B45E; }
+.theme-dark .item-badge.wrong { background: #3A2124; color: #FF9A9A; }
+.theme-dark .item-label { color: #E8EAF0; }
+.theme-dark .item-sub { color: #9AA3B5; }
+.theme-dark .item-arrow { color: #4A5568; }
+.theme-dark .muted { color: #9AA3B5; }
+.theme-dark .empty-title { color: #E8EAF0; }
+.theme-dark .quick-btn { background: #232B45; color: #8FA8FF; }
+.theme-dark .load-more { color: #8FA8FF; }
+.theme-dark .known { border-color: #3B455C; color: #9AA3B5; }
+.item-known { font-size: 24rpx; color: #22A06B; background: #E8F8F0; border-radius: 999rpx; padding: 8rpx 18rpx; margin-left: 8rpx; white-space: nowrap; }
+.item-known:active { background: #D5F0E3; }
+.theme-dark .item-known { color: #4ADE9B; background: #1B3329; }

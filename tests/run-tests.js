@@ -2303,6 +2303,102 @@ async function runTailTests() {
     eq(langLib.langOfId(''), '', '认不出的 id 返回空串')
   }
 
+  // N. 第九轮：字号模式方向、声纹页深色、深色补齐、儿童时长、首页目标、下一步、分享、断网
+  {
+    // A. 字号模式必须用 rpx 绝对值（用 % 会相对 16px 默认值算，把 32px 的大词缩小）
+    const appWxss = read('app.wxss')
+    const pct = appWxss.match(/\.theme-(sm|lg|xl)[^{]*\{[^}]*font-size:\s*\d+%/g) || []
+    eq(pct.length, 0, '字号模式不许再用百分比（%相对16px算，方向是反的）')
+    ok(/\.theme-xl \.stage-word \{ font-size: 86rpx; \}/.test(appWxss), '超大字号把大单词放大到 86rpx')
+    ok(/\.theme-sm \.stage-word \{ font-size: 58rpx; \}/.test(appWxss), '小字号把大单词缩到 58rpx')
+    ;['theme-sm', 'theme-lg', 'theme-xl'].forEach(function (m) {
+      ;['.word', '.stage-word', '.meaning', '.example', '.option', '.q-prompt'].forEach(function (cls) {
+        ok(new RegExp('\\.' + m + ' \\' + cls + ' \\{').test(appWxss) || new RegExp('\\.' + m + ' \\' + cls + ',').test(appWxss),
+          m + ' 要覆盖 ' + cls)
+      })
+    })
+
+    // B. 声纹协议页根节点必须挂 themeClass（本页写了 14 处 .theme-dark，不挂就全失效）
+    const vpWxml = read('pages/voiceprint/voiceprint.wxml')
+    ok(/class="page \{\{themeClass\}\}"/.test(vpWxml), '声纹协议页根节点挂了 themeClass')
+
+    // C. 深色模式补齐：原来 0 处的 5 个页面现在要有页面级 .theme-dark
+    ;['quiz', 'index', 'today', 'wrong', 'family'].forEach(function (pg) {
+      const css = read('pages/' + pg + '/' + pg + '.wxss')
+      const n = (css.match(/\.theme-dark /g) || []).length
+      ok(n >= 3, pg + ' 的深色规则不少于 3 条（实际 ' + n + '）')
+    })
+
+    // D. 儿童练习时长：听写 / 今日待练 / 错词本也要计时
+    ;['dictation', 'today', 'wrong'].forEach(function (pg) {
+      const js = read('pages/' + pg + '/' + pg + '.js')
+      ok(/practiceTimer\.start\(/.test(js), pg + ' onShow 要开始计时')
+      ok(/practiceTimer\.stop\(/.test(js), pg + ' onHide/onUnload 要结束计时')
+    })
+
+    // E. 首页「今日复习目标」卡片可点
+    const idxWxml = read('pages/index/index.wxml')
+    ok(/<view class="goal card" bindtap="editGoal">/.test(idxWxml), '首页目标卡片可点')
+    const idxJs = read('pages/index/index.js')
+    ok(/editGoal\(\) \{/.test(idxJs), '首页有 editGoal 方法')
+    ok(/storage\.setDailyGoal\(n\)/.test(idxJs), 'editGoal 真的会存目标')
+
+    // F. 学完新词要有下一步（不能只有一句「都学完了」）
+    const learnWxml = read('pages/learn/learn.wxml')
+    ok(/class="next-steps"/.test(learnWxml), '空状态有下一步区块')
+    ok(/bindtap="goSpeak"/.test(learnWxml), '能直接去练句子')
+    ok(/bindtap="goStats"/.test(learnWxml), '能去看统计')
+    const learnJs = read('pages/learn/learn.js')
+    ok(/nextDue:/.test(learnJs), '带到期数量')
+    ok(/goSpeak\(\) \{ nav\.go/.test(learnJs), 'goSpeak 走 nav')
+
+    // G. 分享补齐：学 / 测 / 听写 / 待练 四页
+    ;['learn', 'quiz', 'dictation', 'today'].forEach(function (pg) {
+      const js = read('pages/' + pg + '/' + pg + '.js')
+      ok(/onShareAppMessage\(\)/.test(js), pg + ' 有 onShareAppMessage')
+      ok(/shareCopy\.title\(/.test(js), pg + ' 走统一分享文案（语种跟着走）')
+    })
+
+    // H. 待练清单「会了」
+    const todayWxml = read('pages/today/today.wxml')
+    ok(/catchtap="knownItem"/.test(todayWxml), '待练清单有「会了」按钮')
+    const todayJs = read('pages/today/today.js')
+    ok(/knownItem\(e\)/.test(todayJs), '有 knownItem 方法')
+    ok(/storage\.review\(id, 5\)/.test(todayJs), '「会了」按满分评一次')
+
+    // I. 断网感知 + AI 超时缩到 12 秒
+    const appJs = read('app.js')
+    ok(/wx\.onNetworkStatusChange/.test(appJs), '注册了网络状态监听')
+    ok(/isOnline\(\)/.test(appJs), '对外暴露 isOnline')
+    const netLib = require('../utils/net')
+    const realGetApp = global.getApp
+    global.getApp = function () { return { isOnline: function () { return false } } }
+    eq(netLib.isOnline(), false, 'net.isOnline 能读到断网状态')
+    global.getApp = function () { return { isOnline: function () { return true } } }
+    eq(netLib.isOnline(), true, 'net.isOnline 能读到联网状态')
+    global.getApp = function () { throw new Error('no app') }
+    eq(netLib.isOnline(), true, '拿不到 app 时默认当在线（宁可试也不误判）')
+    global.getApp = realGetApp
+    ;['ai-lookup', 'ai-eval', 'translate'].forEach(function (f) {
+      const js = read('utils/' + f + '.js')
+      ok(/TIMEOUT = 12000/.test(js), f + ' 超时缩到 12 秒')
+      ok(/net\.isOnline\(\)/.test(js), f + ' 发请求前先看有没有网')
+      ok(/offline/.test(js), f + ' 断网有专门的说法')
+    })
+    eq(require('../utils/ai-lookup').AI_URLS.length > 0, true, '查词地址还在')
+
+    // J. 关键路径的 catch 不再静默吞异常
+    ;['storage', 'profile', 'audio'].forEach(function (f) {
+      const js = read('utils/' + f + '.js')
+      ok(/require\('\.\/logger'\)/.test(js), f + ' 引入 logger')
+      ok(/logger\.warn\(/.test(js), f + ' 有关键路径日志')
+    })
+    const storageJs = read('utils/storage.js')
+    ok(/logger\.warn\('\[storage\] 句子进度落盘失败'/.test(storageJs), '句子进度落盘失败会记日志')
+    const profileJs = read('utils/profile.js')
+    ok(/logger\.warn\('\[profile\] 写档案失败'/.test(profileJs), '写档案失败会记日志')
+  }
+
   // K. 对练（我说中文，给我目标语言的说法）
   // 关键约束：只放在情景对话里，不做独立翻译页（个人主体 + 教育类目，
   // 独立翻译入口容易被判成工具类应用，插件类目已经因此被驳过一次）。

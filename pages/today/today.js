@@ -1,4 +1,5 @@
 // 今日待练：把 FSRS 到期词、口语重点项、错词本合成一个清单，每天打开就知道练什么。
+const shareCopy = require('../../utils/share-copy')
 const theme = require('../../utils/theme')
 const nav = require('../../utils/nav')
 const storage = require('../../utils/storage')
@@ -10,6 +11,7 @@ const pager = require('../../utils/pager')
 const sentenceProgress = require('../../utils/sentence-progress')
 // 儿童模式：待练清单要按适龄分类过滤（b78fd89 漏了这一行，导致整页 ReferenceError）
 const kidMode = require('../../utils/kid-mode')
+const practiceTimer = require('../../utils/practice-timer')
 
 Page({
   behaviors: [theme],
@@ -33,6 +35,9 @@ Page({
     const lang = storage.getCurrentLang()
     if (lang !== this.data.lang) this.setData({ lang: lang, langName: getLangMeta(lang).name })
     this.refresh()
+    // 第九轮：儿童练习时长原来只统计口语/学习/测验三页，今日待练漏了，
+    // 孩子一晚上都在这里点听，家长却看到「今天练了 0 分钟」。
+    practiceTimer.start(!!this.data.isKid)
   },
 
   refresh() {
@@ -120,11 +125,20 @@ Page({
       onError() { wx.showToast({ title: '这句暂时读不出来，点一下再试', icon: 'none' }) }
     })
   },
+  // 清单里直接标「会了」：按「记得」评一次，推到最远间隔，这条就不再出现在待练里
+  knownItem(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    storage.review(id, 5)
+    storage.flushAll()
+    wx.showToast({ title: '已标记会了', icon: 'success' })
+    this.refresh()
+  },
   stopPlay() {
     if (this._player) { try { this._player.destroy() } catch (e) {} this._player = null }
   },
-  onHide() { this.stopPlay() },
-  onUnload() { this.stopPlay() },
+  onHide() { this.stopPlay(); practiceTimer.stop() },
+  onUnload() { this.stopPlay(); practiceTimer.stop() },
 
   loadMore() {
     if (!this._pager.more()) return
@@ -145,5 +159,10 @@ Page({
   goLearn() { nav.go('/pages/learn/learn', { mode: 'due' }) },
   goSpeak() { nav.go('/pages/speak/speak', { focus: 1 }) },
   goSpeakDue() { nav.go('/pages/speak/speak', { due: 1 }) },
-  goWrong() { nav.go('/pages/wrong/wrong') }
+  goWrong() { nav.go('/pages/wrong/wrong') },
+  onShareAppMessage() {
+    const st = storage.getStats() || {}
+    const lang = storage.getCurrentLang()
+    return { title: shareCopy.title({ lang: lang, streak: st.streak, mastered: storage.getMasteredCount(lang) }), path: '/pages/today/today' }
+  },
 })

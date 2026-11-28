@@ -32,6 +32,8 @@
         </view>
         <!-- catchtap：不能让点发音冒泡到整行的 goItem，否则一按就跳走了 -->
         <view class="item-play" wx:if="{{item.say}}" data-text="{{item.say}}" data-id="{{item.sayId}}" catchtap="playItem">🔊</view>
+        <!-- 第九轮：清单里能听但没法标「会了」，听完想标记还得跳去练习页走一遍流程 -->
+        <view class="item-known" wx:if="{{item.type==='due'}}" data-id="{{item.id}}" catchtap="knownItem">✓ 会了</view>
         <view class="item-arrow">›</view>
       </view>
       <view class="load-more" wx:if="{{hasMore}}" bindtap="loadMore">加载更多（已显示 {{items.length}}/{{total}}）</view>

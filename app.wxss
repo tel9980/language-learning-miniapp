@@ -35,13 +35,71 @@ page {
 .row { display: flex; align-items: center; }
 .between { justify-content: space-between; }
 
-/* ===== 无障碍：字号与深色模式（页面 root 挂 themeClass） ===== */
-.theme-sm .title, .theme-sm .stage-word { font-size: 90%; }
-.theme-sm .muted, .theme-sm .subtitle, .theme-sm .stage-meaning { font-size: 90%; }
-.theme-lg .title, .theme-lg .stage-word { font-size: 112%; }
-.theme-lg .muted, .theme-lg .subtitle, .theme-lg .stage-meaning { font-size: 112%; }
-.theme-xl .title, .theme-xl .stage-word { font-size: 125%; }
-.theme-xl .muted, .theme-xl .subtitle, .theme-xl .stage-meaning { font-size: 125%; }
+/* ===== 无障碍：字号与深色模式（页面 root 挂 themeClass） =====
+
+   ⚠️ 这里必须用 rpx 绝对值，不能用 %。
+   原因（第九轮实测发现的老 bug）：页面里的正文字号全是 rpx 绝对值——
+   .stage-word 64rpx(32px)、.word 72rpx(36px)、.meaning 40rpx、.option 28rpx。
+   而 page / .container 都没设 font-size，% 只能相对继承来的 16px 默认值算：
+     .theme-xl .stage-word 写 125% → 16px × 1.25 = 20px
+   于是「选超大字号」把 32px 的大单词缩成 20px，方向刚好反了。
+   而 .theme-xl .stage-word（两个类）优先级又高于 .stage-word（一个类），一定赢。
+   现在改成按倍率直接给 rpx，和下面 .theme-kid 的写法保持一致。
+
+   倍率：小 0.9 / 大 1.18 / 超大 1.35（与 pages/stats/stats.js 的 scales 一致） */
+.theme-sm .word { font-size: 65rpx; }
+.theme-sm .stage-word { font-size: 58rpx; }
+.theme-sm .stage-word.sentence { font-size: 32rpx; }
+.theme-sm .meaning { font-size: 36rpx; }
+.theme-sm .stage-meaning { font-size: 27rpx; }
+.theme-sm .phonetic,
+.theme-sm .stage-phonetic { font-size: 25rpx; }
+.theme-sm .example,
+.theme-sm .example-en { font-size: 25rpx; }
+.theme-sm .example-cn { font-size: 22rpx; }
+.theme-sm .q-prompt { font-size: 32rpx; }
+.theme-sm .q-hint { font-size: 27rpx; }
+.theme-sm .option { font-size: 25rpx; }
+.theme-sm .spell-input { font-size: 29rpx; }
+.theme-sm .title { font-size: 32rpx; }
+.theme-sm .subtitle { font-size: 23rpx; }
+.theme-sm .muted { font-size: 22rpx; }
+
+.theme-lg .word { font-size: 85rpx; }
+.theme-lg .stage-word { font-size: 76rpx; }
+.theme-lg .stage-word.sentence { font-size: 42rpx; }
+.theme-lg .meaning { font-size: 47rpx; }
+.theme-lg .stage-meaning { font-size: 35rpx; }
+.theme-lg .phonetic,
+.theme-lg .stage-phonetic { font-size: 33rpx; }
+.theme-lg .example,
+.theme-lg .example-en { font-size: 33rpx; }
+.theme-lg .example-cn { font-size: 28rpx; }
+.theme-lg .q-prompt { font-size: 42rpx; }
+.theme-lg .q-hint { font-size: 35rpx; }
+.theme-lg .option { font-size: 33rpx; }
+.theme-lg .spell-input { font-size: 38rpx; }
+.theme-lg .title { font-size: 42rpx; }
+.theme-lg .subtitle { font-size: 31rpx; }
+.theme-lg .muted { font-size: 28rpx; }
+
+.theme-xl .word { font-size: 97rpx; }
+.theme-xl .stage-word { font-size: 86rpx; }
+.theme-xl .stage-word.sentence { font-size: 49rpx; }
+.theme-xl .meaning { font-size: 54rpx; }
+.theme-xl .stage-meaning { font-size: 41rpx; }
+.theme-xl .phonetic,
+.theme-xl .stage-phonetic { font-size: 38rpx; }
+.theme-xl .example,
+.theme-xl .example-en { font-size: 38rpx; }
+.theme-xl .example-cn { font-size: 32rpx; }
+.theme-xl .q-prompt { font-size: 49rpx; }
+.theme-xl .q-hint { font-size: 41rpx; }
+.theme-xl .option { font-size: 38rpx; }
+.theme-xl .spell-input { font-size: 43rpx; }
+.theme-xl .title { font-size: 49rpx; }
+.theme-xl .subtitle { font-size: 35rpx; }
+.theme-xl .muted { font-size: 32rpx; }
 
 /* 儿童模式：整页放大，而不是只放大标题。
    以前儿童模式只把 5 类元素放大 12%，例句正文、按钮、选项、进度一个字都没变——

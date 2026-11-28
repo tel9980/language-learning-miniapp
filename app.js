@@ -16,7 +16,11 @@ function currentRoute() {
 App({
   globalData: {
     lang: 'en',
-    theme: { fontScale: 1, darkMode: false }
+    theme: { fontScale: 1, darkMode: false },
+    // 第九轮：断网感知。以前全项目没有 wx.onNetworkStatusChange，
+    // 用户在地铁里点 AI 查词要干等 15–25 秒才等到「再试一次」，
+    // 而第 0.1 秒其实就已经断网了。这里维护一个全局在线标记，AI 请求前先看它。
+    online: true
   },
   onLaunch() {
     storage.init()
@@ -28,6 +32,29 @@ App({
     this.applyTheme()
     // 异步检查在线素材更新（未配置域名时自动 no-op，不影响启动速度与使用）
     onlineData.checkUpdate()
+    this.watchNetwork()
+  },
+  // 断网/恢复监听：UI 不弹窗打扰，只更新 globalData.online，由 AI 请求自己判断
+  watchNetwork() {
+    if (typeof wx.onNetworkStatusChange !== 'function') return
+    try {
+      const self = this
+      wx.onNetworkStatusChange(function (res) {
+        self.globalData.online = !!(res && res.isConnected)
+      })
+      if (typeof wx.getNetworkType === 'function') {
+        wx.getNetworkType({
+          success(res) { self.globalData.online = !(res && res.networkType === 'none') }
+        })
+      }
+    } catch (e) {
+      logger.warn('网络状态监听注册失败', e)
+    }
+  },
+  // 供 utils 读取（AI 请求前问一句，比等 15 秒超时好）
+  isOnline() {
+    const o = this.globalData && this.globalData.online
+    return o === undefined ? true : !!o
   },
   // 进后台时把攒着的评分落盘（写入合并的兜底，见 utils/storage.js 的 writeDeferred）
   onHide() {

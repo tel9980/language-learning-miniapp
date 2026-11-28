@@ -1,4 +1,5 @@
 const theme = require('../../utils/theme')
+const shareCopy = require('../../utils/share-copy')
 const storage = require('../../utils/storage')
 const { getWords } = require('../../utils/words')
 const quiz = require('../../utils/quiz')
@@ -127,5 +128,10 @@ Page({
       learnedCount: list.filter(function (q) { return q && q.learned }).length
     })
   },
-  goStats() { wx.switchTab({ url: '/pages/stats/stats' }) }
+  goStats() { wx.switchTab({ url: '/pages/stats/stats' }) },
+  onShareAppMessage() {
+    const st = storage.getStats() || {}
+    const lang = storage.getCurrentLang()
+    return { title: shareCopy.title({ lang: lang, streak: st.streak, mastered: storage.getMasteredCount(lang) }), path: '/pages/quiz/quiz' }
+  },
 })

@@ -8,11 +8,14 @@
 // 缓存：本地留 40 条（同一个词反复查不再花钱），Worker 侧还有 KV 缓存 30 天。
 
 const device = require('./device')
+const net = require('./net')
 
 const AI_URLS = ['https://ai.qy663.de5.net/lookup']
 const CACHE_KEY = 'lp_ai_lookup_v1'
 const MAX_CACHE = 40
-const TIMEOUT = 15000
+// 第九轮：25s/15s 都太长——Gemini 正常 2–4 秒就回，等到 15 秒说明早挂了。
+// 缩到 12 秒，配合 net.isOnline() 的断网预判，用户不用再干等。
+const TIMEOUT = 12000
 
 function configured() { return AI_URLS.length > 0 && /^https:/.test(AI_URLS[0] || '') }
 
@@ -48,6 +51,8 @@ function lookup(word, lang, cb) {
   const q = String(word || '').trim()
   if (!q) { cb({ ok: false, reason: 'empty' }); return }
   if (!configured()) { cb({ ok: false, reason: 'not-configured' }); return }
+  // 断网就别发了：等 12 秒超时的体验比立刻说「现在没网」差得多
+  if (!net.isOnline()) { cb({ ok: false, reason: 'offline' }); return }
 
   const hit = fromCache(q, lang)
   if (hit) {

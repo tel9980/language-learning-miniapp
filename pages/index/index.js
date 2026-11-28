@@ -19,6 +19,29 @@ Page({
     speakCount: 0, focusCount: 0, unreadComments: 0,
     myName: '我', myAvatar: '😀', modeName: '标准'
   },
+  // 第九轮：首页的「今日复习目标」卡片原来点不动，改目标要进「统计 → 使用设置」，
+  // 而这张卡是每天都要看一眼的地方。现在点一下就能改。
+  editGoal() {
+    const that = this
+    wx.showModal({
+      title: '设置每日目标',
+      content: '请输入每天要复习的单词数（1-200）',
+      editable: true,
+      placeholderText: String(this.data.dailyGoal),
+      success(res) {
+        if (!res.confirm) return
+        const n = parseInt(res.content, 10)
+        if (n >= 1 && n <= 200) {
+          storage.setDailyGoal(n)
+          that.refresh()
+          wx.showToast({ title: '已保存', icon: 'success' })
+        } else {
+          wx.showToast({ title: '请输入 1-200 的数字', icon: 'none' })
+        }
+      }
+    })
+  },
+
   onShow() {
     this.syncTheme()
     storage.init()

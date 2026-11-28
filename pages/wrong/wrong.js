@@ -3,6 +3,7 @@ const audio = require('../../utils/audio')
 const storage = require('../../utils/storage')
 const { getWords, getLangMeta } = require('../../utils/words')
 const pager = require('../../utils/pager')
+const practiceTimer = require('../../utils/practice-timer')
 
 const INTERVALS = storage.INTERVALS
 
@@ -40,6 +41,8 @@ Page({
       this.setData({ lang: lang, langName: getLangMeta(lang).name })
     }
     if (this.data.mode === 'list') this.refresh()
+    // 第九轮：错词本也是练习，计时也要算上
+    practiceTimer.start(!!this.data.isKid)
   },
 
   refresh() {
@@ -123,7 +126,10 @@ Page({
     this.setData({ mode: 'list', expandedId: '' }, this.refresh)
   },
 
+  onHide() { practiceTimer.stop() },
+
   onUnload() {
+    practiceTimer.stop()
     if (this._audio) {
       this._audio.destroy()
       this._audio = null

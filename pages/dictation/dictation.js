@@ -1,4 +1,5 @@
 const theme = require('../../utils/theme')
+const shareCopy = require('../../utils/share-copy')
 const storage = require('../../utils/storage')
 const { getWords } = require('../../utils/words')
 const kidMode = require('../../utils/kid-mode')
@@ -8,6 +9,7 @@ const { getLangMeta } = require('../../utils/lang')
 const quiz = require('../../utils/quiz')
 const dictation = require('../../utils/dictation')
 const audio = require('../../utils/audio')
+const practiceTimer = require('../../utils/practice-timer')
 
 const ROUND = 10
 
@@ -22,9 +24,9 @@ Page({
   },
 
   onLoad() { this.build() },
-  onShow() { this.syncTheme() },
-  onHide() { this.stopAudio(); storage.flushAll() },
-  onUnload() { this.stopAudio(); storage.flushAll() },
+  onShow() { this.syncTheme(); practiceTimer.start(!!this.data.isKid) },
+  onHide() { this.stopAudio(); practiceTimer.stop(); storage.flushAll() },
+  onUnload() { this.stopAudio(); practiceTimer.stop(); storage.flushAll() },
 
   switchMode(e) {
     const mode = e.currentTarget.dataset.mode
@@ -153,5 +155,10 @@ Page({
 
   goLearn() {
     wx.switchTab({ url: '/pages/learn/learn' })
-  }
+  },
+  onShareAppMessage() {
+    const st = storage.getStats() || {}
+    const lang = storage.getCurrentLang()
+    return { title: shareCopy.title({ lang: lang, streak: st.streak, mastered: storage.getMasteredCount(lang) }), path: '/pages/dictation/dictation' }
+  },
 })

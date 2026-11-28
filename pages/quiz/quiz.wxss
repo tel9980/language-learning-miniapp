@@ -37,3 +37,22 @@
 .result-detail { font-size: 26rpx; margin-top: 24rpx; }
 .quiz-hint { margin-top: 8rpx; }
 .result-btn { width: 100%; margin-top: 32rpx; }
+
+/* ===== 深色模式（第九轮补：本页原来 0 处 .theme-dark，选项/反馈块在深色下都是亮块） ===== */
+.theme-dark .progress-track { background: #2A3244; }
+.theme-dark .score-chip.correct { background: #1B3329; color: #4ADE9B; }
+.theme-dark .score-chip.wrong { background: #3A2124; color: #FF9A9A; }
+.theme-dark .q-type { background: #2A3350; color: #8FA8FF; }
+.theme-dark .option { border-color: #333C50; }
+.theme-dark .opt-letter { background: #2E3648; color: #9AA3B5; }
+.theme-dark .option.selected { border-color: #4A6CF7; background: #232B45; }
+.theme-dark .option.selected .opt-letter { background: #4A6CF7; color: #fff; }
+.theme-dark .option.right { border-color: #22A06B; background: #1B3329; }
+.theme-dark .option.right .opt-letter { background: #22A06B; color: #fff; }
+.theme-dark .option.wrong { border-color: #F05A5A; background: #3A2124; }
+.theme-dark .option.wrong .opt-letter { background: #F05A5A; color: #fff; }
+.theme-dark .spell-input { border-color: #333C50; background: #232B3C; color: #E8EAF0; }
+.theme-dark .fb-right { background: #1B3329; }
+.theme-dark .fb-wrong { background: #3A2124; }
+.theme-dark .result-accuracy { color: #8FA8FF; }
+.theme-dark .result-title { color: #E8EAF0; }
