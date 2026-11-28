@@ -482,7 +482,7 @@ node tools/validate.js && node tests/run-tests.js && git push
 纯函数（FSRS/高亮/徽章/相似度/素材数据）有 Node 单元测试，另有页面冒烟测试：
 
 ```bash
-node tests/run-tests.js     # 1113 条，含下面的页面冒烟
+node tests/run-tests.js     # 1117 条，含下面的页面冒烟
 node tests/smoke-pages.js   # 只跑页面冒烟（17 页 onLoad/onShow + 模块引用守门）
 ```
 
