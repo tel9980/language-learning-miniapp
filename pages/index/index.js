@@ -6,6 +6,7 @@ const profile = require('../../utils/profile')
 const family = require('../../utils/family')
 const { getLangMeta, LANG_KEYS } = require('../../utils/lang')
 const modePicker = require('../../utils/mode-picker')
+const shareCopy = require('../../utils/share-copy')
 
 const app = getApp()
 
@@ -57,14 +58,14 @@ Page({
     wx.showToast({ title: '已切换到 ' + getLangMeta(next).name, icon: 'none' })
     this.refresh()
   },
-  // 首页也能转发：带上打卡天数，比干巴巴的「一个学外语的小程序」更容易被点开
+  // 首页也能转发：带上打卡天数，比干巴巴的「一个学外语的小程序」更容易被点开。
+  // 语种名要跟着当前语种走——学日语的用户分享出去写「练英语口语」，
+  // 对方点开是日语界面，两边对不上（见 utils/share-copy.js）。
   onShareAppMessage() {
     const st = storage.getStats() || {}
-    const mastered = storage.getMasteredCount(storage.getCurrentLang())
-    const title = (st.streak || mastered)
-      ? '我在「语伴」连续打卡 ' + (st.streak || 0) + ' 天，掌握了 ' + mastered + ' 个词，一起来练英语口语吧'
-      : '来和我一起练英语口语｜语伴'
-    return { title: title, path: '/pages/index/index' }
+    const lang = storage.getCurrentLang()
+    const mastered = storage.getMasteredCount(lang)
+    return { title: shareCopy.title({ lang: lang, streak: st.streak, mastered: mastered }), path: '/pages/index/index' }
   },
 
   goSpeak() { nav.go('/pages/speak/speak') },

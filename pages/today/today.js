@@ -8,6 +8,8 @@ const { getWords, getLangMeta } = require('../../utils/words')
 const audio = require('../../utils/audio')
 const pager = require('../../utils/pager')
 const sentenceProgress = require('../../utils/sentence-progress')
+// 儿童模式：待练清单要按适龄分类过滤（b78fd89 漏了这一行，导致整页 ReferenceError）
+const kidMode = require('../../utils/kid-mode')
 
 Page({
   behaviors: [theme],

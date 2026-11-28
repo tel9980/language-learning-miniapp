@@ -1,5 +1,7 @@
 const theme = require('../../utils/theme')
 const profile = require('../../utils/profile')
+const storage = require('../../utils/storage')
+const shareCopy = require('../../utils/share-copy')
 
 Page({
   behaviors: [theme],
@@ -9,8 +11,8 @@ Page({
     const p = profile.currentProfile() || { name: '我' }
     this.setData({
       myName: p.name,
-      inviteTitle: '来和我一起练口语｜语伴',
-      inviteDesc: p.name + '邀请你一起用「语伴」练英语口语，点开就能试，免费～'
+      inviteTitle: shareCopy.title({ lang: storage.getCurrentLang() }),
+      inviteDesc: shareCopy.invite({ lang: storage.getCurrentLang(), name: p.name })
     })
   },
   onShareAppMessage() {

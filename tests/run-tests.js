@@ -969,6 +969,19 @@ eq(storageMod.getNewWords('en', 5, '不存在的分类').length, 0, 'unknown cat
 const wordRank = require('../utils/word-rank')
 ok(wordRank.size >= 700, 'word rank table covers most english words')
 eq(wordRank.rankOf('en_211'), 156, 'rank of "keep" comes from ECDICT frq')
+// 800 个英语词必须全部有排名：以前 41 个财务/工作词是 Infinity，学「全部」时被推到最后
+{
+  const enAll = require('../utils/words').getWords('en')
+  const noRank = enAll.filter(function (w) { return wordRank.rankOf(w.id) === Infinity })
+  eq(noRank.length, 0, '800 个英语词全部有词频排名（含 41 个财务/工作词）')
+  ok(enAll.length === wordRank.size, '词频表条数与英语词数一致（' + enAll.length + '）')
+  // 真实频次必须来自 ECDICT，不是随手编的
+  eq(wordRank.rankOf('en_445'), 788, 'loss 的排名来自 ECDICT frq')
+  eq(wordRank.rankOf('en_458'), 416, 'interest 的排名来自 ECDICT frq')
+  eq(wordRank.rankOf('en_442'), 1681, 'revenue 的排名来自 ECDICT frq')
+  // 没有语料频次的连字符/多词词排到最后，但也不能是 Infinity
+  ok(wordRank.rankOf('en_342') > 24000, 'check-in 兜底排在表尾（不再是 Infinity）')
+}
 eq(wordRank.rankOf('ja_001'), Infinity, 'japanese words have no rank (sort last)')
 const sortedFresh = storageMod.getNewWords('en', 8)
 // 扩到 800 词后，新加入的高频词 even(COCA 107) 比 keep(156) 更常用，排到了第一位
@@ -1054,7 +1067,7 @@ recordings.save('wxfile://tmp_abc.mp3', { label: 'hi' }).then((entry) => {
 }).then((entry) => {
   eq(entry, null, 'save resolves null when saveFile fails and nothing can be freed')
   return runExtraTests()
-}).then(() => runTailTests()).then(() => {
+}).then(() => runTailTests()).then(() => runSmokeTests()).then(() => {
   console.log(`\n单元测试结果：${pass} 通过 / ${fail} 失败`)
   if (fail) {
     failures.forEach(f => console.log('  ✗ ' + f))
@@ -1748,6 +1761,49 @@ async function runExtraTests() {
 }
 
 // ---- 追加用例：本轮新增的纯逻辑模块（日志 / 影子跟读 / 队列 / 设备号 / 预取 / 录音对比）----
+// ---- 页面冒烟（17 页 onLoad/onShow 真跑一遍 + 未声明模块静态守门） ----
+// 这一类问题（漏写 require、拼错方法名）静态正则断言抓不住：
+// b78fd89 就是这样把 pages/today/today.js 改成必崩的——三处断言全绿、CI 全绿、线上白屏。
+async function runSmokeTests() {
+  const smoke = require('./smoke-pages')
+  const res = smoke.run(ok)
+  ok(res.pages >= 15, '冒烟覆盖到全部页面（实测 ' + res.pages + ' 页）')
+  if (res.problems.length) {
+    res.problems.forEach(function (p) { ok(false, '页面冒烟: ' + p) })
+  }
+
+  const bad = smoke.undeclaredModules()
+  bad.forEach(function (b) {
+    ok(false, '未声明的模块引用: ' + b.page + ' → ' + b.missing.join(', '))
+  })
+  ok(bad.length === 0, '所有页面用到的模块都在本文件 require 过')
+
+  // 分享文案：以前 8 处写死「练英语口语」，日语用户分享出去是英语文案
+  const shareCopy = require('../utils/share-copy')
+  eq(shareCopy.spokenOf('en'), '英语', '分享文案：en → 英语')
+  eq(shareCopy.spokenOf('ja'), '日语', '分享文案：ja → 日语')
+  eq(shareCopy.spokenOf('vi'), '越南语', '分享文案：vi → 越南语')
+  eq(shareCopy.spokenOf('ko'), '韩语', '分享文案：ko → 韩语')
+  eq(shareCopy.spokenOf('xx'), '英语', '分享文案：未知语种按 utils/lang 的规则当英语')
+  ok(/日语口语/.test(shareCopy.title({ lang: 'ja', streak: 7, mastered: 50 })), '分享标题跟着语种走')
+  ok(!/英语/.test(shareCopy.title({ lang: 'ja', streak: 7, mastered: 50 })), '日语用户不再出现「英语」')
+  ok(/连续打卡 30 天/.test(shareCopy.title({ lang: 'en', streak: 30, mastered: 120 })), '有数据时带打卡天数')
+  ok(/徽章/.test(shareCopy.title({ lang: 'en', streak: 30, mastered: 120, badges: 3 })), '有徽章时带徽章数')
+  ok(!/徽章/.test(shareCopy.title({ lang: 'en', streak: 30, mastered: 120 })), '没徽章时不硬凑')
+  eq(shareCopy.title({ lang: 'ko' }), '来和我一起练韩语口语｜语伴', '没有记录时退化成邀请文案（按语种）')
+  ok(/韩语口语/.test(shareCopy.invite({ lang: 'ko', name: '小明' })), '邀请文案跟着语种走')
+  // 三个页面的分享文案都必须走模板，不能再写死
+  const fsMod = require('fs')
+  const pathMod = require('path')
+  const read = (p) => fsMod.readFileSync(pathMod.join(__dirname, '..', p), 'utf8')
+  ;['pages/index/index.js', 'pages/stats/stats.js', 'pages/share/share.js'].forEach(function (f) {
+    // 先去掉注释行：注释里提到「练英语口语」是在解释这段历史，不算写死
+    const src = read(f).split('\n').filter(function (l) { return !/^\s*\/\//.test(l) }).join('\n')
+    ok(!/练英语口语/.test(src), f + ' 不再写死「练英语口语」')
+    ok(/shareCopy\./.test(src), f + ' 分享文案走 utils/share-copy')
+  })
+}
+
 async function runTailTests() {
   const fsMod = require('fs')
   const pathMod = require('path')

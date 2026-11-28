@@ -3,6 +3,7 @@ const speaking = require('../../utils/speaking')
 const sentences = require('../../utils/sentences')
 const recordings = require('../../utils/recordings')
 const achievements = require('../../utils/achievements')
+const shareCopy = require('../../utils/share-copy')
 const theme = require('../../utils/theme')
 const familyBackup = require('../../utils/family-backup')
 const ttsCache = require('../../utils/tts-cache')
@@ -95,12 +96,14 @@ Page({
       recordings: recordings.list().length
     })
     const unlockedCount = badges.filter(b => b.unlocked).length
-    // 分享文案用真实数据拼，不做假徽章（没有记录就退化成邀请文案）
-    const streakDays = stats.streak || 0
-    const shareTitle = (streakDays || mastered)
-      ? '我在「语伴」连续打卡 ' + streakDays + ' 天，掌握了 ' + mastered + ' 个词' +
-        (unlockedCount ? '，解锁 ' + unlockedCount + ' 枚徽章' : '') + '，一起来练英语口语吧'
-      : '来和我一起练英语口语｜语伴'
+    // 分享文案用真实数据拼，不做假徽章（没有记录就退化成邀请文案）。
+    // 语种名跟当前语种走，不再写死「英语」（文案模板见 utils/share-copy.js）
+    const shareTitle = shareCopy.title({
+      lang: storage.getCurrentLang(),
+      streak: stats.streak || 0,
+      mastered: mastered,
+      badges: unlockedCount
+    })
 
     const practiceMin = Math.round(storage.getPracticeSeconds() / 60)
     this.setData({
@@ -258,17 +261,17 @@ Page({
   // 分享卡片带真实数据（连续打卡 / 掌握词数 / 徽章数），别人点进来直接到首页。
   onShareAppMessage() {
     return {
-      title: this.data.shareTitle || '来和我一起练英语口语｜语伴',
+      title: this.data.shareTitle || shareCopy.title({ lang: storage.getCurrentLang() }),
       path: '/pages/index/index'
     }
   },
   onShareTimeline() {
-    return { title: this.data.shareTitle || '来和我一起练英语口语｜语伴' }
+    return { title: this.data.shareTitle || shareCopy.title({ lang: storage.getCurrentLang() }) }
   },
   copyShare() {
     const that = this
     wx.setClipboardData({
-      data: (that.data.shareTitle || '来和我一起练英语口语｜语伴') + '（微信小程序「语伴」）',
+      data: (that.data.shareTitle || shareCopy.title({ lang: storage.getCurrentLang() })) + '（微信小程序「语伴」）',
       success() { wx.showToast({ title: '分享文案已复制', icon: 'success' }) }
     })
   },
