@@ -18,6 +18,8 @@ const session = require('../../utils/speak-session')
 const shadowTip = require('../../utils/shadow-tip')
 const mic = require('../../utils/mic')
 const translate = require('../../utils/translate')
+const pageTimers = require('../../utils/page-timers')
+const screen = require('../../utils/screen')
 const logger = require('../../utils/logger')
 const shareCopy = require('../../utils/share-copy')
 
@@ -114,6 +116,8 @@ Page({
       stars: storage.getStats().totalCorrect || 0
     })
     practiceTimer.start(kid)
+    // 屏幕常亮（第十一轮）：跟读时手不动，最容易息屏，一息屏录音就断
+    screen.on()
     const intent = nav.takeIntent('pages/speak/speak')
     // 从搜索页点「去跟读这句」、或从转发卡片带 ?item= 进来：只练这一条，练完回正常队列
     const oneId = (intent && intent.item) || this._pendingItem
@@ -152,8 +156,12 @@ Page({
   },
 
   // 评分/录音记录是延迟落盘的，离开页面前必须冲一次
-  onHide() { practiceTimer.stop(); this.stopAll(); storage.flushAll() },
-  onUnload() { practiceTimer.stop(); this.stopAll(); storage.flushAll() },
+  onHide() { pageTimers.clear(this); screen.off(); practiceTimer.stop(); this.stopAll(); storage.flushAll() },
+  // 定时器统一登记在 pageTimers 里，跳页时一起清（第十一轮）：
+  // 评分后 700ms 自动 next()、儿童星星 1.2s 隐藏、AB 复读 400ms 重播，
+  // 这三个原来都没 clear，用户中途返回就会在已卸载页面上 setData。
+  later(fn, ms) { return pageTimers.later(this, fn, ms) },
+  onUnload() { pageTimers.clear(this); screen.off(); practiceTimer.stop(); this.stopAll(); storage.flushAll() },
 
   closeGuide() {
     this.setData({ showGuide: false })
@@ -327,7 +335,7 @@ Page({
         if (that._abPlaying && that.data.abLoop) {
           that._abPlaying = false
           that.setData({ abCount: that.data.abCount + 1 })
-          setTimeout(function () { if (that.data.abLoop) that.playText(text, slow, id) }, 400)
+          that.later(function () { if (that.data.abLoop) that.playText(text, slow, id) }, 400)
         }
       }
     })
@@ -827,15 +835,14 @@ Page({
     if (this.data.isKid && q >= 1) {
       addUpdate.showStar = true
       addUpdate.stars = (this.data.stars || 0) + 1
-      const that = this
-      setTimeout(function () { that.setData({ showStar: false }) }, 1200)
+      this.later(() => this.setData({ showStar: false }), 1200)
     }
     this.setData(Object.assign({
       justRated: true,
       todayCount: speaking.getToday().count,
       focusCount: speaking.getFocusItems(this.allItems(storage.getCurrentLang())).length
     }, addUpdate))
-    setTimeout(() => this.next(), 700)
+    this.later(() => this.next(), 700)
   },
 
   next() {

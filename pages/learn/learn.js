@@ -7,6 +7,7 @@ const audio = require('../../utils/audio')
 const localAudio = require('../../utils/local-audio')
 const kidMode = require('../../utils/kid-mode')
 const practiceTimer = require('../../utils/practice-timer')
+const pageTimers = require('../../utils/page-timers')
 
 // 首帧语言名（第十轮）：初始 data 原来写死 langName: '英语'，onShow 才覆盖，
 // 学日语的用户每次进页面都会先闪一下「英语」。这里在模块加载时就按当前语种算好。
@@ -160,7 +161,7 @@ Page({
       if (queue[nextIndex + 1]) audio.prefetch(queue[nextIndex + 1].id)
     } else {
       wx.showToast({ title: '本轮完成！', icon: 'success' })
-      setTimeout(() => this.load(), 600)
+      this.later(() => this.load(), 600)
     }
   },
   // ---- 滑动手势 ----
@@ -179,12 +180,15 @@ Page({
     const dy = t.clientY - t0.y
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return   // 竖着划 / 幅度太小，当点击
     this._swiped = true
-    setTimeout(() => { this._swiped = false }, 300)
+    this.later(() => { this._swiped = false }, 300)
     if (!this.data.flipped) { this.setData({ flipped: true }); return }
     this.rate({ currentTarget: { dataset: { q: dx > 0 ? 5 : 0 } } })
   },
-  onHide() { practiceTimer.stop(); storage.flushAll() },
+  onHide() { pageTimers.clear(this); practiceTimer.stop(); storage.flushAll() },
+  // 定时器登记（第十一轮）：切分类后 600ms 重新 load、滑动 300ms 复位
+  later(fn, ms) { return pageTimers.later(this, fn, ms) },
   onUnload() {
+    pageTimers.clear(this)
     practiceTimer.stop()
     // 评分是延迟落盘的，离开页面前必须冲一次，否则最后几张卡会丢
     storage.flushAll()

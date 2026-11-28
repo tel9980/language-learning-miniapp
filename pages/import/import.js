@@ -1,5 +1,6 @@
 const theme = require('../../utils/theme')
 const storage = require('../../utils/storage')
+const pageTimers = require('../../utils/page-timers')
 
 Page({
   behaviors: [theme],
@@ -12,6 +13,10 @@ Page({
   },
 
   onShow() { this.syncTheme(); this.refreshMine() },
+  // 定时器登记（第十一轮）：导入成功后 600ms 弹结果窗
+  later(fn, ms) { return pageTimers.later(this, fn, ms) },
+  onHide() { pageTimers.clear(this) },
+  onUnload() { pageTimers.clear(this) },
 
   refreshMine() {
     this.setData({ mine: storage.getCustomItems(storage.getCurrentLang()) })
@@ -62,7 +67,7 @@ Page({
     const lang = storage.getCurrentLang()
     const added = storage.addCustomItems(items.map(x => Object.assign(x, { lang: lang })))
     wx.showToast({ title: `已导入 ${added} 条`, icon: 'success' })
-    setTimeout(() => {
+    this.later(() => {
       wx.showModal({
         title: '导入成功', content: `已添加 ${added} 条到「自建」跟读素材，去口语练习页切换「✏️ 自建」开始练习吧。`,
         showCancel: false,

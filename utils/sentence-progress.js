@@ -127,6 +127,21 @@ function summary(items, now) {
   return { learned: learned, due: due, total: (items || []).length }
 }
 
+// 整表替换（备份恢复用）。第十一轮补上：之前只有读没有写，导致单档案备份
+// 导出的数据里没有句子进度，换机后练过的句子全变回「没练过」。
+function replaceAll(map) {
+  if (!map || typeof map !== 'object' || Array.isArray(map)) return false
+  const clean = {}
+  Object.keys(map).forEach(function (k) {
+    const v = map[k]
+    if (!v || typeof v !== 'object') return
+    clean[k] = Object.assign({}, v)
+  })
+  _cache = clean
+  _dirty = true
+  return persist() > 0
+}
+
 function flush() { return persist() }
 
 function invalidate() {
@@ -138,5 +153,5 @@ function invalidate() {
 module.exports = {
   KEY: KEY, FLUSH_DELAY: FLUSH_DELAY,
   review: review, SOURCE_WEIGHT: SOURCE_WEIGHT, get: get, all: all, dueIds: dueIds, summary: summary,
-  flush: flush, invalidate: invalidate
+  replaceAll: replaceAll, flush: flush, invalidate: invalidate
 }

@@ -580,14 +580,30 @@ function flushAll() {
   try { require('./sentence-progress').flush() } catch (e) { logger.warn('[storage] 句子进度落盘失败', e) }
 }
 
-// 导出全部学习数据：返回可序列化的普通对象（v2 含口语数据）
+// 备份格式版本。改了导出字段就要 +1，导入端按版本判断能认出哪些字段。
+//   1 = 只有进度/统计/设置
+//   2 = 加口语数据（speak）
+//   3 = 加自建素材、主题（custom / theme）
+//   4 = 加句子复习表（sentences）与提醒偏好（reminder）
+//       —— 第十一轮补：v3 之前单档案备份是残缺的，句子进度只进「全家备份」。
+const BACKUP_VERSION = 4
+
+// 导出全部学习数据：返回可序列化的普通对象
 function exportData() {
   flush()
   let speak = null
   try { speak = require('./speaking').exportData() } catch (e) { logger.warn('[storage] 导出时读口语数据失败', e) }
+  let sentences = null
+  try { sentences = require('./sentence-progress').all() } catch (e) { logger.warn('[storage] 导出时读句子进度失败', e) }
+  let reminder = null
+  try {
+    const raw = wx.getStorageSync('lp_reminder_v1')
+    // 存的是 JSON 字符串，备份里放对象更好读；导入时再序列化回去
+    reminder = typeof raw === 'string' ? JSON.parse(raw) : (raw || null)
+  } catch (e) { reminder = null }
   return {
     format: 'yuban-lang-backup',
-    version: 3,
+    version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
     progress: getProgress(),
     stats: getStats(),
@@ -595,7 +611,9 @@ function exportData() {
     daily: getDaily(),
     custom: getCustomItems(),
     theme: getTheme(),
-    speak: speak
+    speak: speak,
+    sentences: sentences,
+    reminder: reminder
   }
 }
 
@@ -616,6 +634,12 @@ function importData(data) {
   if (!data.progress || !data.stats || !data.settings || !data.daily) {
     return { ok: false, reason: '备份内容不完整' }
   }
+  // 新版本导出的备份里可能有旧版认不出的字段，硬吃会写出半坏的数据。
+  // 宁可让用户先更新小程序，也不要把好数据写坏。
+  const ver = Number(data.version) || 1
+  if (ver > BACKUP_VERSION) {
+    return { ok: false, reason: '备份来自更新版本的小程序，请先更新后再导入' }
+  }
   writeProgressAll(migrateProgress(data.progress))
   write(KEY_STATS, data.stats)
   write(KEY_SETTINGS, data.settings)
@@ -624,10 +648,17 @@ function importData(data) {
   if (data.custom) write(KEY_CUSTOM, data.custom)
   if (data.theme) write(KEY_THEME, data.theme)
   // v2：恢复口语数据
-  if (data.speak && data.version >= 2) {
+  if (data.speak && ver >= 2) {
     try { require('./speaking').importData(data.speak) } catch (e) { logger.warn('[storage] 导入口语数据失败', e) }
   }
-  return { ok: true, version: data.version || 1 }
+  // v4：恢复句子复习表与提醒偏好（旧备份没有这两个字段，跳过即可）
+  if (data.sentences && ver >= 4) {
+    try { require('./sentence-progress').replaceAll(data.sentences) } catch (e) { logger.warn('[storage] 导入句子进度失败', e) }
+  }
+  if (data.reminder && ver >= 4) {
+    try { wx.setStorageSync('lp_reminder_v1', data.reminder) } catch (e) { logger.warn('[storage] 导入提醒偏好失败', e) }
+  }
+  return { ok: true, version: ver }
 }
 
 module.exports = {

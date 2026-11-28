@@ -2,6 +2,7 @@ const theme = require('../../utils/theme')
 const profile = require('../../utils/profile')
 const prompt = require('../../utils/prompt')
 const storage = require('../../utils/storage')
+const pageTimers = require('../../utils/page-timers')
 
 const MODE_NAMES = { normal: '标准', kid: '儿童', elder: '长辈' }
 
@@ -18,6 +19,11 @@ Page({
     this.syncTheme()
     this.refresh()
   },
+  // 定时器登记（第十一轮）：切换/新增档案后 600ms reLaunch 回首页。
+  // 用户在这 600ms 里自己按了返回，原来还会被拽走一次。
+  later(fn, ms) { return pageTimers.later(this, fn, ms) },
+  onHide() { pageTimers.clear(this) },
+  onUnload() { pageTimers.clear(this) },
 
   noop() {},
 
@@ -40,11 +46,12 @@ Page({
   },
 
   choose(e) {
+    const that = this
     const id = e.currentTarget.dataset.id
     if (id === this.data.currentId) return
     if (!profile.switchTo(id)) return
     wx.showToast({ title: '已切换档案', icon: 'success' })
-    setTimeout(function () { wx.reLaunch({ url: '/pages/index/index' }) }, 600)
+    that.later(function () { wx.reLaunch({ url: '/pages/index/index' }) }, 600)
   },
 
   addProfile() {
@@ -62,7 +69,7 @@ Page({
             const id = profile.add(name, mode)
             profile.switchTo(id)
             wx.showToast({ title: '已创建并切换', icon: 'success' })
-            setTimeout(function () { wx.reLaunch({ url: '/pages/index/index' }) }, 600)
+            that.later(function () { wx.reLaunch({ url: '/pages/index/index' }) }, 600)
           }
         })
       }

@@ -17,3 +17,15 @@
 .theme-dark .switch.on { background: #4A6CF7; }
 .theme-dark .knob { background: #E8EAF0; }
 .theme-dark .picker-val { color: #8FA8FF; }
+
+/* 暂不支持推送时（第十一轮）：开关做成"只记录"的弱化态，别让人以为设好了就能收到 */
+.warn-box { margin-bottom: 20rpx; background: #FFF8E8; border: 1rpx solid #F3E2BC; }
+.warn-title { font-size: 28rpx; font-weight: 700; color: #8A5A00; margin-bottom: 10rpx; }
+.warn-box .muted { display: block; line-height: 1.7; margin-bottom: 8rpx; color: #8A6A2E; }
+.tag-off { margin-left: 12rpx; font-size: 22rpx; color: #8A6A2E; background: #F3E2BC; padding: 2rpx 10rpx; border-radius: 8rpx; }
+.switch.off-disabled { opacity: .55; }
+
+.theme-dark .warn-box { background: #3E3527; border-color: #5A4A2E; }
+.theme-dark .warn-title { color: #E4A94A; }
+.theme-dark .warn-box .muted { color: #C9A96E; }
+.theme-dark .tag-off { color: #C9A96E; background: #5A4A2E; }

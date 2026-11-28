@@ -12,8 +12,14 @@ const onlineData = require('../../utils/online-data')
 const logger = require('../../utils/logger')
 const { getWords } = require('../../utils/words')
 const modePicker = require('../../utils/mode-picker')
+const pageTimers = require('../../utils/page-timers')
+const chartPalette = require('../../utils/chart-palette')
 
 const app = getApp()
+
+// 备份导入的长度上限（字符数）。一份 821 词的备份约 58KB，
+// wx.showModal 的可编辑输入框粘到 20K 字以上在真机上就开始卡。
+const IMPORT_MAX_CHARS = 200 * 1024
 
 Page({
   behaviors: [theme],
@@ -24,6 +30,10 @@ Page({
     feedbackEnabled: true, fontScale: 1, darkMode: false, ttsCacheKb: 0, voiceprintAgreed: false,
     recCount: 0, recKb: 0, recMaxMb: 6
   },
+  // 定时器登记（第十一轮）：导入成功后 800/900ms reLaunch
+  later(fn, ms) { return pageTimers.later(this, fn, ms) },
+  onHide() { pageTimers.clear(this) },
+  onUnload() { pageTimers.clear(this) },
   onShow() {
     this.syncTheme()
     this.refresh()
@@ -156,24 +166,25 @@ Page({
       ctx.scale(dpr, dpr)
       ctx.clearRect(0, 0, W, H)
 
+      const pal = chartPalette.palette(!!this.data.darkMode)
       const pts = this.data.fluency || []
       const padL = 36, padB = 30, padT = 16, padR = 12
       const chartH = H - padB - padT
       const chartW = W - padL - padR
       const slot = chartW / Math.max(pts.length - 1, 1)
 
-      // 网格线 0/50/100%
-      ctx.strokeStyle = '#EEF1FB'
+      // 网格线 0/50/100%（配色跟主题走，见 utils/chart-palette.js）
+      ctx.strokeStyle = pal.grid
       ctx.lineWidth = 1
       ;[0, 50, 100].forEach(function (rate) {
         const y = padT + chartH - (rate / 100) * chartH
         ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke()
-        ctx.fillStyle = '#B7BFCC'; ctx.font = '16px sans-serif'; ctx.textAlign = 'right'
+        ctx.fillStyle = pal.label; ctx.font = '16px sans-serif'; ctx.textAlign = 'right'
         ctx.fillText(rate + '%', padL - 6, y + 5)
       })
 
       // 折线（只连有练习的天，无练习天跳过）
-      ctx.strokeStyle = '#4A6CF7'
+      ctx.strokeStyle = pal.line
       ctx.lineWidth = 3
       ctx.beginPath()
       let drawing = false
@@ -192,11 +203,11 @@ Page({
       // 数据点 + 标签（每 3 天标一次）
       coords.forEach(function (c, i) {
         if (c.p.count > 0) {
-          ctx.fillStyle = '#4A6CF7'
+          ctx.fillStyle = pal.line
           ctx.beginPath(); ctx.arc(c.x, c.y, 4, 0, Math.PI * 2); ctx.fill()
         }
         if (i % 3 === 0 || i === coords.length - 1) {
-          ctx.fillStyle = '#8A94A6'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center'
+          ctx.fillStyle = pal.label; ctx.font = '14px sans-serif'; ctx.textAlign = 'center'
           ctx.fillText(c.p.label, c.x, H - 8)
         }
       })
@@ -215,6 +226,7 @@ Page({
       ctx.scale(dpr, dpr)
       ctx.clearRect(0, 0, W, H)
 
+      const pal = chartPalette.palette(!!this.data.darkMode)
       const days = this.data.days
       const max = Math.max.apply(null, days.map(d => d.value).concat([1]))
       const padL = 30, padB = 40, padT = 20
@@ -223,8 +235,8 @@ Page({
       const slot = chartW / days.length
       const barW = Math.min(slot * 0.5, 36)
 
-      // 网格线
-      ctx.strokeStyle = '#EEF1FB'
+      // 网格线（配色跟主题走）
+      ctx.strokeStyle = pal.grid
       ctx.lineWidth = 1
       for (let i = 0; i <= 4; i++) {
         const y = padT + chartH - (chartH / 4) * i
@@ -232,7 +244,7 @@ Page({
         ctx.moveTo(padL, y)
         ctx.lineTo(W - 10, y)
         ctx.stroke()
-        ctx.fillStyle = '#B7BFCC'
+        ctx.fillStyle = pal.label
         ctx.font = '18px sans-serif'
         ctx.textAlign = 'right'
         ctx.fillText(String(Math.round(max / 4 * i)), padL - 6, y + 6)
@@ -244,21 +256,21 @@ Page({
         const y = padT + chartH - h
         // 柱
         const grad = ctx.createLinearGradient(0, y, 0, padT + chartH)
-        grad.addColorStop(0, '#6E8BFF')
-        grad.addColorStop(1, '#4A6CF7')
+        grad.addColorStop(0, pal.barTop)
+        grad.addColorStop(1, pal.barBottom)
         ctx.fillStyle = grad
         ctx.beginPath()
         ctx.roundRect ? ctx.roundRect(x, y, barW, Math.max(h, 2), 6) : ctx.rect(x, y, barW, Math.max(h, 2))
         ctx.fill()
         // 数值
         if (d.value > 0) {
-          ctx.fillStyle = '#4A6CF7'
+          ctx.fillStyle = pal.line
           ctx.font = 'bold 18px sans-serif'
           ctx.textAlign = 'center'
           ctx.fillText(String(d.value), x + barW / 2, y - 6)
         }
         // 日期
-        ctx.fillStyle = '#8A94A6'
+        ctx.fillStyle = pal.label
         ctx.font = '18px sans-serif'
         ctx.textAlign = 'center'
         ctx.fillText(d.label, x + barW / 2, H - 12)
@@ -345,6 +357,8 @@ Page({
     modePicker.pick(function () {
       that.syncTheme()
       that.refresh()
+      // 儿童/长辈模式也会改字号，图表要跟着重算尺寸
+      that.later(function () { that.drawChart(); that.drawFluencyChart() }, 60)
     })
   },
 
@@ -364,16 +378,22 @@ Page({
         storage.setFontScale(scales[res.tapIndex])
         app.refreshTheme()
         that.syncTheme()
+        // 字号变了，卡片高度跟着变 → canvas 尺寸要重算，否则图会被拉伸
+        that.later(function () { that.drawChart(); that.drawFluencyChart() }, 60)
         wx.showToast({ title: '字号已调整', icon: 'success' })
       }
     })
   },
 
   toggleDarkMode() {
+    const self = this
     const v = !this.data.darkMode
     storage.setDarkMode(v)
     app.refreshTheme()
     this.syncTheme()
+    // canvas 是个独立绘制层：换配色后必须重画，否则深色下还是浅色图表。
+    // setData 是异步的，等这一帧渲染完再画，不然拿到的是旧底色。
+    this.later(function () { self.drawChart(); self.drawFluencyChart() }, 60)
     wx.showToast({ title: v ? '已开启深色模式' : '已关闭深色模式', icon: 'none' })
   },
 
@@ -444,17 +464,26 @@ Page({
   },
 
   importProgress() {
+    const that = this
     wx.showModal({
       title: '导入进度',
       content: '请粘贴之前导出的备份数据（以 {"format":"yuban-lang-backup" 开头）',
       editable: true,
       success(res) {
         if (!res.confirm || !res.content) return
+        const text = String(res.content).trim()
+        // 一份 821 词的备份约 58KB。wx.showModal 的可编辑输入框粘这么长会明显卡顿，
+        // 真机上还可能被截断——截断后 JSON.parse 报错，用户看到的是「格式错误」，
+        // 会以为是备份文件坏了。所以先量长度，超了直接给能行动的提示。
+        if (text.length > IMPORT_MAX_CHARS) {
+          that.tipTooLong('导入进度')
+          return
+        }
         let data
         try {
-          data = JSON.parse(res.content)
+          data = JSON.parse(text)
         } catch (e) {
-          wx.showToast({ title: '数据格式错误', icon: 'none' })
+          wx.showToast({ title: '数据格式不对，检查是否粘完整', icon: 'none' })
           return
         }
         const result = storage.importData(data)
@@ -463,8 +492,17 @@ Page({
           return
         }
         wx.showToast({ title: '导入成功', icon: 'success' })
-        setTimeout(function () { wx.reLaunch({ url: '/pages/index/index' }) }, 800)
+        that.later(function () { wx.reLaunch({ url: '/pages/index/index' }) }, 800)
       }
+    })
+  },
+
+  // 备份太长时给一条能走通的路，而不是只报错
+  tipTooLong(title) {
+    wx.showModal({
+      title: '内容太长',
+      content: '粘贴的备份超过 ' + Math.round(IMPORT_MAX_CHARS / 1024) + 'K 字，真机输入框粘不下这么长。\n\n建议改用「导出全家包 / 导入全家包」：它同样复制到剪贴板，但恢复时不用把整段贴进输入框（可直接从剪贴板读）。',
+      showCancel: false
     })
   },
 
@@ -492,9 +530,14 @@ Page({
       editable: true,
       success(res) {
         if (!res.confirm || !res.content) return
+        const text = String(res.content).trim()
+        if (text.length > IMPORT_MAX_CHARS) {
+          that.tipTooLong('导入全家包')
+          return
+        }
         let data
-        try { data = JSON.parse(res.content) } catch (e) {
-          wx.showToast({ title: '数据格式错误', icon: 'none' }); return
+        try { data = JSON.parse(text) } catch (e) {
+          wx.showToast({ title: '数据格式不对，检查是否粘完整', icon: 'none' }); return
         }
         // 让用户选覆盖还是合并
         wx.showActionSheet({
@@ -504,7 +547,7 @@ Page({
             const result = familyBackup.importAll(data, mode)
             if (!result.ok) { wx.showToast({ title: result.reason, icon: 'none' }); return }
             wx.showToast({ title: '导入 ' + result.count + ' 位家人', icon: 'success' })
-            setTimeout(function () { wx.reLaunch({ url: '/pages/index/index' }) }, 900)
+            that.later(function () { wx.reLaunch({ url: '/pages/index/index' }) }, 900)
           }
         })
       }

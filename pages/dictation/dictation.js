@@ -10,6 +10,8 @@ const quiz = require('../../utils/quiz')
 const dictation = require('../../utils/dictation')
 const audio = require('../../utils/audio')
 const practiceTimer = require('../../utils/practice-timer')
+const pageTimers = require('../../utils/page-timers')
+const screen = require('../../utils/screen')
 
 const ROUND = 10
 
@@ -24,9 +26,16 @@ Page({
   },
 
   onLoad() { this.build() },
-  onShow() { this.syncTheme(); practiceTimer.start(!!this.data.isKid) },
-  onHide() { this.stopAudio(); practiceTimer.stop(); storage.flushAll() },
-  onUnload() { this.stopAudio(); practiceTimer.stop(); storage.flushAll() },
+  onShow() {
+    this.syncTheme()
+    practiceTimer.start(!!this.data.isKid)
+    // 屏幕常亮（第十一轮）：听写要思考，手也不动，息屏就白想
+    screen.on()
+  },
+  onHide() { pageTimers.clear(this); screen.off(); this.stopAudio(); practiceTimer.stop(); storage.flushAll() },
+  onUnload() { pageTimers.clear(this); screen.off(); this.stopAudio(); practiceTimer.stop(); storage.flushAll() },
+  // 定时器登记（第十一轮）：进页 300ms 后自动播第一题，跳页时得清掉
+  later(fn, ms) { return pageTimers.later(this, fn, ms) },
 
   switchMode(e) {
     const mode = e.currentTarget.dataset.mode
@@ -75,7 +84,7 @@ Page({
       progress: 0, playing: false
     })
     // 进来直接放第一题的音频，少点一次
-    if (queue[0]) setTimeout(() => this.play(), 300)
+    if (queue[0]) this.later(() => this.play(), 300)
   },
 
   play() {

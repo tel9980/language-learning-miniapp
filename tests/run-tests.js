@@ -615,7 +615,7 @@ const EN_WORDS = words.WORDS.en
 const JA_WORDS = words.WORDS.ja
 const VI_WORDS = words.WORDS.vi
 const KO_WORDS = words.WORDS.ko
-eq(EN_WORDS.length, 821, 'english word count = 821')
+eq(EN_WORDS.length, 828, 'english word count = 828')
 eq(JA_WORDS.length, 110, 'japanese word count = 110')
 eq(VI_WORDS.length, 80, 'vietnamese word count = 80')
 eq(KO_WORDS.length, 150, 'korean word count = 150')
@@ -673,7 +673,7 @@ eq(words.getWordsByCategory('en', '日常').length, 134, 'filter by 日常 retur
   // 第十轮：购物/天气原来只有 2 和 1 个词，点进去就学完了，各补到 12 个
   eq(words.getWordsByCategory('en', '购物').length, 12, '购物分类补到 12 个词')
   eq(words.getWordsByCategory('en', '天气').length, 12, '天气分类补到 12 个词')
-eq(words.getWords('en').length, 821, 'getWords ignores unknown lang fallback')
+eq(words.getWords('en').length, 828, 'getWords ignores unknown lang fallback')
 
 // ---- audio：日语必须带 le=jap，否则有道只返回 1920 字节静音占位文件 ----
 const audio = require('../utils/audio')
@@ -811,7 +811,7 @@ EN_WORDS.forEach(function (w) {
   enAudioIds.push(w.id)
   if (w.example) enAudioIds.push(w.id + '_ex')
 })
-eq(enAudioIds.length, 1790, '英语音频应有 1790 条（120 句 + 28 台词 + 821 词 + 821 例句）')
+eq(enAudioIds.length, 1804, '英语音频应有 1804 条（120 句 + 28 台词 + 828 词 + 828 例句）')
 const enMissing = enAudioIds.filter(function (id) { return !localAudio.has(id) })
 eq(enMissing.length, 0, 'every English item has bundled audio (missing: ' + enMissing.slice(0, 5).join(',') + ')')
 eq(badMp3(enAudioIds).length, 0, 'English audio files are real mp3')
@@ -976,7 +976,7 @@ eq(wordRank.rankOf('en_211'), 156, 'rank of "keep" comes from ECDICT frq')
 {
   const enAll = require('../utils/words').getWords('en')
   const noRank = enAll.filter(function (w) { return wordRank.rankOf(w.id) === Infinity })
-  eq(noRank.length, 0, '821 个英语词全部有词频排名（含 41 个财务/工作词 + 21 个购物/天气补词）')
+  eq(noRank.length, 0, '828 个英语词全部有词频排名（含 41 个财务/工作词 + 21 个购物/天气补词 + 7 个交通补词）')
   ok(enAll.length === wordRank.size, '词频表条数与英语词数一致（' + enAll.length + '）')
   // 真实频次必须来自 ECDICT，不是随手编的
   eq(wordRank.rankOf('en_445'), 788, 'loss 的排名来自 ECDICT frq')
@@ -1390,7 +1390,7 @@ async function runExtraTests() {
   let o8 = null
   od.checkUpdate(function (r) { o8 = r }, { force: true })
   eq(o8 && o8.updated, true, '空覆盖层版本也能更新')
-  eq(words.getWords('en').length, 821, '空覆盖层回落到内置词库')
+  eq(words.getWords('en').length, 828, '空覆盖层回落到内置词库')
 
   // 6 小时节流：别每次启动都为「比一个版本号」白拉 134KB
   const realNow = Date.now
@@ -1446,7 +1446,7 @@ async function runExtraTests() {
     words: shipped.words, sentences: shipped.sentences, dialogues: shipped.dialogues
   })).digest('hex').slice(0, 13)
   eq(fp, shipped.version, '指纹与内容一致（改词库才变版本，重复部署不会让用户白拉）')
-  eq(shipped.words.en.length, 821, '发布包英语 821 词')
+  eq(shipped.words.en.length, 828, '发布包英语 828 词')
   eq(shipped.words.ja.length, 110, '发布包日语 110 词')
   eq(shipped.sentences.en.length, 120, '发布包英语 120 句')
   eq(shipped.sentences.ja.length, 100, '发布包日语 100 句')
@@ -2463,15 +2463,112 @@ async function runTailTests() {
 
     // O8. 购物/天气分类补到 12 个（原来 2 和 1）
     const enWords = EN_WORDS
-    ok(enWords.length === 821, '英语词库 821 词（800 + 21 个购物/天气补词）')
+    ok(enWords.length === 828, '英语词库 828 词（800 + 21 个购物/天气补词 + 7 个交通补词）')
     const shop = enWords.filter(function (w) { return w.category === '购物' })
     const wea = enWords.filter(function (w) { return w.category === '天气' })
     eq(shop.length, 12, '购物分类 12 个词')
     eq(wea.length, 12, '天气分类 12 个词')
     ok(shop.concat(wea).every(function (w) { return w.ex2 && w.ex2c && w.col }), '补的词字段齐全')
-    ok(wordRank.size === 821, '词频表覆盖 821 词')
+    ok(wordRank.size === 828, '词频表覆盖 828 词')
     ok(shop.concat(wea).every(function (w) { return wordRank.rankOf(w.id) !== Infinity }), '补的词都有词频排名')
   }
+
+    // P. 第十一轮
+    // ---- P1. 备份要能带走句子进度与提醒偏好（原来单档案备份漏了两类数据）----
+    const spMod = require('../utils/sentence-progress')
+    spMod.review('vs001', 5, 'speak')
+    spMod.review('vs002', 2, 'quiz')
+    spMod.flush()
+    const bk = storage.exportData()
+    eq(bk.version, 4, '备份格式升到 v4')
+    ok(bk.sentences && bk.sentences.vs001, '导出包含句子复习表')
+    ok('reminder' in bk, '导出包含提醒偏好字段')
+    // 往返：把存储里的句子进度真删掉，导入后要回来。
+    // 注意 spMod.invalidate() 只清内存缓存，删了缓存再读还会从 storage 读回来，
+    // 所以这里必须真删 storage 的 key（按当前档案命名空间算出来）。
+    const bkCopy = JSON.parse(JSON.stringify(bk))
+    const spKey = require('../utils/profile').nsKey(spMod.KEY)
+    try { wx.removeStorageSync(spKey) } catch (e) {}
+    storage.invalidate()
+    spMod.invalidate()
+    eq(Object.keys(spMod.all()).length, 0, '删掉存储 key 后句子进度为空')
+    const im = storage.importData(bkCopy)
+    ok(im.ok, 'v4 备份能导入')
+    ok(spMod.get('vs001') && spMod.get('vs001').level >= 0, '导入后句子进度回来了')
+    ok(spMod.get('vs002'), '第二句也回来了')
+    // 更高版本的备份必须拒绝，不能写出半坏数据
+    const tooNew = Object.assign({}, bkCopy, { version: 99 })
+    ok(!storage.importData(tooNew).ok, '比当前版本更新的备份被拒绝')
+    ok(/更新版本/.test(storage.importData(tooNew).reason), '拒绝理由是「来自更新版本」')
+
+    // ---- P2. 图表配色跟主题走，不是写死浅色 ----
+    const pal = require('../utils/chart-palette')
+    const light = pal.palette(false)
+    const dark = pal.palette(true)
+    ok(light.grid !== dark.grid, '深浅两套网格色不同')
+    ok(light.line !== dark.line, '深浅两套折线色不同')
+    ;['grid', 'label', 'line', 'barTop', 'barBottom'].forEach(function (k) {
+      ok(/^#[0-9A-Fa-f]{6}$/.test(light[k]), '浅色 ' + k + ' 是合法色值')
+      ok(/^#[0-9A-Fa-f]{6}$/.test(dark[k]), '深色 ' + k + ' 是合法色值')
+    })
+    const statsSrc = read('pages/stats/stats.js')
+    ok(/chartPalette\.palette\(!!this\.data\.darkMode\)/.test(statsSrc), '绘图读主题')
+    eq((statsSrc.match(/#EEF1FB|#B7BFCC/g) || []).length, 0, '绘图里不再写死浅色网格/轴标')
+    ok(/toggleDarkMode[\s\S]{0,600}drawChart/.test(statsSrc), '切深色后重绘图表')
+    ok(/setFontSize[\s\S]{0,700}drawFluencyChart/.test(statsSrc), '改字号后重绘图表')
+
+    // ---- P3. 口语/听写时锁屏 ----
+    const screenMod = require('../utils/screen')
+    ok(typeof screenMod.on === 'function' && typeof screenMod.off === 'function', 'screen 模块导出 on/off')
+    const speakScreen = read('pages/speak/speak.js')
+    const dictScreen = read('pages/dictation/dictation.js')
+    ok(/screen\.on\(\)/.test(speakScreen), '口语页 onShow 开常亮')
+    ok(/onHide\(\)[^\n]*screen\.off\(\)/.test(speakScreen), '口语页 onHide 关常亮')
+    ok(/onUnload\(\)[^\n]*screen\.off\(\)/.test(speakScreen), '口语页 onUnload 关常亮')
+    ok(/screen\.on\(\)/.test(dictScreen), '听写页 onShow 开常亮')
+    ok(/onHide\(\)[^\n]*screen\.off\(\)/.test(dictScreen), '听写页 onHide 关常亮')
+
+    // ---- P4. 定时器跳页要回收 ----
+    const pt = require('../utils/page-timers')
+    ok(typeof pt.later === 'function' && typeof pt.clear === 'function', 'page-timers 导出 later/clear')
+    const fakePage = {}
+    const savedSet = global.setTimeout
+    const savedClear = global.clearTimeout
+    let cleared = 0
+    global.setTimeout = function (fn, ms) { return { fn: fn, ms: ms } }
+    global.clearTimeout = function () { cleared++ }
+    pt.later(fakePage, function () {}, 100)
+    pt.later(fakePage, function () {}, 200)
+    eq((fakePage._timers || []).length, 2, '登记了两个定时器')
+    eq(pt.clear(fakePage), 2, 'clear 返回清掉的个数')
+    eq((fakePage._timers || []).length, 0, '清完列表为空')
+    eq(cleared, 2, '确实调了 clearTimeout')
+    global.setTimeout = savedSet
+    global.clearTimeout = savedClear
+    ;['pages/speak/speak.js', 'pages/learn/learn.js', 'pages/dictation/dictation.js', 'pages/profiles/profiles.js', 'pages/import/import.js', 'pages/voiceprint/voiceprint.js', 'pages/stats/stats.js'].forEach(function (f) {
+      const js = read(f)
+      ok(/pageTimers = require\('\.\.\/\.\.\/utils\/page-timers'\)/.test(js), f + ' 引入 page-timers')
+      ok(/later\(fn, ms\) \{ return pageTimers\.later\(this, fn, ms\) \}/.test(js), f + ' 提供 this.later')
+      ok(/pageTimers\.clear\(this\)/.test(js), f + ' 在离开页面时清定时器')
+      eq((js.match(/(?<!this\.|that\.)setTimeout\(/g) || []).length, 0, f + ' 不再有裸 setTimeout')
+    })
+
+    // ---- P5. 备份导入的长度与版本保护 ----
+    ok(/IMPORT_MAX_CHARS/.test(statsSrc), '导入有长度上限')
+    ok(/tipTooLong/.test(statsSrc), '超长时给可操作的提示')
+    ok(/内容太长/.test(statsSrc), '超长提示文案存在')
+
+    // ---- P6. 提醒页如实说明「暂不支持推送」----
+    const remWxml = read('pages/reminder/reminder.wxml')
+    ok(/暂不支持推送/.test(remWxml), '标题写明暂不支持')
+    ok(/现在设了也收不到通知/.test(remWxml), '开头就说清楚收不到')
+    ok(/仅记录/.test(remWxml), '开关标注「仅记录」')
+
+    // ---- P7. 交通分类补到 12 个 ----
+    const tra = EN_WORDS.filter(function (w) { return w.category === '交通' })
+    eq(tra.length, 12, '交通分类 12 个词')
+    ok(tra.every(function (w) { return w.ex2 && w.ex2c && w.col }), '交通补词字段齐全')
+    ok(tra.every(function (w) { return wordRank.rankOf(w.id) !== Infinity }), '交通补词都有词频排名')
 
   // K. 对练（我说中文，给我目标语言的说法）
   // 关键约束：只放在情景对话里，不做独立翻译页（个人主体 + 教育类目，

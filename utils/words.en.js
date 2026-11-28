@@ -822,7 +822,14 @@ const words = [
     { id: "en_818", word: "weather", phonetic: "/ˈweðə(r)/", meaning: "n. 天气", example: "The weather is nice today.", exampleCn: "今天天气很好。", category: "天气", ex2: "What is the weather like tomorrow?", ex2c: "明天天气怎么样？", col: "bad weather" },
     { id: "en_819", word: "rain", phonetic: "/reɪn/", meaning: "n. 雨 v. 下雨", example: "The rain stopped at noon.", exampleCn: "中午雨停了。", category: "天气", ex2: "It rained all night long.", ex2c: "下了一整夜的雨。", col: "heavy rain" },
     { id: "en_820", word: "snow", phonetic: "/snəʊ/", meaning: "n. 雪 v. 下雪", example: "The snow covered the whole town.", exampleCn: "雪覆盖了整个小镇。", category: "天气", ex2: "It seldom snows in this city.", ex2c: "这座城市很少下雪。", col: "thick snow" },
-    { id: "en_821", word: "umbrella", phonetic: "/ʌmˈbrelə/", meaning: "n. 伞；雨伞", example: "Take an umbrella with you.", exampleCn: "带把伞去。", category: "天气", ex2: "She forgot her umbrella on the bus.", ex2c: "她把伞忘在公交车上了。", col: "open an umbrella" }
+    { id: "en_821", word: "umbrella", phonetic: "/ʌmˈbrelə/", meaning: "n. 伞；雨伞", example: "Take an umbrella with you.", exampleCn: "带把伞去。", category: "天气", ex2: "She forgot her umbrella on the bus.", ex2c: "她把伞忘在公交车上了。", col: "open an umbrella" },
+    { id: "en_822", word: "train", phonetic: "/treɪn/", meaning: "n. 火车 v. 训练", example: "I take the train to work.", exampleCn: "我坐火车上班。", category: "交通", ex2: "The train was ten minutes late.", ex2c: "火车晚了十分钟。", col: "by train" },
+    { id: "en_823", word: "bus", phonetic: "/bʌs/", meaning: "n. 公共汽车", example: "The bus stops here every ten minutes.", exampleCn: "公交车每十分钟在这里停一次。", category: "交通", ex2: "Which bus goes to the airport?", ex2c: "哪路公交车去机场？", col: "take a bus" },
+    { id: "en_824", word: "bike", phonetic: "/baɪk/", meaning: "n. 自行车 v. 骑自行车", example: "I ride my bike to school every day.", exampleCn: "我每天骑自行车上学。", category: "交通", ex2: "She bought a new bike last week.", ex2c: "她上周买了一辆新自行车。", col: "ride a bike" },
+    { id: "en_825", word: "ticket", phonetic: "/ˈtɪkɪt/", meaning: "n. 票；入场券", example: "I bought two tickets online.", exampleCn: "我在网上买了两张票。", category: "交通", ex2: "The ticket is valid for one day.", ex2c: "这张票一天内有效。", col: "a one-way ticket" },
+    { id: "en_826", word: "station", phonetic: "/ˈsteɪʃn/", meaning: "n. 车站；站", example: "Meet me at the station gate.", exampleCn: "在车站门口等我。", category: "交通", ex2: "The next station is People Square.", ex2c: "下一站是人民广场。", col: "a bus station" },
+    { id: "en_827", word: "airport", phonetic: "/ˈeəpɔːt/", meaning: "n. 机场", example: "We arrived at the airport after two hours' drive.", exampleCn: "我们开了两个小时车才到机场。", category: "交通", ex2: "The airport is far from the city centre.", ex2c: "机场离市中心很远。", col: "at the airport" },
+    { id: "en_828", word: "traffic", phonetic: "/ˈtræfɪk/", meaning: "n. 交通；车流", example: "The traffic is heavy at this hour.", exampleCn: "这个时段交通很堵。", category: "交通", ex2: "We were late because of the traffic.", ex2c: "因为堵车我们迟到了。", col: "traffic jam" }
 ]
 
 module.exports = { words }

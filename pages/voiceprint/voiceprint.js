@@ -1,5 +1,6 @@
 const theme = require('../../utils/theme')
 const storage = require('../../utils/storage')
+const pageTimers = require('../../utils/page-timers')
 
 // 声纹授权协议页。
 //
@@ -18,6 +19,10 @@ Page({
   onLoad(q) {
     this.setData({ from: (q && q.from) || '' })
   },
+  // 定时器登记（第十一轮）：同意后 600ms 自动退回口语页
+  later(fn, ms) { return pageTimers.later(this, fn, ms) },
+  onHide() { pageTimers.clear(this) },
+  onUnload() { pageTimers.clear(this) },
   onShow() {
     this.syncTheme()
     const s = storage.getSettings()
@@ -28,7 +33,7 @@ Page({
     this.setData({ agreed: true, agreedAt: storage.getSettings().voiceprintAgreedAt || '' })
     wx.showToast({ title: '已同意，可以录音了', icon: 'success' })
     const that = this
-    setTimeout(function () {
+    that.later(function () {
       // 从录音入口跳过来的，同意完直接退回口语页，省一次手动返回
       if (that.data.from === 'record' && getCurrentPages().length > 1) wx.navigateBack()
     }, 600)
