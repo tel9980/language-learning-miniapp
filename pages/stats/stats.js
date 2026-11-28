@@ -2,6 +2,7 @@ const storage = require('../../utils/storage')
 const speaking = require('../../utils/speaking')
 const sentences = require('../../utils/sentences')
 const recordings = require('../../utils/recordings')
+const backupFile = require('../../utils/backup-file')
 const achievements = require('../../utils/achievements')
 const shareCopy = require('../../utils/share-copy')
 const prompt = require('../../utils/prompt')
@@ -50,7 +51,11 @@ Page({
         recCount: ru.count,
         recKb: Math.round(ru.bytes / 1024),
         recMaxMb: Math.round(ru.maxBytes / 1048576),
-        recText: ru.count > 0 ? ru.count + ' 条 · ' + size + ' MB / ' + Math.round(ru.maxBytes / 1048576) + ' MB' : '还没录过'
+        // 条数上限也要露出来（第十三轮）：超出 30 条会挤掉最旧的一条，
+        // 但界面上从来没说过有 30 条这个上限，用户只会觉得录音自己消失了。
+        recText: ru.count > 0
+          ? ru.count + ' / ' + ru.maxKeep + ' 条 · ' + size + ' MB / ' + Math.round(ru.maxBytes / 1048576) + ' MB'
+          : '还没录过（上限 ' + ru.maxKeep + ' 条）'
       })
     } catch (e) { logger.warn('[stats] 读取录音占用失败', e) }
   },
@@ -454,25 +459,106 @@ Page({
     })
   },
 
-  exportProgress() {
-    const data = storage.exportData()
-    const text = JSON.stringify(data)
+  // ---- 备份：复制 or 存成文件（第十三轮） ----
+  //
+  // 原来只有「复制到剪贴板」一条路。828 词全学完的备份约 60KB，
+  // 换手机时得粘进备忘录、再整段复制回来，错一个字符就整包失败 ——
+  // 备份功能是有的，但真正要用的时候用不上。所以多给一条「存成文件」。
+  copyText(text, tip) {
     wx.setClipboardData({
       data: text,
       success() {
-        wx.showModal({
-          title: '已复制到剪贴板',
-          content: '备份数据已复制。粘贴到备忘录或微信收藏保存，换设备时用「导入进度」恢复。',
-          showCancel: false
-        })
+        wx.showModal({ title: '已复制到剪贴板', content: tip, showCancel: false })
       },
-      fail() {
-        wx.showToast({ title: '复制失败', icon: 'none' })
+      fail() { wx.showToast({ title: '复制失败', icon: 'none' }) }
+    })
+  },
+
+  // 写成本地 json 再交给 wx.shareFileMessage，用户可以直接发给「文件传输助手」
+  shareBackup(text, label) {
+    const that = this
+    const r = backupFile.save(text)
+    if (!r.ok) {
+      // 老基础库没有文件系统 / 写失败：退回剪贴板，别让用户卡在这一步
+      that.copyText(text, '这个环境不支持存成文件，已改为复制到剪贴板。')
+      return
+    }
+    backupFile.share(r.filePath, r.name, function (res) {
+      if (res.ok || res.reason === 'cancelled') return
+      if (res.reason === 'unsupported') {
+        that.copyText(text, '这个版本的微信不支持分享文件，已改为复制到剪贴板。')
+        return
       }
+      wx.showModal({
+        title: '文件已生成',
+        content: '已存成 ' + r.name + '，但分享没成功。可以改用「复制到剪贴板」。',
+        showCancel: false
+      })
+    })
+  },
+
+  exportProgress() {
+    const that = this
+    const data = storage.exportData()
+    const text = JSON.stringify(data)
+    wx.showActionSheet({
+      itemList: ['复制到剪贴板', '存成文件发给微信（换手机用这个）'],
+      success(res) {
+        if (res.tapIndex === 0) {
+          that.copyText(text, '备份数据已复制。粘贴到备忘录或微信收藏保存，换设备时用「导入进度」恢复。')
+        } else {
+          that.shareBackup(text, '学习数据备份')
+        }
+      },
+      fail() {}
     })
   },
 
   importProgress() {
+    const that = this
+    wx.showActionSheet({
+      itemList: ['从聊天记录选备份文件（推荐）', '手动粘贴文本'],
+      success(res) {
+        if (res.tapIndex === 0) that.importFromFile()
+        else that.importByPaste()
+      },
+      fail() {}
+    })
+  },
+
+  // 从聊天记录里选一份备份 json 读回来。比粘贴可靠得多：文件不会被输入框截断。
+  importFromFile() {
+    const that = this
+    backupFile.pick(function (r) {
+      if (!r.ok) {
+        if (r.reason === 'cancelled') return
+        wx.showToast({ title: that.pickErrorText(r.reason), icon: 'none' })
+        return
+      }
+      let data
+      try {
+        data = JSON.parse(r.text)
+      } catch (e) {
+        wx.showToast({ title: '这个文件不是备份数据', icon: 'none' })
+        return
+      }
+      that.applyBackup(data)
+    })
+  },
+
+  // 导入成功后的公共收尾：换档 / 校验都走 storage.importData
+  applyBackup(data) {
+    const that = this
+    const result = storage.importData(data)
+    if (!result.ok) {
+      wx.showToast({ title: result.reason, icon: 'none' })
+      return
+    }
+    wx.showToast({ title: '导入成功', icon: 'success' })
+    that.later(function () { wx.reLaunch({ url: '/pages/index/index' }) }, 800)
+  },
+
+  importByPaste() {
     const that = this
     wx.showModal({
       title: '导入进度',
@@ -495,13 +581,7 @@ Page({
           wx.showToast({ title: '数据格式不对，检查是否粘完整', icon: 'none' })
           return
         }
-        const result = storage.importData(data)
-        if (!result.ok) {
-          wx.showToast({ title: result.reason, icon: 'none' })
-          return
-        }
-        wx.showToast({ title: '导入成功', icon: 'success' })
-        that.later(function () { wx.reLaunch({ url: '/pages/index/index' }) }, 800)
+        that.applyBackup(data)
       }
     })
   },
@@ -517,21 +597,78 @@ Page({
 
   // ---- 全家包备份（跨设备搬一家人） ----
   exportFamily() {
+    const that = this
     const data = familyBackup.exportAll()
-    wx.setClipboardData({
-      data: JSON.stringify(data),
-      success() {
-        wx.showModal({
-          title: '全家包已复制',
-          content: '已包含全部 ' + data.profiles.length + ' 位家人的进度。发到微信收藏，换设备时用「导入全家包」恢复。注意：录音需到新设备重录。',
-          showCancel: false
-        })
+    const text = JSON.stringify(data)
+    wx.showActionSheet({
+      itemList: ['复制到剪贴板', '存成文件发给微信（换手机用这个）'],
+      success(res) {
+        if (res.tapIndex === 0) {
+          that.copyText(text, '已包含全部 ' + data.profiles.length + ' 位家人的进度。发到微信收藏，换设备时用「导入全家包」恢复。注意：录音需到新设备重录。')
+        } else {
+          that.shareBackup(text, '全家包备份')
+        }
       },
-      fail() { wx.showToast({ title: '复制失败', icon: 'none' }) }
+      fail() {}
     })
   },
 
   importFamily() {
+    const that = this
+    wx.showActionSheet({
+      itemList: ['从聊天记录选全家包文件（推荐）', '手动粘贴文本'],
+      success(res) {
+        if (res.tapIndex === 0) that.importFamilyFromFile()
+        else that.importFamilyByPaste()
+      },
+      fail() {}
+    })
+  },
+
+  importFamilyFromFile() {
+    const that = this
+    backupFile.pick(function (r) {
+      if (!r.ok) {
+        if (r.reason === 'cancelled') return
+        wx.showToast({ title: that.pickErrorText(r.reason), icon: 'none' })
+        return
+      }
+      let data
+      try { data = JSON.parse(r.text) } catch (e) {
+        wx.showToast({ title: '这个文件不是全家包数据', icon: 'none' }); return
+      }
+      that.applyFamilyBackup(data)
+    })
+  },
+
+  // 选文件失败的各种原因，翻译成人话
+  pickErrorText(reason) {
+    const map = {
+      unsupported: '这个版本的微信不支持选文件，请改用「手动粘贴文本」',
+      'too-big': '这个文件太大了，不像是备份数据',
+      empty: '这个文件是空的',
+      'read-failed': '文件读不出来，换一个试试',
+      'no-file': '没有选到文件'
+    }
+    return map[reason] || '没能读到备份文件'
+  },
+
+  // 导入全家包后的公共收尾：让用户选合并还是覆盖
+  applyFamilyBackup(data) {
+    const that = this
+    wx.showActionSheet({
+      itemList: ['合并（保留现有 + 导入）', '覆盖（清空后恢复）'],
+      success(choice) {
+        const mode = choice.tapIndex === 0 ? 'merge' : 'overwrite'
+        const result = familyBackup.importAll(data, mode)
+        if (!result.ok) { wx.showToast({ title: result.reason, icon: 'none' }); return }
+        wx.showToast({ title: '导入 ' + result.count + ' 位家人', icon: 'success' })
+        that.later(function () { wx.reLaunch({ url: '/pages/index/index' }) }, 900)
+      }
+    })
+  },
+
+  importFamilyByPaste() {
     const that = this
     wx.showModal({
       title: '导入全家包',
@@ -548,17 +685,7 @@ Page({
         try { data = JSON.parse(text) } catch (e) {
           wx.showToast({ title: '数据格式不对，检查是否粘完整', icon: 'none' }); return
         }
-        // 让用户选覆盖还是合并
-        wx.showActionSheet({
-          itemList: ['合并（保留现有 + 导入）', '覆盖（清空后恢复）'],
-          success(choice) {
-            const mode = choice.tapIndex === 0 ? 'merge' : 'overwrite'
-            const result = familyBackup.importAll(data, mode)
-            if (!result.ok) { wx.showToast({ title: result.reason, icon: 'none' }); return }
-            wx.showToast({ title: '导入 ' + result.count + ' 位家人', icon: 'success' })
-            that.later(function () { wx.reLaunch({ url: '/pages/index/index' }) }, 900)
-          }
-        })
+        that.applyFamilyBackup(data)
       }
     })
   }

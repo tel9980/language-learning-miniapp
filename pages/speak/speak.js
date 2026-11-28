@@ -2,6 +2,7 @@ const storage = require('../../utils/storage')
 const speaking = require('../../utils/speaking')
 const sentences = require('../../utils/sentences')
 const audio = require('../../utils/audio')
+const audioCtx = require('../../utils/audio-ctx')
 const aiEval = require('../../utils/ai-eval')
 const localAudio = require('../../utils/local-audio')
 const speechScore = require('../../utils/speech-score')
@@ -445,7 +446,7 @@ Page({
         })
       }
       const playMine = function (then) {
-        const ctx = wx.createInnerAudioContext()
+        const ctx = audioCtx.create()
         that._compareCtx = ctx
         const done = function () {
           try { ctx.destroy() } catch (e) {}
@@ -553,6 +554,15 @@ Page({
       // 关键：落盘成功后临时文件已被移走，后续播放必须用 entry.filePath
       if (entry && entry.filePath) that._recFilePath = entry.filePath
       else wx.showToast({ title: '录音没能存下来（空间可能已满）', icon: 'none' })
+      // 第十三轮：录音上限 30 条，超出的最旧一条会被挤掉。
+      // 以前这件事一声不吭，用户只会以为「我录的东西自己没了」。
+      if (entry && entry.droppedCount > 0) {
+        wx.showToast({
+          title: '录音已满 30 条，最旧的一条已被替换（「我的录音」里可管理）',
+          icon: 'none',
+          duration: 3000
+        })
+      }
       // 「留下声音」徽章按录音条数解锁，存下来才查
       if (entry) badges.check()
       that._savePromise = null

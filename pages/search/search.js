@@ -227,6 +227,10 @@ Page({
     const kw = (this.data.keyword || '').trim()
     if (!kw) { wx.showToast({ title: '先输入一个词', icon: 'none' }); return }
     if (!aiLookup.configured()) { wx.showToast({ title: '这一版没配 AI 查词', icon: 'none' }); return }
+    // 第十三轮：在途去重。按钮文案会变成「正在问 AI…」但仍然可点，
+    // 手快点两下就是两个请求、两份额度。AI 额度是「设备 + 档案」共享的，
+    // 用完了当天就没得查 —— 口语页那边一直有这层守卫，这里漏了。
+    if (this.data.aiLoading) return
     const that = this
     this.setData({ aiLoading: true, aiResult: null, aiError: '', aiSaved: false })
     aiLookup.lookup(kw, this.data.lang, function (r) {

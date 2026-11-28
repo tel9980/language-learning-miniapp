@@ -1,5 +1,6 @@
 const theme = require('../../utils/theme')
 const recordings = require('../../utils/recordings')
+const audioCtx = require('../../utils/audio-ctx')
 
 Page({
   behaviors: [theme],
@@ -63,7 +64,7 @@ Page({
     if (!first || !last) return
     this.stopPlay()
     const that = this
-    const ctx = wx.createInnerAudioContext()
+    const ctx = audioCtx.create()
     this._player = ctx
     let stage = 0
     ctx.onEnded(function () {
@@ -98,7 +99,7 @@ Page({
     if (!item || !item.filePath) return
     this.stopPlay()
     const that = this
-    this._player = wx.createInnerAudioContext()
+    this._player = audioCtx.create()
     this._player.src = item.filePath
     this._player.onEnded(() => that.setData({ playingId: '' }))
     this._player.onError(() => { wx.showToast({ title: '这条录音可能已过期，请重录', icon: 'none' }); that.setData({ playingId: '' }) })

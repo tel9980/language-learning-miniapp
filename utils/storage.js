@@ -30,7 +30,7 @@ function defaults() {
   return {
     progress: {},
     stats: { totalLearned: 0, totalReviews: 0, totalCorrect: 0, streak: 0, lastActive: '', firstDay: '' },
-    settings: { lang: 'en', dailyGoal: 20, feedbackEnabled: true, guideSeen: false, aiEvalAgreed: false, voiceprintAgreed: false, voiceprintAgreedAt: '', guardianAgreed: false, guardianAgreedAt: '', kidAiUnlocked: false, kidAiUnlockedAt: '', kidRest: '' },
+    settings: { lang: 'en', dailyGoal: 20, feedbackEnabled: true, guideSeen: false, aiEvalAgreed: false, voiceprintAgreed: false, voiceprintAgreedAt: '', guardianAgreed: false, guardianAgreedAt: '', kidAiUnlocked: false, kidAiUnlockedAt: '', kidRest: '', firstTipClosed: false },
     daily: {},
     custom: [],
     theme: { fontScale: 1, darkMode: false }
@@ -280,6 +280,11 @@ function getCurrentLang() { return getSettings().lang || 'en' }
 function setDailyGoal(n) { const s = getSettings(); s.dailyGoal = n; write(KEY_SETTINGS, s) }
 function setFeedbackEnabled(v) { const s = getSettings(); s.feedbackEnabled = !!v; write(KEY_SETTINGS, s) }
 function setGuideSeen(v) { const s = getSettings(); s.guideSeen = !!v; write(KEY_SETTINGS, s) }
+// 首页新手提示条（第十三轮）：只在「刚开始用」的那几天出现，点一次永久关掉
+function getFirstTipClosed() { return !!getSettings().firstTipClosed }
+function setFirstTipClosed(v) { const s = getSettings(); s.firstTipClosed = !!v; write(KEY_SETTINGS, s) }
+// 练过的天数 = daily 里有记录的天数（不等于连续打卡，断签也算练过）
+function getPracticeDayCount() { return Object.keys(getDaily()).length }
 // AI 听音评测需要把录音上传，必须用户亲口同意一次才记下来（问过一次就不再问）
 function setAiEvalAgreed(v) { const s = getSettings(); s.aiEvalAgreed = !!v; write(KEY_SETTINGS, s) }
 // 声纹授权：微信审核要求「独立的《声纹授权协议》+ 取得用户授权同意后才能采集」。
@@ -589,13 +594,28 @@ function setKidAiUnlocked(v) {
   return true
 }
 // 休息提醒今天是否已经弹过（'15' / '30' 两个节点各弹一次）
+//
+// ⚠️ 这里原来只存一个 "日期:节点" 字符串，于是「每天各弹一次」根本做不到：
+// 弹完 30 分钟档会把 15 分钟档的记录覆盖掉，下一轮 restDue() 发现 15 还没弹过，
+// 又弹一次；再下一轮又发现 30 没了……两个档位来回弹，能弹到用户关掉小程序。
+// 现在存成 "日期:15,30"，旧数据（"日期:15"）也能照原样读。
+function _restStepsOf(s) {
+  const raw = s && s.kidRest
+  const tk = todayKey()
+  if (typeof raw !== 'string') return []
+  if (raw === tk) return ['15', '30']          // 兼容「当天全部弹完」的极简写法
+  if (raw.indexOf(tk + ':') !== 0) return []   // 不是今天的记录
+  return raw.slice(tk.length + 1).split(',').filter(Boolean)
+}
 function kidRestSeen(step) {
-  const s = getSettings()
-  return s.kidRest === todayKey() + ':' + step
+  return _restStepsOf(getSettings()).indexOf(String(step)) >= 0
 }
 function markKidRestSeen(step) {
   const s = getSettings()
-  s.kidRest = todayKey() + ':' + step
+  const steps = _restStepsOf(s)
+  if (steps.indexOf(String(step)) < 0) steps.push(String(step))
+  steps.sort()
+  s.kidRest = todayKey() + ':' + steps.join(',')
   writeDeferred(KEY_SETTINGS, s)
 }
 
@@ -697,7 +717,7 @@ function importData(data) {
 module.exports = {
   init, todayKey, getSettings, setLang, getCurrentLang, setDailyGoal,
   setFeedbackEnabled, setGuideSeen, setLearnCat, setAiEvalAgreed, getVoiceprintAgreed, setVoiceprintAgreed, getTheme, setFontScale, setDarkMode,
-  addPracticeSeconds, getPracticeSeconds, getGuardianAgreed, setGuardianAgreed, getKidAiUnlocked, setKidAiUnlocked, kidRestSeen, markKidRestSeen,
+  addPracticeSeconds, getPracticeSeconds, getGuardianAgreed, setGuardianAgreed, getKidAiUnlocked, setKidAiUnlocked, kidRestSeen, markKidRestSeen, getFirstTipClosed, setFirstTipClosed, getPracticeDayCount,
   getCustomItems, addCustomItems, removeCustomItem,
   getProgress, getStats, getDaily, getDueWords, getNewWords, getToday,
   review, quizAnswer, getMasteredCount, INTERVALS, clearLapse,

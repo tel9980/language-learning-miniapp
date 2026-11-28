@@ -1,5 +1,6 @@
 const theme = require('../../utils/theme')
 const family = require('../../utils/family')
+const audioCtx = require('../../utils/audio-ctx')
 const prompt = require('../../utils/prompt')
 
 Page({
@@ -30,7 +31,7 @@ Page({
     if (!item || !item.filePath) return
     this.stopPlay()
     const that = this
-    this._player = wx.createInnerAudioContext()
+    this._player = audioCtx.create()
     this._player.src = item.filePath
     this._player.onEnded(() => that.setData({ playingId: '' }))
     this._player.onError(() => { wx.showToast({ title: '这条录音可能已过期，请重录', icon: 'none' }); that.setData({ playingId: '' }) })

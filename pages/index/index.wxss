@@ -59,3 +59,17 @@
 .theme-dark .arrow { color: #4A5568; }
 .theme-dark .family-section .section-label { color: #9AA3B5; }
 .theme-dark .goal-tip { color: #9AA3B5; }
+
+/* ===== 新手提示条（第十三轮） =====
+   首页有 11 个入口卡，第一次打开的人不知道该点哪个。
+   用一条浅色提示条而不是弹窗：不遮挡、不打断，点「知道了」就永久消失。 */
+.first-tip { margin-bottom: 20rpx; background: #EEF3FF; border: 2rpx solid #D6E0FF; border-radius: 20rpx; padding: 24rpx 26rpx; }
+.first-tip-title { font-size: 28rpx; font-weight: 700; color: #2E4FCC; margin-bottom: 8rpx; }
+.first-tip-text { font-size: 25rpx; color: #5A6474; line-height: 1.65; }
+.first-tip-actions { display: flex; align-items: center; gap: 20rpx; margin-top: 18rpx; }
+.first-tip-go { background: #4A6CF7; color: #fff; font-size: 25rpx; padding: 14rpx 28rpx; border-radius: 999rpx; }
+.first-tip-close { color: #7A869A; font-size: 25rpx; padding: 14rpx 6rpx; }
+.theme-dark .first-tip { background: #232B45; border-color: #33406B; }
+.theme-dark .first-tip-title { color: #8FA8FF; }
+.theme-dark .first-tip-text { color: #9AA3B5; }
+.theme-dark .first-tip-close { color: #8A94A6; }

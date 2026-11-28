@@ -23,7 +23,10 @@ Page({
     lang: storage.getCurrentLang(), langName: _firstLangMeta.name, langFlag: _firstLangMeta.flag,
     dailyGoal: 20, goalPercent: 0, goalTip: '',
     speakCount: 0, focusCount: 0, unreadComments: 0,
-    myName: '我', myAvatar: '😀', modeName: '标准'
+    myName: '我', myAvatar: '😀', modeName: '标准',
+    // 新手提示条（第十三轮）：首页有 11 个入口卡平铺，第一次打开的人不知道点哪个。
+    // 只在「练过的天数 ≤ 3 天 且 没关过」时出现，点「知道了」永久不再出现。
+    showFirstTip: false
   },
   // 第九轮：首页的「今日复习目标」卡片原来点不动，改目标要进「统计 → 使用设置」，
   // 而这张卡是每天都要看一眼的地方。现在点一下就能改。
@@ -74,7 +77,17 @@ Page({
     const speakCount = speaking.getToday().count
     const focusCount = speaking.getFocusWords(lang).length
     app.globalData.lang = lang
-    this.setData({ stats, today, dueCount, mastered, lang, langName: meta.name, langFlag: meta.flag, dailyGoal, goalPercent, goalTip, speakCount, focusCount, unreadComments: family.unreadComments(), myName: p.name, myAvatar: p.avatar, modeName: modeNames[p.mode] || '标准' })
+    const showFirstTip = !storage.getFirstTipClosed() && storage.getPracticeDayCount() <= 3
+    this.setData({ stats, today, dueCount, mastered, lang, langName: meta.name, langFlag: meta.flag, dailyGoal, goalPercent, goalTip, speakCount, focusCount, unreadComments: family.unreadComments(), myName: p.name, myAvatar: p.avatar, modeName: modeNames[p.mode] || '标准', showFirstTip })
+  },
+  // 新手提示条：关掉就永久记住（不是「今天不再显示」——这条只对头几天有用）
+  closeFirstTip() {
+    storage.setFirstTipClosed(true)
+    this.setData({ showFirstTip: false })
+  },
+  goLearnFromTip() {
+    this.closeFirstTip()
+    wx.switchTab({ url: '/pages/learn/learn' })
   },
   switchLang() {
     const langs = LANG_KEYS

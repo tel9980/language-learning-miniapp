@@ -2236,7 +2236,14 @@ async function runTailTests() {
     const timerSrc = read('utils/practice-timer.js')
     ok(/storage\.addPracticeSeconds\(sec\)/.test(timerSrc), '计时结束写回练习时长')
     ok(/sec < 3/.test(timerSrc), '误触（<3 秒）不记时长')
-    ok(/restDue\(\)/.test(timerSrc), '儿童模式到点提醒休息')
+    // 第十三轮：提醒改成「页内定时到点就弹」，不再在 stop() 里补弹。
+    // 旧实现只在离开页面时检查，孩子连着练 40 分钟一次提醒都没有。
+    ok(/function arm\(\)/.test(timerSrc), '练习计时器有页内定时（arm）')
+    ok(/setTimeout\(function \(\) \{[\s\S]{0,80}fire\(target\)/.test(timerSrc), '到点直接弹提醒，不等离开页面')
+    ok(/elapsedSeconds/.test(timerSrc), '累计时长要算上本次前台已经过去的')
+    ok(!/restDue\(\)/.test(timerSrc), 'stop() 里不再用 restDue 补弹')
+    // kid-mode 里那个 restDue 已经删掉了（它还会导致 15/30 两档来回弹，见 storage 注释）
+    ok(!/restDue/.test(read('utils/kid-mode.js')), 'kid-mode 不再导出会来回弹的 restDue')
     ;['pages/learn/learn.js', 'pages/quiz/quiz.js', 'pages/speak/speak.js'].forEach((f) => {
       ok(/practiceTimer\.start\(/.test(read(f)), f + ' 开始计练习时长')
       ok(/practiceTimer\.stop\(/.test(read(f)), f + ' 离开时结算练习时长')
@@ -2823,6 +2830,173 @@ async function runTailTests() {
       eq(kidRes.todayHasTarget, true, '既到期又错过的词仍要出现在待练清单里')
       eq(kidRes.todayTotal, 1, '同一个词既到期又错过时，清单只该有 1 条（去重前是 2 条）')
     }
+  })()
+
+  // S. 第十三轮：静音开关、儿童休息提醒时机、录音满 30 条、AI 去重、备份文件化、新手提示
+  ;(() => {
+    // S1 静音开关：iOS 那个侧边拨杆默认会把 InnerAudioContext 一起静音，而且不报错。
+    //    全项目统一走 utils/audio-ctx.js，除它自己以外不许再出现裸的 createInnerAudioContext。
+    const actx = read('utils/audio-ctx.js')
+    ok(/obeyMuteSwitch = false/.test(actx), 'audio-ctx 要关掉对静音开关的服从')
+    ok(/module\.exports = \{ create: create \}/.test(actx), 'audio-ctx 导出 create')
+    const audioFiles = []
+    ;(function walk(dir) {
+      fsMod.readdirSync(pathMod.join(__dirname, '..', dir)).forEach((n) => {
+        const rel = dir + '/' + n
+        const full = pathMod.join(__dirname, '..', rel)
+        if (fsMod.statSync(full).isDirectory()) walk(rel)
+        else if (/\.js$/.test(n)) audioFiles.push(rel)
+      })
+    })('pages')
+    ;['utils/audio.js', 'utils/audio-ctx.js'].forEach((f) => audioFiles.push(f))
+    const bareCtx = audioFiles.filter((f) => {
+      if (f === 'utils/audio-ctx.js') return false
+      return /wx\.createInnerAudioContext\(/.test(read(f))
+    })
+    eq(bareCtx.length, 0, '除 audio-ctx 外不该有裸的 wx.createInnerAudioContext：' + bareCtx.join(','))
+    ;['utils/audio.js', 'pages/speak/speak.js', 'pages/recordings/recordings.js',
+      'pages/family-recordings/family-recordings.js'].forEach((f) => {
+      ok(/audioCtx\.create\(\)/.test(read(f)), f + ' 要用 audioCtx.create()')
+      ok(/require\('[^']*audio-ctx'\)/.test(read(f)), f + ' 要 require audio-ctx')
+    })
+
+    // S2 儿童休息提醒：必须页内定时到点就弹，而不是离开页面时补弹
+    const ptSrc = read('utils/practice-timer.js')
+    ok(/function elapsedSeconds/.test(ptSrc), '要能算「落盘的 + 本次前台已过去的」')
+    ok(/function arm\(\)/.test(ptSrc) && /function fire\(/.test(ptSrc), '有 arm / fire 两个环节')
+    ok(!/stop\(\)[\s\S]{0,400}showModal/.test(ptSrc), 'stop() 里不该再弹提醒')
+    // kidRest 必须能同时记住两档，否则 15/30 会来回弹
+    const stRest = require('../utils/storage')
+    const kidRestSrc = read('utils/storage.js')
+    ok(/function _restStepsOf/.test(kidRestSrc), 'kidRest 要按「日期:15,30」存多档')
+    ok(/steps\.join\(','\)/.test(kidRestSrc), 'kidRest 写回时用逗号拼接')
+    // 真跑一遍：15 分钟弹一次、30 分钟弹一次，之后再练两小时都不该再弹
+    const savedSetTimeout = global.setTimeout
+    const savedClearTimeout = global.clearTimeout
+    const savedNow = Date.now
+    const savedModal = wx.showModal
+    const fakeTimers = []
+    let fakeNow = 1750000000000
+    const restModals = []
+    global.setTimeout = function (fn, ms) { const t = { fn: fn, at: fakeNow + (ms || 0) }; fakeTimers.push(t); return t }
+    global.clearTimeout = function (t) { const i = fakeTimers.indexOf(t); if (i >= 0) fakeTimers.splice(i, 1) }
+    Date.now = function () { return fakeNow }
+    wx.showModal = function (o) { restModals.push(o.title); if (o.complete) o.complete() }
+    // 把「今天的休息记录」和「今天已练秒数」清干净，否则前面用例写过的状态会让这条断言飘。
+    // storage 没有 setter，所以直接写底层 key 再 invalidate（跑完还原，别污染后面的用例）。
+    const profMod = require('../utils/profile')
+    const kSettings = profMod.nsKey('lp_settings_v1')
+    const kDaily = profMod.nsKey('lp_daily_v1')
+    const snapSettings = wx.getStorageSync(kSettings)
+    const snapDaily = wx.getStorageSync(kDaily)
+    const sNow = stRest.getSettings()
+    sNow.kidRest = ''
+    wx.setStorageSync(kSettings, sNow)
+    const dNow = stRest.getDaily()
+    delete dNow[new Date().getFullYear() + '-' + ('0' + (new Date().getMonth() + 1)).slice(-2) + '-' + ('0' + new Date().getDate()).slice(-2)]
+    wx.setStorageSync(kDaily, dNow)
+    stRest.invalidate()
+    const timerMod = require('../utils/practice-timer')
+    timerMod.reset()
+    timerMod.start(true)
+    const drain = function () {
+      let guard = 0
+      while (guard++ < 60) {
+        const due = fakeTimers.filter((t) => t.at <= fakeNow)
+        if (!due.length) break
+        due.forEach((t) => { const i = fakeTimers.indexOf(t); if (i >= 0) fakeTimers.splice(i, 1); t.fn() })
+      }
+    }
+    for (let m = 1; m <= 120; m++) { fakeNow += 60 * 1000; drain() }
+    Date.now = savedNow
+    global.setTimeout = savedSetTimeout
+    global.clearTimeout = savedClearTimeout
+    wx.showModal = savedModal
+    timerMod.reset()
+    // 还原底层 key
+    if (snapSettings) wx.setStorageSync(kSettings, snapSettings); else wx.removeStorageSync(kSettings)
+    if (snapDaily) wx.setStorageSync(kDaily, snapDaily); else wx.removeStorageSync(kDaily)
+    stRest.invalidate()
+    eq(restModals.length, 2, '连着练 2 小时只该弹 2 次（15 分钟、30 分钟各一次），实际 ' + restModals.length)
+    ok(/休息/.test(restModals[0] || ''), '第一档是 15 分钟的休息提醒')
+    ok(/练得够久|休息/.test(restModals[1] || ''), '第二档是 30 分钟的提醒')
+
+    // S3 录音满 30 条：要透出被挤掉的条数，界面要说出上限
+    const recSrc = read('utils/recordings.js')
+    ok(/entry\.droppedCount = result\.dropped\.length/.test(recSrc), 'save 要把被挤掉的条数透出去')
+    ok(/droppedCount > 0/.test(read('pages/speak/speak.js')), '口语页要提示「最旧的一条已被替换」')
+    ok(/30 条/.test(read('pages/speak/speak.js')), '提示里要写清上限是 30 条')
+    ok(/ru\.maxKeep/.test(read('pages/stats/stats.js')), '统计页要显示条数上限')
+
+    // S4 搜索页 AI 查词在途去重
+    const searchAiSrc = read('pages/search/search.js')
+    ok(/if \(this\.data\.aiLoading\) return/.test(searchAiSrc), '搜索页 AI 查词要有在途守卫')
+    ok(/if \(this\.data\.aiLoading\) return/.test(read('pages/speak/speak.js')), '口语页 AI 听音本来就有守卫')
+
+    // S5 备份文件化
+    const bfSrc = read('utils/backup-file.js')
+    ok(/function save/.test(bfSrc) && /function share/.test(bfSrc) && /function pick/.test(bfSrc), 'backup-file 要提供 save / share / pick')
+    ok(/wx\.shareFileMessage/.test(bfSrc), 'share 用 wx.shareFileMessage')
+    ok(/wx\.chooseMessageFile/.test(bfSrc), 'pick 用 wx.chooseMessageFile')
+    ok(/readdirSync/.test(bfSrc) && /unlinkSync/.test(bfSrc), '要清理旧备份，别把文件配额堆满')
+    const statsBkSrc = read('pages/stats/stats.js')
+    ok(/backupFile\.save\(text\)/.test(statsBkSrc), '导出时要能写成文件')
+    ok(/backupFile\.pick\(/.test(statsBkSrc), '导入时要能从聊天记录选文件')
+    ok(/wx\.showActionSheet\(\{[\s\S]{0,200}复制到剪贴板/.test(statsBkSrc), '导出给用户「复制 / 存文件」两个选择')
+    ok(/importByPaste/.test(statsBkSrc) && /applyBackup/.test(statsBkSrc), '粘贴与文件两条路要共用同一套校验')
+    // 真跑一遍 save → pick
+    const savedWx = global.wx
+    const fakeFiles = {}
+    const fakeFs = {
+      writeFileSync(fp, d) { fakeFiles[fp] = d },
+      readdirSync(d) { return Object.keys(fakeFiles).filter((k) => k.indexOf(d + '/') === 0).map((k) => k.slice(d.length + 1)) },
+      unlinkSync(fp) { delete fakeFiles[fp] },
+      readFileSync(fp) { return fakeFiles[fp] }
+    }
+    const sharedFiles = []
+    global.wx = {
+      env: { USER_DATA_PATH: 'wxfile://usr' },
+      getFileSystemManager: () => fakeFs,
+      shareFileMessage(o) { sharedFiles.push(o.fileName); if (o.success) o.success() },
+      chooseMessageFile(o) { o.success({ tempFiles: [{ path: 'wxfile://tmp/b.json', name: 'backup.json', size: 32 }] }) }
+    }
+    delete require.cache[require.resolve('../utils/backup-file')]
+    const bfMod = require('../utils/backup-file')
+    const savedRes = bfMod.save('{"format":"yuban-lang-backup"}')
+    ok(savedRes.ok, 'backup-file.save 要能写成功')
+    ok(/^backup-\d{8}-\d{6}\.json$/.test(savedRes.name), '备份文件名带日期与时分秒，实际 ' + savedRes.name)
+    for (let i = 0; i < 6; i++) bfMod.save('x')
+    ok(Object.keys(fakeFiles).length <= bfMod.KEEP, '只保留最近 ' + bfMod.KEEP + ' 份备份')
+    let shareRes = null
+    bfMod.share(savedRes.filePath, savedRes.name, (r) => { shareRes = r })
+    ok(shareRes && shareRes.ok, 'share 成功要回调 ok')
+    fakeFiles['wxfile://tmp/b.json'] = '{"format":"yuban-family-backup"}'
+    let pickRes = null
+    bfMod.pick((r) => { pickRes = r })
+    ok(pickRes && pickRes.ok && /yuban-family-backup/.test(pickRes.text), 'pick 要读出文件内容')
+    // 降级：没有这两个 API 时不能抛错
+    global.wx = { env: { USER_DATA_PATH: 'wxfile://usr' }, getFileSystemManager: () => fakeFs }
+    let noShare = null
+    let noPick = null
+    bfMod.share('a', 'b', (r) => { noShare = r })
+    bfMod.pick((r) => { noPick = r })
+    ok(noShare && noShare.reason === 'unsupported', '没有 shareFileMessage 时要如实说 unsupported')
+    ok(noPick && noPick.reason === 'unsupported', '没有 chooseMessageFile 时要如实说 unsupported')
+    global.wx = savedWx
+    delete require.cache[require.resolve('../utils/backup-file')]
+
+    // S6 首页新手提示条
+    const stTip = require('../utils/storage')
+    ok(typeof stTip.getFirstTipClosed === 'function' && typeof stTip.setFirstTipClosed === 'function',
+      'storage 要有新手提示的开关')
+    ok(typeof stTip.getPracticeDayCount === 'function', 'storage 要能数练过的天数')
+    const idxSrc = read('pages/index/index.js')
+    ok(/showFirstTip/.test(idxSrc), '首页要有新手提示条的状态')
+    ok(/getPracticeDayCount\(\) <= 3/.test(idxSrc), '只在刚开始用的头几天出现')
+    ok(/closeFirstTip\(\)/.test(idxSrc), '点「知道了」要永久关掉')
+    const idxWxmlTip = read('pages/index/index.wxml')
+    ok(/class="first-tip" wx:if="\{\{showFirstTip\}\}"/.test(idxWxmlTip), '首页要有提示条节点')
+    ok(/带我去学单词/.test(idxWxmlTip), '提示条要给一个明确的下一步')
   })()
 
   // K. 对练（我说中文，给我目标语言的说法）

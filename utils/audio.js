@@ -20,6 +20,7 @@ const logger = require('./logger')
 
 const localAudio = require('./local-audio')
 const ttsCache = require('./tts-cache')
+const audioCtx = require('./audio-ctx')
 
 // 单次下载的看门狗时长：wx.downloadFile 没有 timeout 参数，默认要等 60 秒才失败，
 // 弱网下用户看到的就是「点了没反应」。8 秒还没下完就放弃这个源、换下一个（有道↔百度）。
@@ -97,7 +98,7 @@ function createPlayer(opts) {
   }
   function play(src) {
     destroy()
-    ctx = wx.createInnerAudioContext()
+    ctx = audioCtx.create()
     if (opts.onEnded) ctx.onEnded(opts.onEnded)
     if (opts.onError) ctx.onError(opts.onError)
     ctx.src = src

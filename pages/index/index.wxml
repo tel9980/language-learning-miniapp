@@ -40,6 +40,19 @@
     <view class="arrow">›</view>
   </view>
 
+  <!-- 新手提示条（第十三轮）：11 个入口平铺，第一次打开的人不知道该点哪个。
+       只在练过的天数 ≤ 3 天时出现，点「知道了」永久关掉。 -->
+  <view class="first-tip" wx:if="{{showFirstTip}}">
+    <view class="first-tip-body">
+      <view class="first-tip-title">第一次用？</view>
+      <view class="first-tip-text">先从「单词学习」开始最省力：每天 20 个词，5 分钟就够。</view>
+      <view class="first-tip-actions">
+        <view class="first-tip-go" catchtap="goLearnFromTip">带我去学单词</view>
+        <view class="first-tip-close" catchtap="closeFirstTip">知道了</view>
+      </view>
+    </view>
+  </view>
+
   <view class="today-cta card" hover-class="tap-hover" bindtap="goToday">
     <view class="cta-icon">📋</view>
     <view class="cta-body">

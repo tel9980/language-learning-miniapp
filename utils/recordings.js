@@ -75,6 +75,10 @@ function save(tempFilePath, meta, retried, freed) {
           const result = trim(list)
           write(result.keep)
           removeFiles(result.dropped)
+          // 第十三轮：超出上限被挤掉的条数要透出去。
+          // 原来 trim() 直接删文件、一个字都不说，用户录到第 31 条时
+          // 第 1 条就凭空消失了，只会以为「app 把我的录音弄丢了」。
+          entry.droppedCount = result.dropped.length
           resolve(entry)
         })
       },
