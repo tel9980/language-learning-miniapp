@@ -2274,9 +2274,13 @@ async function runTailTests() {
     ok(/kidMode\.allowedWords/.test(read('pages/quiz/quiz.js')), '测验统一走 allowedWords')
 
     // A. 麦克风用途说明
+    // 注意：app.json 里**不能**写 permission["scope.record"]。那个位置只接受位置类接口
+    // （scope.userLocation 等），录音不在此列，微信会报「无效的 app.json permission」并忽略。
+    // 麦克风的用途说明在《声纹授权协议》页与 utils/mic.js 的引导弹窗里，不靠这里。
     const appJ = JSON.parse(read('app.json'))
-    ok(!!(appJ.permission && appJ.permission['scope.record']), 'app.json 声明了 scope.record')
-    ok((appJ.permission['scope.record'].desc || '').length >= 8, '麦克风用途写得够具体')
+    ok(!(appJ.permission && appJ.permission['scope.record']), 'app.json 不声明权限范围外的 scope（会报无效）')
+    ok(/scope\.record/.test(read('utils/mic.js')), 'mic.js 用正确的 scope 探测权限')
+    ok(/麦克风被关掉了/.test(read('utils/mic.js')), '拒绝过之后有引导文案')
 
     // B. 预取只在 WiFi
     const audioSrc = read('utils/audio.js')
@@ -2444,7 +2448,7 @@ async function runTailTests() {
     ok(/function usage\(\)/.test(recJs), 'recordings.js 提供 usage()')
     ok(/module\.exports = \{[^}]*usage[^}]*\}/.test(recJs), 'usage 已导出')
     const statsW = read('pages/stats/stats.wxml')
-    ok(/我的录音/.test(statsW) && /recCount/.test(statsW), '统计页显示录音条数与占用')
+    ok(/我的录音/.test(statsW) && /recText/.test(statsW), '统计页显示录音条数与占用')
     ok(/goRecordings\(\)/.test(read('pages/stats/stats.js')), '统计页能点进录音列表')
 
     // O6. 首帧语种名：初始 data 写死 '英语'，学日语的用户每次都闪一下
@@ -2569,6 +2573,28 @@ async function runTailTests() {
     eq(tra.length, 12, '交通分类 12 个词')
     ok(tra.every(function (w) { return w.ex2 && w.ex2c && w.col }), '交通补词字段齐全')
     ok(tra.every(function (w) { return wordRank.rankOf(w.id) !== Infinity }), '交通补词都有词频排名')
+
+    // ---- P9. wxml 里不许写方法调用（{{x.toFixed(1)}} 编译期就报 unexpected token .）----
+    const wxmls = ['pages/stats/stats.wxml', 'pages/speak/speak.wxml', 'pages/learn/learn.wxml',
+      'pages/quiz/quiz.wxml', 'pages/index/index.wxml', 'pages/today/today.wxml',
+      'pages/wrong/wrong.wxml', 'pages/dictation/dictation.wxml', 'pages/recordings/recordings.wxml',
+      'pages/search/search.wxml', 'pages/family/family.wxml', 'pages/profiles/profiles.wxml',
+      'pages/import/import.wxml', 'pages/voiceprint/voiceprint.wxml', 'pages/share/share.wxml',
+      'pages/reminder/reminder.wxml', 'pages/family-recordings/family-recordings.wxml']
+    const badCalls = []
+    wxmls.forEach(function (f) {
+      const txt = read(f)
+      // 只看 {{ }} 里的内容
+      const exprs = txt.match(/\{\{[\s\S]*?\}\}/g) || []
+      exprs.forEach(function (ex) {
+        if (/\.\s*(toFixed|toString|map|filter|slice|join|split|replace|toLowerCase|toUpperCase|push|sort|reverse)\s*\(/.test(ex)) {
+          badCalls.push(f + ' -> ' + ex.slice(0, 60))
+        }
+      })
+    })
+    eq(badCalls.length, 0, 'wxml 表达式里没有方法调用' + (badCalls.length ? '：' + badCalls.join(' | ') : ''))
+    ok(/recText/.test(read('pages/stats/stats.wxml')), '录音占用文案在 js 里预计算好')
+    ok(/recText:/.test(read('pages/stats/stats.js')), 'stats.js 提供了 recText')
 
     // ---- P8. 本地音频播不了的环境要能出声（access denied）----
     // 有些环境不许 InnerAudioContext 播本地文件（wxfile://...），报 operateAudio:fail:access denied。

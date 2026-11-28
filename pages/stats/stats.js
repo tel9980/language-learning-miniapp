@@ -28,7 +28,7 @@ Page({
     levels: [], days: [], speak: {},
     calendar: [], unlockedCount: 0, badges: [], shareTitle: '',
     feedbackEnabled: true, fontScale: 1, darkMode: false, ttsCacheKb: 0, voiceprintAgreed: false,
-    recCount: 0, recKb: 0, recMaxMb: 6
+    recCount: 0, recKb: 0, recMaxMb: 6, recText: '还没录过'
   },
   // 定时器登记（第十一轮）：导入成功后 800/900ms reLaunch
   later(fn, ms) { return pageTimers.later(this, fn, ms) },
@@ -42,7 +42,16 @@ Page({
     // 录音占用（第十轮）：录音才是 6MB 的大头，之前一点都不显示
     try {
       const ru = recordings.usage()
-      this.setData({ recCount: ru.count, recKb: Math.round(ru.bytes / 1024), recMaxMb: Math.round(ru.maxBytes / 1048576) })
+      // wxml 里不能用方法调用（{{x.toFixed(1)}} 会被编译成「unexpected token .」），
+      // 所有格式化都在这里算好，模板只做字符串拼接。
+      const mb = ru.bytes / 1048576
+      const size = mb >= 1 ? mb.toFixed(1) : (ru.bytes / 1024).toFixed(2)
+      this.setData({
+        recCount: ru.count,
+        recKb: Math.round(ru.bytes / 1024),
+        recMaxMb: Math.round(ru.maxBytes / 1048576),
+        recText: ru.count > 0 ? ru.count + ' 条 · ' + size + ' MB / ' + Math.round(ru.maxBytes / 1048576) + ' MB' : '还没录过'
+      })
     } catch (e) { logger.warn('[stats] 读取录音占用失败', e) }
   },
   refresh() {

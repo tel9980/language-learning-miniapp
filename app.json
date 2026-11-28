@@ -18,11 +18,6 @@
     "pages/voiceprint/voiceprint",
     "pages/today/today"
   ],
-  "permission": {
-    "scope.record": {
-      "desc": "用于跟读录音与发音评分；录音默认只存在本机，需你同意才会开启"
-    }
-  },
   "window": {
     "navigationBarBackgroundColor": "#4A6CF7",
     "navigationBarTextStyle": "white",
