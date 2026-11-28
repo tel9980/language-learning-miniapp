@@ -28,6 +28,9 @@ Page({
       wx.showShareMenu({ withShareTicket: false, menus: ['shareAppMessage', 'shareTimeline'] })
     }
     this.syncTheme()
+    // 复位上一次可能残留的触摸状态：在 touchend 之前就切页的话，_touch0 会留着一个旧起点，
+    // 下次抬手算出来的位移是假的，会被当成滑动。
+    this._touch0 = null
     // 儿童模式要统计练习时长（15 / 30 分钟休息提醒），只计前台时间
     practiceTimer.start(this.data.isKid)
     // 离线音频优先流播 CDN（见 utils/audio.js），不预载分包——
@@ -121,8 +124,11 @@ Page({
   goSpeak() { nav.go('/pages/speak/speak') },
   goStats() { nav.go('/pages/stats/stats') },
   flip() {
-    // 刚滑动过就不要当成点击（同一次抬手会先 touchend 再 tap）
-    if (this._swiped) return
+    // 刚滑动过就不要当成点击（同一次抬手会先 touchend 再 tap）。
+    // 第十四轮：这里原来靠一个 300ms 的定时器复位 _swiped，而 onHide 会 pageTimers.clear(this)
+    // 把它清掉 → 滑一下再切页，_swiped 永远为 true，卡片永久点不动（tabBar 页实例常驻，
+    // 除非杀小程序）。改成记时间戳，没有定时器就没有回收问题。
+    if (Date.now() - (this._swipedAt || 0) < 300) return
     this.setData({ flipped: !this.data.flipped })
   },
   speak() {
@@ -138,10 +144,21 @@ Page({
       }
     })
   },
+  // 防连点（第十四轮）：setData 是同步更新 this.data 的，评完一张 _advance() 之后
+  // this.data.current 已经是下一张卡了。手快连点两下，第二下会把一张**根本没看到**的卡
+  // 也评掉（实测：队列 5 张，连点后进度多 2 个词，第 2 张被标成「记得」，之后很久不再出现）。
+  // 250ms 足够挡住连点，又不影响正常节奏——人看一张卡不可能比这更快。
+  _tooFast() {
+    const now = Date.now()
+    if (now - (this._ratedAt || 0) < 250) return true
+    this._ratedAt = now
+    return false
+  },
   rate(e) {
     const q = Number(e.currentTarget.dataset.q)
     const w = this.data.current
     if (!w) return
+    if (this._tooFast()) return
     storage.review(w.id, q)
     // 徽章解锁提示（第十二轮）：以前只有统计页会算徽章，解锁了当时看不到
     badges.check()
@@ -151,6 +168,7 @@ Page({
   markKnown() {
     const w = this.data.current
     if (!w) return
+    if (this._tooFast()) return
     storage.markKnown(w.id)
     wx.showToast({ title: '已标记认识，不再出现在新词里', icon: 'none' })
     this._advance()
@@ -188,8 +206,8 @@ Page({
     const dx = t.clientX - t0.x
     const dy = t.clientY - t0.y
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return   // 竖着划 / 幅度太小，当点击
-    this._swiped = true
-    this.later(() => { this._swiped = false }, 300)
+    // 只记时间，不用定时器：onHide 会 pageTimers.clear(this)，定时器一被清掉这个标志就再也回不去
+    this._swipedAt = Date.now()
     if (!this.data.flipped) { this.setData({ flipped: true }); return }
     this.rate({ currentTarget: { dataset: { q: dx > 0 ? 5 : 0 } } })
   },

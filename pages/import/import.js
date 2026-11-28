@@ -65,11 +65,22 @@ Page({
       return { text: parts[0].trim(), cn: (parts[1] || '').trim(), scene: that.data.scene }
     }).filter(x => x.text)
     const lang = storage.getCurrentLang()
-    const added = storage.addCustomItems(items.map(x => Object.assign(x, { lang: lang })))
-    wx.showToast({ title: `已导入 ${added} 条`, icon: 'success' })
+    // addCustomItems 现在返回 { added, skipped, capped }（第十四轮）：
+    // 以前按 id 判重永远判不出重复，同一份内容导入两次会存两条；也没有上限。
+    // 三个数字都要如实报出来，否则「已导入 N 条」会和用户实际看到的条数对不上。
+    const r = storage.addCustomItems(items.map(x => Object.assign(x, { lang: lang })))
+    const added = r.added
+    const tail = []
+    if (r.skipped) tail.push(`跳过 ${r.skipped} 条重复`)
+    if (r.capped) tail.push(`${r.capped} 条超出上限（最多 ${storage.CUSTOM_MAX} 条）`)
+    const note = tail.length ? '，' + tail.join('，') : ''
+    wx.showToast({ title: added ? `已导入 ${added} 条` : '没有新增内容', icon: 'none' })
     this.later(() => {
       wx.showModal({
-        title: '导入成功', content: `已添加 ${added} 条到「自建」跟读素材，去口语练习页切换「✏️ 自建」开始练习吧。`,
+        title: added ? '导入成功' : '没有新增内容',
+        content: added
+          ? `已添加 ${added} 条到「自建」跟读素材${note}。去口语练习页切换「✏️ 自建」开始练习吧。`
+          : `这次没有新内容${note}。`,
         showCancel: false,
         success() { wx.navigateBack() }
       })

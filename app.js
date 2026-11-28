@@ -1,6 +1,7 @@
 const storage = require('./utils/storage')
 const onlineData = require('./utils/online-data')
 const logger = require('./utils/logger')
+const chrome = require('./utils/chrome')
 
 // 出错时取当前页面路径，实时日志里才分得清是哪个页面炸的
 function currentRoute() {
@@ -62,14 +63,20 @@ App({
   onHide() {
     try { storage.flushAll() } catch (e) {}
   },
+  // 主题落地。页面内部靠 themeClass 上的 CSS 类（见 app.wxss），
+  // 但底部 tabBar 与窗口背景是**原生层**，不吃 wxss，必须走 API——第十四轮之前这里只有一句
+  // 「写一个没人读的 storage key」，等于空转，所以深色模式下页面全黑、底栏还是一条白。
   applyTheme() {
     const t = this.globalData.theme || { fontScale: 1, darkMode: false }
+    const dark = !!t.darkMode
     try {
       wx.setStorageSync('lp_theme_applied', t)
       // 字号不是靠改根 font-size 实现的（那样对 rpx 无效，第九轮踩过这个坑）：
       // app.wxss 里有 .theme-sm / .theme-lg / .theme-xl 三档，按倍率给出各关键类的 rpx 绝对值，
       // 页面 root 挂上 themeClass 就生效。深色同理，也是 themeClass 上的 .theme-dark。
     } catch (e) {}
+    // 底部 tabBar 与窗口背景（具体取值与去重见 utils/chrome.js）
+    chrome.apply(dark)
   },
   // 供页面读取当前主题
   getTheme() { return this.globalData.theme || { fontScale: 1, darkMode: false } },

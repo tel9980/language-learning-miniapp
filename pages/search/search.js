@@ -266,7 +266,7 @@ Page({
     if (!r || !r.word) return
     if (this.data.aiSaved) { wx.showToast({ title: '已经存过啦', icon: 'none' }); return }
     const ex = (r.examples && r.examples[0]) || null
-    storage.addCustomItems([{
+    const r1 = storage.addCustomItems([{
       text: r.word,
       cn: r.meaning || '',
       scene: 'AI 查词',
@@ -277,7 +277,14 @@ Page({
       storage.addCustomItems([{ text: ex.text, cn: ex.cn || '', scene: 'AI 查词', lang: this.data.lang }])
     }
     this.setData({ aiSaved: true })
-    wx.showToast({ title: '已存入「我的素材」', icon: 'success' })
+    // 去重后可能一条都没新增（之前存过），这时说「已存入」是假的
+    if (!r1.added && r1.skipped) {
+      wx.showToast({ title: '这个词已经在「我的素材」里了', icon: 'none' })
+    } else if (r1.capped) {
+      wx.showToast({ title: '素材已满 300 条，先去导入页删几条', icon: 'none' })
+    } else {
+      wx.showToast({ title: '已存入「我的素材」', icon: 'none' })
+    }
   },
 
   closeAi() {

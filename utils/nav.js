@@ -2,6 +2,11 @@
 // 而 switchTab 又不支持 query 参数，所以用「意图」暂存的方式跨 tab 传参。
 const INTENT_KEY = 'lp_nav_intent_v1'
 
+// 意图的有效期（第十四轮）：以前只在「目标页正好取走」时才删，目标页没被打开
+// （switchTab 失败、用户中途改主意）时这个意图会永久留着——很久以后用户进那个 tab，
+// 会突然跳到一个陌生词，完全没有上下文。超过这个时间就当没说过。
+const INTENT_TTL = 60 * 1000
+
 // 必须在 app.json tabBar.list 里
 const TAB_PAGES = [
   'pages/index/index',
@@ -27,6 +32,7 @@ function go(url, intent) {
     if (intent) {
       try {
         intent.page = path
+        intent.ts = Date.now()
         wx.setStorageSync(INTENT_KEY, intent)
       } catch (e) {}
     }
@@ -43,7 +49,13 @@ function takeIntent(page) {
     const v = wx.getStorageSync(INTENT_KEY)
     if (!v) return null
     const intent = typeof v === 'string' ? JSON.parse(v) : v
-    if (!intent || intent.page !== key) return null
+    if (!intent) return null
+    // 过期的（或者压根不是给我的）顺手清掉，免得一直躺在 storage 里
+    if (intent.ts && Date.now() - intent.ts > INTENT_TTL) {
+      wx.removeStorageSync(INTENT_KEY)
+      return null
+    }
+    if (intent.page !== key) return null
     wx.removeStorageSync(INTENT_KEY)
     return intent
   } catch (e) {
@@ -54,4 +66,4 @@ function takeIntent(page) {
 // 兼容：不带意图的普通跳转
 function to(url) { go(url, null) }
 
-module.exports = { go, to, takeIntent, isTabPage, TAB_PAGES, INTENT_KEY }
+module.exports = { go, to, takeIntent, isTabPage, TAB_PAGES, INTENT_KEY, INTENT_TTL }

@@ -31,7 +31,8 @@ Page({
   agree() {
     storage.setVoiceprintAgreed(true)
     this.setData({ agreed: true, agreedAt: storage.getSettings().voiceprintAgreedAt || '' })
-    wx.showToast({ title: '已同意，可以录音了', icon: 'success' })
+    // icon:'success' 的 toast 最多显示 7 个汉字，这句 9 个字会被截断（第十四轮）
+    wx.showToast({ title: '已同意，可以录音了', icon: 'none' })
     const that = this
     that.later(function () {
       // 从录音入口跳过来的，同意完直接退回口语页，省一次手动返回

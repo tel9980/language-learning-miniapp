@@ -876,7 +876,8 @@ Page({
       this.setData({ mode: 'train', sceneIndex: this.data.sceneIndex }, () => {
         this.refreshScenes(); this.buildQueueAndLoad()
       })
-      wx.showToast({ title: wasDue ? '到期句子复习完成！' : '重点复练完成！', icon: 'success' })
+      // 9 个字，icon:'success' 会被截断（第十四轮）
+      wx.showToast({ title: wasDue ? '到期句子复习完成！' : '重点复练完成！', icon: 'none' })
     } else {
       wx.showToast({ title: '本组跟读完成！', icon: 'success' })
       this.setData({ index: 0 }, () => this.loadCurrent())

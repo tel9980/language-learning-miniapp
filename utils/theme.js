@@ -24,6 +24,9 @@ module.exports = Behavior({
       try { kid = profile.isKid() } catch (e) {}
       if (kid) cls += ' theme-kid'
       this.setData({ themeClass: cls.trim(), fontScale: s, darkMode: !!t.darkMode, isKid: kid })
+      // 原生层（tabBar / 窗口背景）不吃 wxss，在这里兜一次最稳：
+      // app.onLaunch 时 tabBar 可能还没建好。重复调用由 utils/chrome.js 内部去重。
+      try { require('./chrome').apply(!!t.darkMode) } catch (e) {}
     }
   }
 })

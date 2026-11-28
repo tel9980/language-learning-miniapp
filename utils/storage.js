@@ -308,23 +308,44 @@ function getCustomItems(lang) {
   const all = read(KEY_CUSTOM, [])
   return lang ? all.filter(function (x) { return x.lang === lang }) : all
 }
+// 自建素材上限（第十四轮）：单条约 140 字节，300 条约 43KB。
+// 之前完全没有上限——一次导入 3000 条就是单个 key 430KB，之后每次 getCustomItems() 要 6ms
+// （正常 0.0x ms），而口语页每次进页都要 clone 一遍这个数组。
+const CUSTOM_MAX = 300
+
+// 内容指纹：语种 + 规整过的正文。
+// **不能用 id 判重**——id 是当场用 Date.now()+随机数新生成的，原来的 `if (seen[id]) return`
+// 永远为假，同一份内容导入两次就存两条（第十四轮实测：2 条重复，学习/口语里同一个词出现两遍）。
+function customKey(x) {
+  return String((x && x.lang) || 'en') + '|' + String((x && x.text) || '').trim().replace(/\s+/g, ' ')
+}
+
+// 返回 { added, skipped, capped }：新增几条、因为重复跳过几条、因为超上限没存几条。
+// 调用方要把后两个数字如实告诉用户，否则「导入成功」和实际条数对不上。
 function addCustomItems(items) {
   const all = read(KEY_CUSTOM, [])
   const seen = {}
-  all.forEach(function (x) { seen[x.id] = true })
+  all.forEach(function (x) { seen[customKey(x)] = true })
   let added = 0
-  items.forEach(function (it) {
-    if (!it || !it.text) return
-    const id = 'cu_' + Date.now() + '_' + (added + Math.floor(Math.random() * 1000))
-    if (seen[id]) return
+  let skipped = 0
+  let capped = 0
+  const list = items || []
+  for (let i = 0; i < list.length; i++) {
+    const it = list[i]
+    if (!it || !String(it.text || '').trim()) continue
+    const k = customKey(it)
+    if (seen[k]) { skipped++; continue }
+    if (all.length >= CUSTOM_MAX) { capped++; continue }
+    seen[k] = true
     all.unshift({
-      id: id, text: it.text, cn: it.cn || '', scene: it.scene || '我的素材',
+      id: 'cu_' + Date.now() + '_' + (added + Math.floor(Math.random() * 1000)),
+      text: String(it.text).trim(), cn: it.cn || '', scene: it.scene || '我的素材',
       lang: it.lang || 'en', createdAt: Date.now()
     })
     added++
-  })
-  write(KEY_CUSTOM, all)
-  return added
+  }
+  if (added) write(KEY_CUSTOM, all)
+  return { added: added, skipped: skipped, capped: capped }
 }
 function removeCustomItem(id) {
   write(KEY_CUSTOM, read(KEY_CUSTOM, []).filter(function (x) { return x.id !== id }))
@@ -718,7 +739,7 @@ module.exports = {
   init, todayKey, getSettings, setLang, getCurrentLang, setDailyGoal,
   setFeedbackEnabled, setGuideSeen, setLearnCat, setAiEvalAgreed, getVoiceprintAgreed, setVoiceprintAgreed, getTheme, setFontScale, setDarkMode,
   addPracticeSeconds, getPracticeSeconds, getGuardianAgreed, setGuardianAgreed, getKidAiUnlocked, setKidAiUnlocked, kidRestSeen, markKidRestSeen, getFirstTipClosed, setFirstTipClosed, getPracticeDayCount,
-  getCustomItems, addCustomItems, removeCustomItem,
+  getCustomItems, addCustomItems, removeCustomItem, CUSTOM_MAX,
   getProgress, getStats, getDaily, getDueWords, getNewWords, getToday,
   review, quizAnswer, getMasteredCount, INTERVALS, clearLapse,
   markKnown, getKnownIds, restoreKnown, KNOWN_AHEAD_DAYS,

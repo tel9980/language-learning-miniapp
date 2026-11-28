@@ -20,11 +20,20 @@ const achievements = require('./achievements')
 const sentences = require('./sentences')
 const { getWords } = require('./words')
 
+const profile = require('./profile')
+
 const KEY = 'lp_badges_seen_v1'
+
+// 「哪些徽章已经提示过」必须按档案隔离（第十四轮）：以前直接用 KEY 读写，
+// 家人共用一台手机时，第一个人解锁过的徽章，第二个人达成时系统以为他早知道了，不弹提示。
+// 同项目 utils/speaking.js 一直是正确写法（profile.nsKey(key)）。
+function seenKey() {
+  try { return profile.nsKey(KEY) } catch (e) { return KEY }
+}
 
 function readSeen() {
   try {
-    const v = wx.getStorageSync(KEY)
+    const v = wx.getStorageSync(seenKey())
     if (Array.isArray(v)) return v
     if (typeof v === 'string' && v) {
       const arr = JSON.parse(v)
@@ -35,7 +44,7 @@ function readSeen() {
 }
 
 function writeSeen(ids) {
-  try { wx.setStorageSync(KEY, ids) } catch (e) {}
+  try { wx.setStorageSync(seenKey(), ids) } catch (e) {}
 }
 
 // 拼 achievements.compute() 需要的数据。字段来源与 pages/stats/stats.js 保持一致，

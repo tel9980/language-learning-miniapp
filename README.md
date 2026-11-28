@@ -70,7 +70,7 @@
 
 | 位置 | 内容 | 体积 |
 | --- | --- | --- |
-| 主包 | 只有代码（wxml/wxss/js/json + tabBar 图标） | 约 **995KB / 2048KB**（含 828 英语词 + 150 韩语词） |
+| 主包 | 只有代码（wxml/wxss/js/json + tabBar 图标） | 约 **1002KB / 2048KB**（含 828 英语词 + 150 韩语词） |
 | Cloudflare Pages | 日语朗读 353 条（100 句 + 33 行台词 + 110 词 + 110 条例句） | 约 1.8MB（不进包） |
 | Cloudflare Pages | 英语朗读 1804 条（828 词 + 828 例句 + 120 句 + 28 行台词） | 约 11MB（不进包） |
 | Cloudflare Pages | 越南语朗读 304 条（100 句 + 44 行台词 + 80 词 + 80 条例句） | 约 1.5MB（不进包） |
@@ -310,7 +310,7 @@ node tools/validate.js           # 主包体积、页面四件套、JSON/JS 语�
 - **提醒页不再让用户白设**：`TM_PLID` 是空串，订阅消息发不出去。原来只在页面底部用一段灰字说明，用户还是会去拨开关、以为设好了。现在标题直接写「（暂不支持推送）」，开头一块醒目的说明「现在设了也收不到通知」，开关旁标「仅记录」并做成弱化态。填了模板 ID 后这个页面会自动改口，不用再改文案。
 - **交通分类补到 12 个**：原来 5 个（turn / car / road / drive / street）。补 train / bus / bike / ticket / station / airport / traffic（词频取 ECDICT，station 841 最靠前），英语词库 800 → 821 → **828**，并补了 14 条预生成音频。
 - **本地播不出音频的环境现在也能出声**：有些环境不许 `InnerAudioContext` 播本地文件（`USER_DATA_PATH` 下的 `wxfile://usr/...`，以及开发者工具里的临时文件），报 `operateAudio:fail:access denied`。而这块代码原来的路径恰恰是「下载 → 复制进 `USER_DATA_PATH/tts/` → 播这个本地文件」，所以每个词都要先失败一次才兜底，日志里一片 `access denied`。更糟的是它把**好文件**当坏缓存 `ttsCache.forget()` 删了——下次再听还得重下。现在撞到这类错误就把「本地不可播」记在模块级（不持久化，换环境自动恢复），本次运行内直接流播 CDN、不再白试本地、也不再删缓存；顺便修了换源时旧 `InnerAudioContext` 从不 `destroy` 的泄漏（实测一次播放留下 2 个，全部没销毁）。
-- 已量过但**不做**的：`words.en.js` 拆字段（`ex2/ex2c/col` 占 35.4%，但 parse 只省 1ms）；`storage.init` 再压（剩的 22 次同步读是刚性）；分片 8→16（每张卡只省 3.6KB）；主包拆分包（995KB / 2048KB）；深色跟随系统（要重写 216 种硬编码色，还会和现有手动开关打架）；20MB mp3 移出 git（要改发布链路，风险中高）。
+- 已量过但**不做**的：`words.en.js` 拆字段（`ex2/ex2c/col` 占 35.4%，但 parse 只省 1ms）；`storage.init` 再压（剩的 22 次同步读是刚性）；分片 8→16（每张卡只省 3.6KB）；主包拆分包（1002KB / 2048KB）；深色跟随系统（要重写 216 种硬编码色，还会和现有手动开关打架）；20MB mp3 移出 git（要改发布链路，风险中高）。
 
 ### 第十二轮：长单词顶出卡片、搜索漏儿童模式、错词本只进不出、徽章没有解锁提示
 
@@ -338,6 +338,17 @@ node tools/validate.js           # 主包体积、页面四件套、JSON/JS 语�
 - **首页新手提示条**。11 个入口卡平铺，第一次打开的人不知道该点哪个。练过的天数 ≤ 3 天且没关过时，在「今日待练」上方出现一条浅色提示：「先从「单词学习」开始最省力」，带「带我去学单词」按钮，点「知道了」永久消失（不是弹窗，不遮挡）。
 - **两处过期注释**：`app.js` 里「音频都放在分包里」（项目没有分包）与「字号缩放无效」（第九轮已修）都已改正，免得下次又按错的注释去改代码。
 - 已量过但**不做**的（第十三轮复核）：性能本轮全部达标（`storage.init` 冷 1.18ms、`getWords('en')` 7.63ms、`getDueWords` 0.37ms、首页 onShow 首次 15.75ms 其中词库解析 7.6ms，二次 0.5ms）—— 预热没有意义；`data.json` 417KB 的 `JSON.parse` 3.53ms 也不是瓶颈。其余同第十二轮：拆字段、拆分包、分片 8→16、深色跟随系统、mp3 移出 git 都不做；30 分钟不做硬锁（拦不住，且会把「休息提醒」变成「强制退出」）。
+
+### 第十四轮：深色下 tabBar 还是白的、学习页滑动后卡片点不动、自建素材无上限
+
+- **深色模式下底部 tabBar 与窗口背景还是白的**：`app.json` 里的 `tabBar.backgroundColor`、`window.backgroundColor`、`page { background }` 都是静态值，**不吃 wxss**。而 `.theme-dark` 的页面底色是 `#1A1F2B`，于是页面全黑、底栏一条白，下拉回弹还闪一块浅灰。全仓 `setTabBarStyle` / `setBackgroundColor` / `setNavigationBarColor` 都是 0 处——深色模式做了十三轮，从来只管页面内部。现在统一走新建的 `utils/chrome.js`（`app.js` 的 `applyTheme()` 与 `theme` Behavior 的 `syncTheme()` 都调它）：深色 `#1A1F2B` 底、选中色提到 `#8FA8FF`（`#4A6CF7` 压在深色底上对比度只有 3.13），老基础库没有 API 就跳过。放两处是因为 `onLaunch` 时 tabBar 可能还没建好，页面 `onShow` 再兜一次最稳；内部用 `_applied` 去重，不会每页都发跨线程调用。顺带一提：这个函数之前只写了一个**全仓没人读**的 `lp_theme_applied`，等于空转。
+- **学习页滑一下再切走，卡片永久点不动**：第十一轮「定时器回收」引入的回归。`onTouchEnd` 里用 `this.later(() => { this._swiped = false }, 300)` 复位标志，而 `onHide()` 第一句就是 `pageTimers.clear(this)` → 复位被清掉 → `_swiped` 永远为 true → `flip()` 永久短路。学习页是 tabBar 常驻页，**除非杀掉小程序否则不会恢复**。改成记时间戳 `this._swipedAt`，`flip()` 里判 `Date.now() - _swipedAt < 300`，没有定时器就没有回收问题；`onShow` 顺手复位 `_touch0`（在 touchend 之前切页会留一个旧起点，下次抬手算出的位移是假的）。
+- **自建素材没有上限，也不按内容去重**：`addCustomItems` 原来用 `if (seen[id]) return` 判重，但 id 是当场 `Date.now()+random` 新生成的，**这个判重永远为假**。实测同一份内容导入两次存两条；一次导入 3000 条 = 单个 key 430KB，之后每次 `getCustomItems()` 6ms（正常 0.0x），而口语页每次进页都要 clone 一遍。现在按 `语种 + 规整空白后的正文` 做指纹，上限 **300 条**（约 43KB，实测读一次 1ms），返回 `{ added, skipped, capped }` 并把三个数字如实报给用户（导入页、查词页都改了口径——「已经存过啦」不再假装又存一份）。
+- **徽章「已看过」记录没按档案隔离**：`utils/badges.js` 直接用 `wx.getStorageSync(KEY)`，没走 `profile.nsKey`。家人共用一台手机时，第一个人解锁过的徽章，第二个人达成时**不弹提示**（系统以为他早知道了）。改成 `profile.nsKey(KEY)`，与 `utils/speaking.js` 一直以来的写法一致。
+- **`nav` 的意图没有过期时间**：`takeIntent` 只在「目标页正好取走」时才删，目标页没被打开（`switchTab` 失败 / 用户中途改主意）时这个意图会**永久留着**——很久以后用户进那个 tab 会突然跳到一个陌生词。现在 `go()` 写入带 `ts`，超过 **60 秒**视为无效并顺手清掉。
+- **学习页连点两下会评掉一张没看的卡**：`setData` 是同步更新 `this.data` 的，第一下评完 `_advance()` 之后 `current` 已经是下一张。实测：队列 5 张，连点后进度多 2 个词，第 2 张被标成「记得」、之后很久不再出现。加了 250ms 短锁（`_tooFast()`），`rate` 与 `markKnown` 共用；间隔正常的两下不受影响。
+- **三处 toast 会被截断**：`icon: 'success'` 的 toast 最多显示 7 个汉字，「已同意，可以录音了」（9 字）、「已存入「我的素材」」（9 字）、「到期句子复习完成！」（9 字）都会被省略号吃掉，改成 `icon: 'none'`。
+- 已量过但**不做**的（第十四轮复核）：懒加载 `ai-eval`/`translate`/`speech-score`/`recordings`/`badges` 这几个少用模块，按依赖序累加实测总共只省 **3.2ms**，不值得引入动态 `require` 的复杂度；`words.en` 的 10.14ms 是词库本身，躲不掉。另外本轮跑了页面方法级冒烟（17 页 163 个方法 0 异常）、wxml 表达式变量全量比对（全部有来源，`themeClass`/`isKid`/`kidTip`/`kidAiUnlocked` 由 theme Behavior 提供）、跳转目标与事件 handler 全扫（0 问题）。
 
 ## 给家人朋友用（多人场景）
 
@@ -387,6 +398,7 @@ node tools/validate.js           # 主包体积、页面四件套、JSON/JS 语�
 │   ├── chart-palette.js            图表深浅两套配色
 │   ├── prompt.js                     弹框输入（askNumber / askText，收掉 6 处重复）
 │   ├── audio-ctx.js           # 统一的 InnerAudioContext（关掉对 iOS 静音开关的服从）
+│   ├── chrome.js            # 原生外观（tabBar / 窗口背景）跟主题，不吃 wxss
 │   ├── backup-file.js         # 备份存成文件 / 从聊天记录选回来
 │   ├── badges.js                     徽章解锁提示（比对上次已解锁集合，新解锁才弹 toast）
 │   ├── words.js                      词库入口（按语种懒加载 words.en / .ja / .vi / .ko）+ 分类
@@ -516,7 +528,7 @@ node tools/validate.js && node tests/run-tests.js && git push
 纯函数（FSRS/高亮/徽章/相似度/素材数据）有 Node 单元测试，另有页面冒烟测试：
 
 ```bash
-node tests/run-tests.js     # 1258 条，含下面的页面冒烟
+node tests/run-tests.js     # 1311 条，含下面的页面冒烟
 node tests/smoke-pages.js   # 只跑页面冒烟（17 页 onLoad/onShow + 模块引用守门）
 node tests/kid-check.js     # 单跑儿童模式取词实测（末行输出 JSON）
 ```
@@ -613,7 +625,7 @@ node tests/kid-check.js     # 单跑儿童模式取词实测（末行输出 JSON
 
 | # | 操作 | 期望结果 | 出问题时看哪里 |
 |---|---|---|---|
-| 1 | 冷启动进首页 | 2 秒内出来，首屏不白 | Console 有无 `SyntaxError`；主包是否 995KB |
+| 1 | 冷启动进首页 | 2 秒内出来，首屏不白 | Console 有无 `SyntaxError`；主包是否 1002KB |
 | 2 | 口语页 →「标准发音」（英语句子） | 立刻有声，字幕跟随高亮 | 日志 `[audio] CDN 预生成音频播放失败` 或 `所有发音源都失败` |
 | 3 | 口语页切日语 →「标准发音」 | 有声（走 CDN） | 上面同一条日志；确认 `yb.qy663.de5.net` 在 request 域名里 |
 | 3b | 口语页切越南语 →「标准发音」 | 有声（走 CDN `audio-vi/`） | `[audio] CDN 离线音频播放失败`；越南语没有在线兜底，CDN 挂了就是没声音 |

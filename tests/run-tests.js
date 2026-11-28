@@ -2999,6 +2999,182 @@ async function runTailTests() {
     ok(/带我去学单词/.test(idxWxmlTip), '提示条要给一个明确的下一步')
   })()
 
+  // T. 第十四轮：原生外观跟主题、学习页滑动卡死、自建素材去重与上限、徽章按档案、intent 过期、toast 截断、连点守卫
+  ;(function () {
+    const fsMod = require('fs'), pathMod = require('path')
+    const read = p => fsMod.readFileSync(pathMod.join(__dirname, '..', p), 'utf8')
+
+    // ---- T1 tabBar 与窗口背景要跟深色走（这两层是原生的，不吃 wxss）----
+    const chromeSrc = read('utils/chrome.js')
+    ok(/wx\.setTabBarStyle\s*\(/.test(chromeSrc), '要调 setTabBarStyle，否则深色下底栏还是白的')
+    ok(/wx\.setBackgroundColor\s*\(/.test(chromeSrc), '要调 setBackgroundColor，否则下拉回弹闪浅灰')
+    ok(/#1A1F2B/.test(chromeSrc) && /#8FA8FF/.test(chromeSrc), '深色用 #1A1F2B 底 / #8FA8FF 选中色')
+    ok(/backgroundColorTop/.test(chromeSrc), 'setBackgroundColor 要给 backgroundColorTop/Bottom（iOS 只认这两个）')
+    ok(/typeof wx\.setTabBarStyle === 'function'/.test(chromeSrc), '老基础库没有这个 API 要跳过而不是崩')
+    ok(/if \(_applied === on\) return/.test(chromeSrc), '重复调用要直接返回，别每页都发一次跨线程调用')
+    ok(/chrome\.apply\(dark\)/.test(read('app.js')), 'app.applyTheme 要落到 chrome.apply')
+    ok(/require\('\.\/chrome'\)\.apply/.test(read('utils/theme.js')), 'syncTheme 也要兜一次（onLaunch 时 tabBar 可能还没建好）')
+    ;(function () {
+      const chrome = require('../utils/chrome')
+      const savedWx = global.wx
+      const calls = []
+      global.wx = Object.assign({}, savedWx, {
+        setTabBarStyle: function (o) { calls.push(['tab', o]) },
+        setBackgroundColor: function (o) { calls.push(['bg', o]) }
+      })
+      try {
+        chrome.reset()
+        chrome.apply(true)
+        eq(calls.length, 2, '深色要同时设置 tabBar 与窗口背景')
+        eq(calls[0][1].backgroundColor, '#1A1F2B', 'tabBar 底色跟 .theme-dark 一致')
+        eq(calls[0][1].selectedColor, '#8FA8FF', '深色下选中色要提亮（#4A6CF7 压深色只有 3.13）')
+        eq(calls[1][1].backgroundColorTop, '#1A1F2B', '窗口背景顶部也要变（下拉回弹露出的是它）')
+        chrome.apply(true)
+        eq(calls.length, 2, '同一个主题重复 apply 不该再发调用')
+        chrome.apply(false)
+        eq(calls.length, 4, '切回浅色要再发一次')
+        eq(calls[2][1].backgroundColor, '#FFFFFF', '浅色 tabBar 回到白底')
+        eq(calls[3][1].backgroundColor, '#F5F7FB', '浅色窗口背景回到 #F5F7FB')
+        // 没有这两个 API 的老基础库不能崩
+        const noApi = {}
+        global.wx = Object.assign({}, savedWx, noApi)
+        delete global.wx.setTabBarStyle
+        delete global.wx.setBackgroundColor
+        chrome.reset()
+        let threw = false
+        try { chrome.apply(true) } catch (e) { threw = true }
+        ok(!threw, '老基础库没有这两个 API 时不能抛错')
+      } finally {
+        global.wx = savedWx
+        chrome.reset()
+      }
+    })()
+
+    // ---- T2 学习页：滑动过再切走，卡片不能永久点不动 ----
+    const learnSrcT = read('pages/learn/learn.js')
+    ok(!/_swiped\s*=\s*true/.test(learnSrcT), '不能再靠 _swiped 布尔标志（复位定时器会被 onHide 清掉）')
+    ok(/this\._swipedAt = Date\.now\(\)/.test(learnSrcT), '滑动要记时间戳')
+    ok(/Date\.now\(\) - \(this\._swipedAt \|\| 0\) < 300/.test(learnSrcT), 'flip 用时间差判断，不依赖定时器')
+    ok(/onShow[\s\S]{0,400}this\._touch0 = null/.test(learnSrcT), 'onShow 要复位残留的触摸起点')
+    ok(/if \(this\._tooFast\(\)\) return/.test(learnSrcT), 'rate/markKnown 要有连点守卫')
+    ;(function () {
+      const savedBehavior = global.Behavior
+      const savedPage = global.Page
+      const savedGetApp = global.getApp
+      const savedNetwork = global.wx.getNetworkType
+      global.Behavior = function (o) { return o || {} }
+      let def = null
+      global.Page = function (o) { def = o; return o }
+      global.getApp = function () { return { globalData: {}, isOnline: () => true, refreshTheme() {} } }
+      // 只给非 wifi：prefetch 会直接返回，不触发下载
+      global.wx.getNetworkType = function (o) { if (o && o.success) o.success({ networkType: 'mobile' }) }
+      const realNow = Date.now
+      let fake = realNow()
+      Date.now = function () { return fake }
+      try {
+        delete require.cache[require.resolve('../pages/learn/learn.js')]
+        require('../pages/learn/learn.js')
+        const inst = Object.assign({}, def)
+        inst.data = JSON.parse(JSON.stringify(def.data || {}))
+        inst.setData = function (o, cb) { Object.assign(this.data, o); if (cb) cb.call(this) }
+        ;(def.behaviors || []).forEach(b => {
+          Object.assign(inst.data, b.data || {})
+          Object.assign(inst, b.methods || {})
+        })
+        inst.data.mode = 'new'
+        inst.onShow(); inst.load()
+        ok((inst._queue || []).length >= 3, '学习页要有队列才能测滑动')
+        inst.onTouchStart({ touches: [{ clientX: 300, clientY: 300 }] })
+        inst.onTouchEnd({ changedTouches: [{ clientX: 100, clientY: 300 }] })
+        eq(inst.data.flipped, true, '没翻面时左右滑直接翻面')
+        fake += 5000
+        inst.onHide(); inst.onShow()   // tabBar 页实例常驻：切走再回来
+        fake += 5000
+        const beforeFlip = inst.data.flipped
+        inst.flip()
+        ok(inst.data.flipped !== beforeFlip, '切走再回来卡片还能翻（修复前 _swiped 卡死，永久点不动）')
+        // 连点两下只算一张
+        const qT = inst._queue || []
+        const n0T = Object.keys(storage.getProgress()).length
+        inst.rate({ currentTarget: { dataset: { q: 5 } } })
+        inst.rate({ currentTarget: { dataset: { q: 5 } } })
+        const progT = storage.getProgress()
+        eq(Object.keys(progT).length - n0T, 1, '连点两下只评一张')
+        ok(!progT[qT[1].id], '第 2 张不能被连点误评（用户根本没看到）')
+        eq(inst.data.index, 1, '连点后应停在第 2 张')
+        fake += 400
+        inst.rate({ currentTarget: { dataset: { q: 5 } } })
+        eq(inst.data.index, 2, '间隔 400ms 的两下要正常推进到第 3 张（守卫不能误挡）')
+      } finally {
+        Date.now = realNow
+        global.wx.getNetworkType = savedNetwork
+        delete require.cache[require.resolve('../pages/learn/learn.js')]
+        global.Behavior = savedBehavior
+        global.Page = savedPage
+        global.getApp = savedGetApp
+      }
+    })()
+
+    // ---- T3 自建素材：按内容去重 + 上限 ----
+    eq(storage.CUSTOM_MAX, 300, '自建素材上限 300 条')
+    const cuBody = 'T3 could you send me the report?'
+    const cu1 = storage.addCustomItems([{ text: cuBody, cn: '你能把报告发我吗', lang: 'en' }])
+    const cu2 = storage.addCustomItems([{ text: cuBody, cn: '你能把报告发我吗', lang: 'en' }])
+    eq(cu1.added, 1, '第一次导入新增 1 条')
+    eq(cu2.added, 0, '同样内容再导一次不该新增')
+    eq(cu2.skipped, 1, '要如实报出跳过了 1 条重复')
+    const cu3 = storage.addCustomItems([{ text: '  T3   could you send me the report?  ', lang: 'en' }])
+    eq(cu3.skipped, 1, '空格差异也算重复（指纹会规整空白）')
+    eq(storage.getCustomItems('en').filter(x => x.text.indexOf('T3') === 0).length, 1, '同一内容只留一条')
+    const bulk = []
+    for (let i = 0; i < 400; i++) bulk.push({ text: 'T3 bulk line ' + i, lang: 'en' })
+    const cuBulk = storage.addCustomItems(bulk)
+    eq(storage.getCustomItems().length, storage.CUSTOM_MAX, '总量要卡在 300 条')
+    ok(cuBulk.capped > 0, '超上限的条数要报出来（' + cuBulk.capped + ' 条）')
+    storage.getCustomItems().forEach(x => storage.removeCustomItem(x.id))
+    eq(storage.getCustomItems().length, 0, '清理干净，不影响后续用例')
+    const impSrcT = read('pages/import/import.js')
+    ok(/r\.skipped/.test(impSrcT) && /r\.capped/.test(impSrcT), '导入页要把重复/超上限如实告诉用户')
+    ok(/storage\.CUSTOM_MAX/.test(impSrcT), '提示里要带上上限数字')
+    const searchSrcT = read('pages/search/search.js')
+    ok(/r1\.skipped/.test(searchSrcT), '查词页存素材时要知道「已经有了」而不是假装又存一份')
+
+    // ---- T4 徽章「已看过」要按档案隔离 ----
+    const badgesSrcT = read('utils/badges.js')
+    ok(/profile\.nsKey\(KEY\)/.test(badgesSrcT), '徽章记录必须走 profile.nsKey（家人共用一台手机时各算各的）')
+    const badgesT = require('../utils/badges')
+    const profT = profile.add('T4档案', 'adult')
+    profile.switchTo(profT)
+    storage.invalidate()
+    const keyT = profile.nsKey(badgesT.KEY)
+    badgesT.check()
+    ok(keyT in _store, 'T4 档案写下了自己的徽章记录：' + keyT)
+    profile.switchTo(profile.DEFAULT_ID)
+    storage.invalidate()
+    const keyDef = profile.nsKey(badgesT.KEY)
+    badgesT.check()
+    ok(keyDef in _store, '默认档案也有自己的一份')
+    ok(keyT !== keyDef, '两个档案的 key 必须不同（修复前是同一个，第二个人解锁不提示）')
+    profile.remove(profT)
+    storage.invalidate()
+
+    // ---- T5 intent 过期 ----
+    const navT = require('../utils/nav')
+    eq(navT.INTENT_TTL, 60000, 'intent 有效期 60 秒')
+    wx.setStorageSync(navT.INTENT_KEY, { page: 'pages/speak/speak', item: 'en_001', ts: Date.now() - 120000 })
+    eq(navT.takeIntent('pages/speak/speak'), null, '过期意图不能用')
+    ok(!wx.getStorageSync(navT.INTENT_KEY), '过期意图要顺手清掉，别一直躺在 storage 里')
+    wx.setStorageSync(navT.INTENT_KEY, { page: 'pages/speak/speak', item: 'en_001', ts: Date.now() - 1000 })
+    const freshT = navT.takeIntent('pages/speak/speak')
+    ok(freshT && freshT.item === 'en_001', '没过期的意图正常取用')
+    ok(/intent\.ts = Date\.now\(\)/.test(read('utils/nav.js')), 'go() 写入时要打时间戳')
+
+    // ---- T6 超过 7 个字的 toast 不能用 icon:'success'（会被截断）----
+    ok(/已同意，可以录音了[^}]*icon: 'none'/.test(read('pages/voiceprint/voiceprint.js')), '「已同意，可以录音了」9 字要改 icon:none')
+    ok(/到期句子复习完成！[\s\S]{0,60}?icon: 'none'/.test(read('pages/speak/speak.js')), '「到期句子复习完成！」9 字要改 icon:none')
+    ok(/已存入「我的素材」[^}]*icon: 'none'/.test(searchSrcT), '「已存入「我的素材」」9 字要改 icon:none')
+  })()
+
   // K. 对练（我说中文，给我目标语言的说法）
   // 关键约束：只放在情景对话里，不做独立翻译页（个人主体 + 教育类目，
   // 独立翻译入口容易被判成工具类应用，插件类目已经因此被驳过一次）。
