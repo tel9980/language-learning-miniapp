@@ -18,6 +18,8 @@ const session = require('../../utils/speak-session')
 const shadowTip = require('../../utils/shadow-tip')
 const mic = require('../../utils/mic')
 const translate = require('../../utils/translate')
+const logger = require('../../utils/logger')
+const shareCopy = require('../../utils/share-copy')
 
 // 跟读模式：word=单词 | sentence=句子 | dialogue=情景对话 | custom=自建素材
 Page({
@@ -86,8 +88,18 @@ Page({
       path: '/pages/speak/speak' + (id ? '?item=' + encodeURIComponent(id) : '')
     }
   },
+  // 朋友圈（第十轮）：原来 17 页只有统计页支持分享到朋友圈。
+  onShareTimeline() {
+    const st = storage.getStats() || {}
+    const lang = storage.getCurrentLang()
+    return { title: shareCopy.title({ lang: lang, streak: st.streak, mastered: storage.getMasteredCount(lang) }) }
+  },
 
   onShow() {
+    // 让右上角菜单里出现「分享到朋友圈」（第十轮）
+    if (typeof wx.showShareMenu === 'function') {
+      wx.showShareMenu({ withShareTicket: false, menus: ['shareAppMessage', 'shareTimeline'] })
+    }
     this.syncTheme()
     // 离线音频优先流播 CDN（见 utils/audio.js），不预载分包——
     // 预载要拉 1–3MB，而真机上读分包文件还可能失败，不如按需。
@@ -676,6 +688,7 @@ Page({
       this._recManager.start({ duration: 60000, format: 'mp3', sampleRate: 16000, numberOfChannels: 1 })
       this.setData({ recording: true, hasRecording: false })
     } catch (e) {
+      logger.warn('[speak] 录音启动失败', e)
       wx.showToast({ title: '录音启动失败', icon: 'none' })
     }
   },

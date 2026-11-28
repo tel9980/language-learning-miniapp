@@ -1,5 +1,6 @@
 const theme = require('../../utils/theme')
 const profile = require('../../utils/profile')
+const prompt = require('../../utils/prompt')
 const storage = require('../../utils/storage')
 
 const MODE_NAMES = { normal: '标准', kid: '儿童', elder: '长辈' }
@@ -48,19 +49,17 @@ Page({
 
   addProfile() {
     const that = this
-    wx.showModal({
+    prompt.askText({
       title: '新增档案',
       content: '给家人起个名字（最多 12 个字）',
-      editable: true,
-      placeholderText: '例如：妈妈',
-      success(res) {
-        if (!res.confirm || !res.content || !res.content.trim()) return
-        that._newName = res.content.trim()
+      value: '',
+      maxLen: 12,
+      done(name) {
         wx.showActionSheet({
-          itemList: ['标准模式', '儿童模式（字大、简单）', '长辈模式（超大字）'],
+          itemList: ['标准模式', '儿童模式（字更大、只留基础分类）', '长辈模式（超大字）'],
           success(r) {
             const mode = ['normal', 'kid', 'elder'][r.tapIndex] || 'normal'
-            const id = profile.add(that._newName, mode)
+            const id = profile.add(name, mode)
             profile.switchTo(id)
             wx.showToast({ title: '已创建并切换', icon: 'success' })
             setTimeout(function () { wx.reLaunch({ url: '/pages/index/index' }) }, 600)
@@ -75,17 +74,15 @@ Page({
     const p = profile.get(id)
     if (!p) return
     const that = this
-    wx.showModal({
+    prompt.askText({
       title: '重命名档案',
-      content: p.name,
-      editable: true,
-      placeholderText: p.name,
-      success(res) {
-        if (res.confirm && res.content && res.content.trim()) {
-          profile.rename(id, res.content.trim())
-          that.refresh()
-          wx.showToast({ title: '已保存', icon: 'success' })
-        }
+      content: '',
+      value: p.name,
+      maxLen: 12,
+      done(name) {
+        profile.rename(id, name)
+        that.refresh()
+        wx.showToast({ title: '已保存', icon: 'success' })
       }
     })
   },

@@ -11,3 +11,11 @@
 .btn.play { background: #EEF2FF; color: #4A6CF7; }
 .btn.comment { background: #FFF4E5; color: #E48A00; }
 .empty { text-align: center; padding: 60rpx 24rpx; }
+
+/* 深色模式（第十轮修复：原来整页 0 条 .theme-dark） */
+.theme-dark .header .title { color: #E8EAF0; }
+.theme-dark .owner { color: #E8EAF0; }
+.theme-dark .label { color: #E8EAF0; }
+.theme-dark .cn { color: #9AA3B5; }
+.theme-dark .btn.play { background: #333C50; color: #8FA8FF; }
+.theme-dark .btn.comment { background: #3E3527; color: #E4A94A; }

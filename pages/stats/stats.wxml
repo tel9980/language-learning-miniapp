@@ -136,6 +136,10 @@
       <view class="setting-label">🌙 深色模式</view>
       <view class="switch {{darkMode?'on':''}}"><view class="knob"></view></view>
     </view>
+    <view class="setting-row" bindtap="goRecordings">
+      <view class="setting-label">🎧 我的录音</view>
+      <view class="setting-value">{{recCount>0?(recCount+' 条 · '+(recKb/1024>=1?(recKb/1024).toFixed(1):(recKb/1024).toFixed(2))+' MB / '+recMaxMb+' MB'):'还没录过'}} ›</view>
+    </view>
     <view class="setting-row" bindtap="clearTtsCache">
       <view class="setting-label">🔊 发音缓存</view>
       <view class="setting-value">{{ttsCacheKb>0?(ttsCacheKb+'KB · 清理'):'空'}} ›</view>

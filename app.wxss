@@ -162,3 +162,17 @@ page {
 .theme-dark .focus-bar.returning,
 .theme-dark .input,
 .theme-dark .textarea { background: #333C50; color: #E8EAF0; }
+
+/* 按压反馈（第十轮）：微信的 view 没有内置点击反馈，只有 button 有。
+   全项目 129 个 bindtap、wxss 里只有 5 个 :active、hover-class 0 处，
+   点卡片/图标完全静默，手指不知道点上没有。这里给一个通用类，高频入口挂上即可。 */
+.tap-hover { opacity: .62; }
+
+/* 空状态（第十轮）：队列为空时不能再是纯白页 */
+.empty-box { text-align: center; padding: 64rpx 24rpx; }
+.empty-emoji { font-size: 88rpx; line-height: 1.2; }
+.empty-title { font-size: 34rpx; font-weight: 700; color: #1F2430; margin: 12rpx 0 10rpx; }
+.empty-tip { font-size: 26rpx; color: #8A94A6; line-height: 1.7; margin-bottom: 28rpx; }
+.empty-btn { margin-top: 16rpx; }
+.theme-dark .empty-title { color: #E8EAF0; }
+.theme-dark .empty-tip { color: #9AA3B5; }

@@ -22,10 +22,10 @@ function rawGet(key) {
   try { return wx.getStorageSync(key) } catch (e) { return '' }
 }
 function rawSet(key, value) {
-  try { wx.setStorageSync(key, value) } catch (e) {}
+  try { wx.setStorageSync(key, value) } catch (e) { console.warn('[family-backup] 写备份数据失败', key, e) }
 }
 function rawRemove(key) {
-  try { wx.removeStorageSync(key) } catch (e) {}
+  try { wx.removeStorageSync(key) } catch (e) { console.warn('[family-backup] 删备份数据失败', key, e) }
 }
 // 进度表在存储里按分片存放（见 utils/progress-keys.js），备份文件里仍保持
 // 「整表」形状：这样新老备份互认，导入时再按当前分片规则拆开写。
@@ -179,7 +179,7 @@ function importAll(payload, mode) {
 
   // 当前档案：仅当指向的档案存在时恢复
   if (payload.current && profiles.some(function (p) { return p.id === payload.current })) {
-    try { wx.setStorageSync(KEY_CURRENT, payload.current) } catch (e) {}
+    try { wx.setStorageSync(KEY_CURRENT, payload.current) } catch (e) { console.warn('[family-backup] 恢复当前档案失败', e) }
   }
 
   // 本模块绕过 storage/speaking 直写了 Storage，必须让两者的进程内缓存失效，

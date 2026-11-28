@@ -139,7 +139,7 @@ function clear() {
   const idx = loadIndex()
   const f = fs()
   Object.keys(idx).forEach(function (k) {
-    if (f && idx[k].path) { try { f.unlinkSync(idx[k].path) } catch (e) {} }
+    if (f && idx[k].path) { try { f.unlinkSync(idx[k].path) } catch (e) { console.warn('[tts-cache] 清理文件失败', e) } }
   })
   _index = {}
   saveIndex()

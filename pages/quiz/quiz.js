@@ -21,6 +21,10 @@ Page({
     wrongList: []
   },
   onShow() {
+    // 让右上角菜单里出现「分享到朋友圈」（第十轮）
+    if (typeof wx.showShareMenu === 'function') {
+      wx.showShareMenu({ withShareTicket: false, menus: ['shareAppMessage', 'shareTimeline'] })
+    }
     this.syncTheme()
     // 儿童模式统计练习时长（15 / 30 分钟休息提醒），只计前台时间
     practiceTimer.start(this.data.isKid)
@@ -129,9 +133,16 @@ Page({
     })
   },
   goStats() { wx.switchTab({ url: '/pages/stats/stats' }) },
+  goLearn() { wx.switchTab({ url: '/pages/learn/learn' }) },
   onShareAppMessage() {
     const st = storage.getStats() || {}
     const lang = storage.getCurrentLang()
     return { title: shareCopy.title({ lang: lang, streak: st.streak, mastered: storage.getMasteredCount(lang) }), path: '/pages/quiz/quiz' }
+  },
+  // 朋友圈（第十轮）：原来 17 页只有统计页支持分享到朋友圈。
+  onShareTimeline() {
+    const st = storage.getStats() || {}
+    const lang = storage.getCurrentLang()
+    return { title: shareCopy.title({ lang: lang, streak: st.streak, mastered: storage.getMasteredCount(lang) }) }
   },
 })

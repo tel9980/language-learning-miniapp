@@ -8,3 +8,10 @@
 .copy-btn { text-align: center; color: #4A6CF7; font-size: 28rpx; padding: 20rpx 0; }
 .tip-card { background: #F7F9FD; margin-top: 16rpx; }
 .tip { line-height: 1.6; }
+
+/* 深色模式（第十轮修复：原来整页 0 条 .theme-dark，
+   标题 #1F2430 压 #262D3D 背景对比度只有 1.13，基本看不见） */
+.theme-dark .hero .title { color: #E8EAF0; }
+.theme-dark .step-title { color: #E8EAF0; }
+.theme-dark .tip-card { background: #2E3648; }
+.theme-dark .tip { color: #C9D2E3; }

@@ -8,15 +8,23 @@ const localAudio = require('../../utils/local-audio')
 const kidMode = require('../../utils/kid-mode')
 const practiceTimer = require('../../utils/practice-timer')
 
+// 首帧语言名（第十轮）：初始 data 原来写死 langName: '英语'，onShow 才覆盖，
+// 学日语的用户每次进页面都会先闪一下「英语」。这里在模块加载时就按当前语种算好。
+const _firstLangMeta = getLangMeta(storage.getCurrentLang())
+
 Page({
   behaviors: [theme],
   data: {
     mode: 'due', dueCount: 0, current: null, flipped: false,
-    queueLen: 0, index: 0, langName: '英语', tts: 'en-US', totalWords: 0,
+    queueLen: 0, index: 0, langName: _firstLangMeta.name, tts: _firstLangMeta.tts, totalWords: 0,
     catNames: ['全部分类'], catIndex: 0, catValue: '', catEmpty: false,
     knownCount: 0, nextDue: 0
   },
   onShow() {
+    // 让右上角菜单里出现「分享到朋友圈」（第十轮）
+    if (typeof wx.showShareMenu === 'function') {
+      wx.showShareMenu({ withShareTicket: false, menus: ['shareAppMessage', 'shareTimeline'] })
+    }
     this.syncTheme()
     // 儿童模式要统计练习时长（15 / 30 分钟休息提醒），只计前台时间
     practiceTimer.start(this.data.isKid)
@@ -187,5 +195,11 @@ Page({
     const st = storage.getStats() || {}
     const lang = storage.getCurrentLang()
     return { title: shareCopy.title({ lang: lang, streak: st.streak, mastered: storage.getMasteredCount(lang) }), path: '/pages/learn/learn' }
+  },
+  // 朋友圈（第十轮）：原来 17 页只有统计页支持分享到朋友圈。
+  onShareTimeline() {
+    const st = storage.getStats() || {}
+    const lang = storage.getCurrentLang()
+    return { title: shareCopy.title({ lang: lang, streak: st.streak, mastered: storage.getMasteredCount(lang) }) }
   },
 })

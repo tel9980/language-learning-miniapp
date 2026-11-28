@@ -111,7 +111,7 @@ function applyMode(id) {
     const theme = require('./storage')
     theme.setFontScale(m.fontScale)
     if (typeof m.darkMode === 'boolean') theme.setDarkMode(m.darkMode)
-  } catch (e) {}
+  } catch (e) { logger.warn('[profile] 应用档案模式失败', id, e) }
 }
 
 // 删除档案：清理其命名空间下的数据与录音文件；默认档案/最后一个不可删
@@ -127,7 +127,7 @@ function remove(id) {
     'lp_custom_items_v1', 'lp_theme_v1', 'lp_speak_records_v1', 'lp_speak_focus_v1',
     'lp_speak_daily_v1', 'lp_recordings_v1', 'lp_sent_progress_v1'])
   baseKeys.forEach(function (k) {
-    try { wx.removeStorageSync(nsKey(k, id)) } catch (e) {}
+    try { wx.removeStorageSync(nsKey(k, id)) } catch (e) { logger.warn('[profile] 清理档案数据失败', k, e) }
   })
   // 录音物理文件
   try {
@@ -168,7 +168,7 @@ function migrateLegacy(baseKeys) {
       const target = nsKey(k, DEFAULT_ID)
       if (!wx.getStorageSync(target)) wx.setStorageSync(target, old)
       wx.removeStorageSync(k)
-    } catch (e) {}
+    } catch (e) { logger.warn('[profile] 迁移老数据失败', k, e) }
   })
   try { wx.setStorageSync(KEY_MIGRATED, '1') } catch (e) { logger.warn('[profile] 写迁移标记失败', e) }
   return true

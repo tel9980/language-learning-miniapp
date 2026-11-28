@@ -8,7 +8,7 @@ function rawRead(key, fallback) {
   try { const v = wx.getStorageSync(key); return v ? JSON.parse(v) : fallback } catch (e) { return fallback }
 }
 function rawWrite(key, value) {
-  try { wx.setStorageSync(key, JSON.stringify(value)) } catch (e) {}
+  try { wx.setStorageSync(key, JSON.stringify(value)) } catch (e) { console.warn('[family] 写排行榜缓存失败', key, e) }
 }
 
 // 家庭排行榜：读每个档案的累计统计 + 今日口语

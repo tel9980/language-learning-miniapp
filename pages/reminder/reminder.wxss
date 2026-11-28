@@ -9,3 +9,11 @@
 .picker-val { color: #4A6CF7; font-size: 28rpx; }
 .note .section-title { margin-bottom: 12rpx; }
 .note .muted { display: block; line-height: 1.7; margin-bottom: 8rpx; }
+
+/* 深色模式（第十轮修复：原来整页 0 条 .theme-dark） */
+.theme-dark .header .title { color: #E8EAF0; }
+.theme-dark .label { color: #E8EAF0; }
+.theme-dark .switch { background: #3B455C; }
+.theme-dark .switch.on { background: #4A6CF7; }
+.theme-dark .knob { background: #E8EAF0; }
+.theme-dark .picker-val { color: #8FA8FF; }

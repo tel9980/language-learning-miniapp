@@ -615,7 +615,7 @@ const EN_WORDS = words.WORDS.en
 const JA_WORDS = words.WORDS.ja
 const VI_WORDS = words.WORDS.vi
 const KO_WORDS = words.WORDS.ko
-eq(EN_WORDS.length, 800, 'english word count = 800')
+eq(EN_WORDS.length, 821, 'english word count = 821')
 eq(JA_WORDS.length, 110, 'japanese word count = 110')
 eq(VI_WORDS.length, 80, 'vietnamese word count = 80')
 eq(KO_WORDS.length, 150, 'korean word count = 150')
@@ -670,7 +670,10 @@ const jaCats = words.getExamCategories('ja').map(c => c.name)
   ok(jaCats.indexOf(c) >= 0, `japanese category "${c}" is selectable`)
 })
 eq(words.getWordsByCategory('en', '日常').length, 134, 'filter by 日常 returns 134')
-eq(words.getWords('en').length, 800, 'getWords ignores unknown lang fallback')
+  // 第十轮：购物/天气原来只有 2 和 1 个词，点进去就学完了，各补到 12 个
+  eq(words.getWordsByCategory('en', '购物').length, 12, '购物分类补到 12 个词')
+  eq(words.getWordsByCategory('en', '天气').length, 12, '天气分类补到 12 个词')
+eq(words.getWords('en').length, 821, 'getWords ignores unknown lang fallback')
 
 // ---- audio：日语必须带 le=jap，否则有道只返回 1920 字节静音占位文件 ----
 const audio = require('../utils/audio')
@@ -808,7 +811,7 @@ EN_WORDS.forEach(function (w) {
   enAudioIds.push(w.id)
   if (w.example) enAudioIds.push(w.id + '_ex')
 })
-eq(enAudioIds.length, 1748, '英语音频应有 1748 条（120 句 + 28 台词 + 800 词 + 800 例句）')
+eq(enAudioIds.length, 1790, '英语音频应有 1790 条（120 句 + 28 台词 + 821 词 + 821 例句）')
 const enMissing = enAudioIds.filter(function (id) { return !localAudio.has(id) })
 eq(enMissing.length, 0, 'every English item has bundled audio (missing: ' + enMissing.slice(0, 5).join(',') + ')')
 eq(badMp3(enAudioIds).length, 0, 'English audio files are real mp3')
@@ -973,7 +976,7 @@ eq(wordRank.rankOf('en_211'), 156, 'rank of "keep" comes from ECDICT frq')
 {
   const enAll = require('../utils/words').getWords('en')
   const noRank = enAll.filter(function (w) { return wordRank.rankOf(w.id) === Infinity })
-  eq(noRank.length, 0, '800 个英语词全部有词频排名（含 41 个财务/工作词）')
+  eq(noRank.length, 0, '821 个英语词全部有词频排名（含 41 个财务/工作词 + 21 个购物/天气补词）')
   ok(enAll.length === wordRank.size, '词频表条数与英语词数一致（' + enAll.length + '）')
   // 真实频次必须来自 ECDICT，不是随手编的
   eq(wordRank.rankOf('en_445'), 788, 'loss 的排名来自 ECDICT frq')
@@ -1377,7 +1380,7 @@ async function runExtraTests() {
   let o7 = null
   od.checkUpdate(function (r) { o7 = r }, { force: true })
   eq(o7 && o7.updated, true, '在线版本更新成功')
-  eq(words.getWords('en').length, 1, '内置 800 词被在线词库覆盖')
+  eq(words.getWords('en').length, 1, '内置词库被在线词库覆盖')
   eq(words.getWords('en')[0].word, 'zebra-online', '取到的就是在线的词')
   eq(words.getWords('ja').length, 110, '没覆盖的语种仍用内置词库')
   ok(words.getExamCategories('en').some(function (c) { return c.name === '日常' }), '在线词的分类也能被分类列表看到')
@@ -1387,7 +1390,7 @@ async function runExtraTests() {
   let o8 = null
   od.checkUpdate(function (r) { o8 = r }, { force: true })
   eq(o8 && o8.updated, true, '空覆盖层版本也能更新')
-  eq(words.getWords('en').length, 800, '空覆盖层回落到内置词库')
+  eq(words.getWords('en').length, 821, '空覆盖层回落到内置词库')
 
   // 6 小时节流：别每次启动都为「比一个版本号」白拉 134KB
   const realNow = Date.now
@@ -1443,7 +1446,7 @@ async function runExtraTests() {
     words: shipped.words, sentences: shipped.sentences, dialogues: shipped.dialogues
   })).digest('hex').slice(0, 13)
   eq(fp, shipped.version, '指纹与内容一致（改词库才变版本，重复部署不会让用户白拉）')
-  eq(shipped.words.en.length, 800, '发布包英语 800 词')
+  eq(shipped.words.en.length, 821, '发布包英语 821 词')
   eq(shipped.words.ja.length, 110, '发布包日语 110 词')
   eq(shipped.sentences.en.length, 120, '发布包英语 120 句')
   eq(shipped.sentences.ja.length, 100, '发布包日语 100 句')
@@ -2338,7 +2341,7 @@ async function runTailTests() {
 
     // E. 首页「今日复习目标」卡片可点
     const idxWxml = read('pages/index/index.wxml')
-    ok(/<view class="goal card" bindtap="editGoal">/.test(idxWxml), '首页目标卡片可点')
+    ok(/<view class="goal card"[^>]*bindtap="editGoal"/.test(idxWxml), '首页目标卡片可点')
     const idxJs = read('pages/index/index.js')
     ok(/editGoal\(\) \{/.test(idxJs), '首页有 editGoal 方法')
     ok(/storage\.setDailyGoal\(n\)/.test(idxJs), 'editGoal 真的会存目标')
@@ -2397,6 +2400,77 @@ async function runTailTests() {
     ok(/logger\.warn\('\[storage\] 句子进度落盘失败'/.test(storageJs), '句子进度落盘失败会记日志')
     const profileJs = read('utils/profile.js')
     ok(/logger\.warn\('\[profile\] 写档案失败'/.test(profileJs), '写档案失败会记日志')
+  }
+
+  // O. 第十轮：深色三页、按压反馈、空状态、prompt 收口、录音占用、首帧语种、朋友圈、购物天气补词
+  {
+    // O1. 深色三页：share / reminder / family-recordings 原来 0 条 .theme-dark，
+    //     标题 #1F2430 压 #262D3D 只有 1.13 对比度
+    ;['pages/share/share.wxss', 'pages/reminder/reminder.wxss', 'pages/family-recordings/family-recordings.wxss'].forEach(function (f) {
+      const css = read(f)
+      const n = (css.match(/\.theme-dark/g) || []).length
+      ok(n >= 3, f + ' 深色规则补齐（' + n + ' 条）')
+      ok(!/^\s*\.hero \.title \{ font-size: 38rpx; font-weight: 700; color: #1F2430; margin/m.test(css) || n > 0,
+        f + ' 深色下标题不再压成不可读')
+    })
+
+    // O2. 按压反馈：view 没有内置反馈，只有 button 有
+    const appCss = read('app.wxss')
+    ok(/\.tap-hover \{ opacity: \.62; \}/.test(appCss), 'app.wxss 提供统一的按压反馈类')
+    const idxW = read('pages/index/index.wxml')
+    const hoverCount = (idxW.match(/hover-class="tap-hover"/g) || []).length
+    ok(hoverCount >= 10, '首页高频入口都挂了 hover-class（' + hoverCount + ' 处）')
+    ok((read('pages/speak/speak.wxml').match(/hover-class="tap-hover"/g) || []).length >= 10, '口语页工具按钮挂了 hover-class')
+    ok((read('pages/learn/learn.wxml').match(/hover-class="tap-hover"/g) || []).length >= 5, '学习页挂了 hover-class')
+
+    // O3. 空队列不再白屏：quiz / dictation 顶层是 !finished && current，空时两个分支都不渲染
+    ok(/wx:if="\{\{!finished && !current\}\}"/.test(read('pages/quiz/quiz.wxml')), '测验有空状态分支')
+    ok(/wx:if="\{\{!finished && !current\}\}"/.test(read('pages/dictation/dictation.wxml')), '听写有空状态分支')
+    ok(/goLearn\(\) \{ wx\.switchTab/.test(read('pages/quiz/quiz.js')), '测验空状态能去学新词')
+    ok(/\.empty-box \{/.test(appCss), '空状态样式在 app.wxss 里统一')
+
+    // O4. 「设置每日目标」两处一字不差 → 收进 utils/prompt.js
+    const promptJs = read('utils/prompt.js')
+    ok(/function askNumber/.test(promptJs) && /function askText/.test(promptJs), 'prompt.js 提供 askNumber / askText')
+    ok(/module\.exports = \{ askNumber: askNumber, askText: askText \}/.test(promptJs), 'prompt.js 导出正确')
+    ;['pages/index/index.js', 'pages/stats/stats.js', 'pages/profiles/profiles.js', 'pages/family-recordings/family-recordings.js'].forEach(function (f) {
+      ok(/require\('\.\.\/\.\.\/utils\/prompt'\)/.test(read(f)), f + ' 引入 prompt')
+    })
+    ok(!/editable: true/.test(read('pages/index/index.js')), '首页不再手写 editable modal')
+    ok(!/editable: true/.test(read('pages/profiles/profiles.js')), '档案页不再手写 editable modal')
+
+    // O5. 录音占用：6MB 的大头之前一条都不显示
+    const recJs = read('utils/recordings.js')
+    ok(/function usage\(\)/.test(recJs), 'recordings.js 提供 usage()')
+    ok(/module\.exports = \{[^}]*usage[^}]*\}/.test(recJs), 'usage 已导出')
+    const statsW = read('pages/stats/stats.wxml')
+    ok(/我的录音/.test(statsW) && /recCount/.test(statsW), '统计页显示录音条数与占用')
+    ok(/goRecordings\(\)/.test(read('pages/stats/stats.js')), '统计页能点进录音列表')
+
+    // O6. 首帧语种名：初始 data 写死 '英语'，学日语的用户每次都闪一下
+    ;['pages/index/index.js', 'pages/learn/learn.js', 'pages/search/search.js', 'pages/today/today.js', 'pages/wrong/wrong.js'].forEach(function (f) {
+      const js = read(f).split('\n').filter(function (l) { return !/^\s*\/\//.test(l) }).join('\n')
+      ok(!/langName: '英语'/.test(js), f + ' 首帧语言名不再写死英语')
+      ok(/_firstLangMeta/.test(js), f + ' 用当前语种推导首帧语言名')
+    })
+
+    // O7. 朋友圈：17 页原来只有统计页有 onShareTimeline
+    ;['pages/speak/speak.js', 'pages/learn/learn.js', 'pages/quiz/quiz.js'].forEach(function (f) {
+      const js = read(f)
+      ok(/onShareTimeline\(\)/.test(js), f + ' 支持分享到朋友圈')
+      ok(/showShareMenu/.test(js), f + ' onShow 里放开朋友圈菜单项')
+    })
+
+    // O8. 购物/天气分类补到 12 个（原来 2 和 1）
+    const enWords = EN_WORDS
+    ok(enWords.length === 821, '英语词库 821 词（800 + 21 个购物/天气补词）')
+    const shop = enWords.filter(function (w) { return w.category === '购物' })
+    const wea = enWords.filter(function (w) { return w.category === '天气' })
+    eq(shop.length, 12, '购物分类 12 个词')
+    eq(wea.length, 12, '天气分类 12 个词')
+    ok(shop.concat(wea).every(function (w) { return w.ex2 && w.ex2c && w.col }), '补的词字段齐全')
+    ok(wordRank.size === 821, '词频表覆盖 821 词')
+    ok(shop.concat(wea).every(function (w) { return wordRank.rankOf(w.id) !== Infinity }), '补的词都有词频排名')
   }
 
   // K. 对练（我说中文，给我目标语言的说法）

@@ -121,4 +121,12 @@ function clear() {
   write([])
 }
 
-module.exports = { save, list, remove, clear, trim, MAX_KEEP, MAX_BYTES }
+// 录音占用（第十轮）：统计页之前只显示发音缓存，6MB 的录音一条都没显示，
+// 用户只会看到「录音存不下来」的 toast，猜不到是空间满了。
+function usage() {
+  const list = read()
+  const bytes = list.reduce(function (sum, e) { return sum + (e.size || 0) }, 0)
+  return { count: list.length, bytes: bytes, maxKeep: MAX_KEEP, maxBytes: MAX_BYTES }
+}
+
+module.exports = { save, list, remove, clear, trim, usage, MAX_KEEP, MAX_BYTES }

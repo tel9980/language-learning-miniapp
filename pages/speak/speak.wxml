@@ -5,7 +5,7 @@
       <view class="guide-title">欢迎来练习口语 👋</view>
       <view class="guide-text">① 选句子/对话 → ② 听标准发音 → ③ 点麦克风录音 → ④ 听回放对比 → ⑤ 自评打分</view>
       <view class="guide-text">说得不熟的会进「重点复练」，反复攻克。点任意处开始。</view>
-      <view class="guide-btn" bindtap="closeGuide">我知道了</view>
+      <view hover-class="tap-hover" class="guide-btn" bindtap="closeGuide">我知道了</view>
     </view>
   </view>
 
@@ -24,10 +24,10 @@
 
     <!-- 跟读类型切换 -->
     <view class="track-tabs">
-      <view class="tab {{track==='sentence'?'on':''}}" data-track="sentence" bindtap="switchTrack">💬 句子</view>
-      <view class="tab {{track==='dialogue'?'on':''}}" data-track="dialogue" bindtap="switchTrack">🎭 对话</view>
-      <view class="tab {{track==='word'?'on':''}}" data-track="word" bindtap="switchTrack">📖 单词</view>
-      <view class="tab {{track==='custom'?'on':''}}" data-track="custom" bindtap="switchTrack">✏️ 自建</view>
+      <view hover-class="tap-hover" class="tab {{track==='sentence'?'on':''}}" data-track="sentence" bindtap="switchTrack">💬 句子</view>
+      <view hover-class="tap-hover" class="tab {{track==='dialogue'?'on':''}}" data-track="dialogue" bindtap="switchTrack">🎭 对话</view>
+      <view hover-class="tap-hover" class="tab {{track==='word'?'on':''}}" data-track="word" bindtap="switchTrack">📖 单词</view>
+      <view hover-class="tap-hover" class="tab {{track==='custom'?'on':''}}" data-track="custom" bindtap="switchTrack">✏️ 自建</view>
     </view>
 
     <!-- 等级筛选 -->
@@ -40,14 +40,14 @@
       <view class="scene-picker">场景：{{sceneNames[sceneIndex]}} ▾</view>
     </picker>
 
-    <view class="focus-bar" bindtap="startFocus" wx:if="{{mode==='train'}}">
+    <view hover-class="tap-hover" class="focus-bar" bindtap="startFocus" wx:if="{{mode==='train'}}">
       <view class="focus-info">
         <view class="focus-title">🎯 重点复练</view>
         <view class="muted">{{focusCount ? '有 ' + focusCount + ' 条说得不够流利，点此集中练' : '练习时点「再练练」可加入重点清单'}}</view>
       </view>
       <view class="arrow">›</view>
     </view>
-    <view class="focus-bar returning" bindtap="backToTrain" wx:else>
+    <view hover-class="tap-hover" class="focus-bar returning" bindtap="backToTrain" wx:else>
       <view class="focus-info">
         <view class="focus-title">↩ 返回日常练习</view>
         <view class="muted">重点复练模式 · 共 {{queueLen}} 条</view>
@@ -56,8 +56,8 @@
     </view>
 
     <view class="row entry-row">
-      <view class="record-entry" bindtap="goRecordings">🎧 我的录音 <view class="arrow">›</view></view>
-      <view class="record-entry" bindtap="goImport">📥 导入素材 <view class="arrow">›</view></view>
+      <view hover-class="tap-hover" class="record-entry" bindtap="goRecordings">🎧 我的录音 <view class="arrow">›</view></view>
+      <view hover-class="tap-hover" class="record-entry" bindtap="goImport">📥 导入素材 <view class="arrow">›</view></view>
     </view>
   </view>
 
@@ -76,7 +76,7 @@
       <view class="role-prompt-line" wx:if="{{otherLine}}">
         <text class="role-tag">{{otherLine.role}}</text> {{otherLine.text}}
         <view class="muted">{{otherLine.cn}}</view>
-        <view class="play-other" bindtap="playOtherLine">🔊 听对方说</view>
+        <view hover-class="tap-hover" class="play-other" bindtap="playOtherLine">🔊 听对方说</view>
       </view>
       <view class="muted" wx:else>这是第一句，先听懂对方在说什么</view>
     </view>
@@ -105,11 +105,11 @@
 
     <!-- A-B 复读 / 角色扮演 / 显示台词 -->
     <view class="tool-row">
-      <view class="tool-btn {{abLoop?'on':''}}" bindtap="toggleAB">🔁 A-B复读<text wx:if="{{abLoop}}"> ×{{abCount}}</text></view>
-      <view class="tool-btn {{rolePlay?'on':''}}" bindtap="toggleRolePlay" wx:if="{{track==='dialogue'}}">🎭 角色扮演</view>
-      <view class="tool-btn" bindtap="revealLine" wx:if="{{rolePlay && track==='dialogue' && !revealed}}">👁 显示台词</view>
+      <view hover-class="tap-hover" class="tool-btn {{abLoop?'on':''}}" bindtap="toggleAB">🔁 A-B复读<text wx:if="{{abLoop}}"> ×{{abCount}}</text></view>
+      <view hover-class="tap-hover" class="tool-btn {{rolePlay?'on':''}}" bindtap="toggleRolePlay" wx:if="{{track==='dialogue'}}">🎭 角色扮演</view>
+      <view hover-class="tap-hover" class="tool-btn" bindtap="revealLine" wx:if="{{rolePlay && track==='dialogue' && !revealed}}">👁 显示台词</view>
       <!-- 对练会把孩子的录音发到境外 AI：儿童模式默认不出现，家长解锁后才显示 -->
-      <view class="tool-btn {{trainMode?'on':''}}" bindtap="toggleTrain" wx:if="{{track==='dialogue' && aiAllowed}}">🗣 对练</view>
+      <view hover-class="tap-hover" class="tool-btn {{trainMode?'on':''}}" bindtap="toggleTrain" wx:if="{{track==='dialogue' && aiAllowed}}">🗣 对练</view>
     </view>
 
     <!-- 对练：我说中文，给我这个场景里怎么说。只放在情景对话里，不做独立翻译页 -->
@@ -119,7 +119,7 @@
         <text class="train-scene" wx:if="{{sceneNames.length}}">{{sceneNames[sceneIndex]}}</text>
       </view>
       <view class="train-hint" wx:if="{{current.meaning}}">比如：{{current.meaning}}</view>
-      <view class="train-btn {{trainRecording?'rec':''}} {{trainBusy?'busy':''}}" bindtap="trainTap">
+      <view hover-class="tap-hover" class="train-btn {{trainRecording?'rec':''}} {{trainBusy?'busy':''}}" bindtap="trainTap">
         {{trainRecording ? '🔴 说完了，点这里' : (trainBusy ? '🤔 正在想怎么说…' : '🎤 点一下开始说')}}
       </view>
       <view class="train-err" wx:if="{{trainErr}}">{{trainErr}}</view>
@@ -127,7 +127,7 @@
         <view class="train-src" wx:if="{{trainResult.text}}">你说：{{trainResult.text}}</view>
         <view class="train-out">{{trainResult.translation}}</view>
         <view class="train-note" wx:if="{{trainResult.note}}">💡 {{trainResult.note}}</view>
-        <view class="train-play" bindtap="playTrain">🔊 再听一遍</view>
+        <view hover-class="tap-hover" class="train-play" bindtap="playTrain">🔊 再听一遍</view>
       </view>
       <view class="train-foot">录音会发给我们自己的服务器转写，不保存、不用于训练</view>
     </view>
@@ -140,7 +140,7 @@
     </view>
 
     <view class="record-zone">
-      <view class="record-btn {{recording?'recording':''}}" bindtap="toggleRecord">
+      <view hover-class="tap-hover" class="record-btn {{recording?'recording':''}}" bindtap="toggleRecord">
         <view class="mic">{{recording?'⏹':'🎤'}}</view>
         <view class="record-label">{{recording?'点此停止录音':'点此开始录音跟读'}}</view>
       </view>
@@ -165,14 +165,14 @@
       </view>
 
       <view class="playback" wx:if="{{hasRecording}}">
-        <view class="play-mine {{playingMine?'playing':''}}" bindtap="playMine">▶️ 听我的回放</view>
-        <view class="play-dup {{comparing?'playing':''}}" bindtap="comparePlay">🔁 标准音 ←→ 我的录音</view>
+        <view hover-class="tap-hover" class="play-mine {{playingMine?'playing':''}}" bindtap="playMine">▶️ 听我的回放</view>
+        <view hover-class="tap-hover" class="play-dup {{comparing?'playing':''}}" bindtap="comparePlay">🔁 标准音 ←→ 我的录音</view>
       </view>
       <view class="shadow-tip" wx:if="{{shadowTip}}">{{shadowTip}}</view>
 
       <!-- 智聆只评中英文；日语/越南语用它换一段「哪里不对」的人话 -->
       <view class="ai-eval" wx:if="{{hasRecording && aiAllowed}}">
-        <view class="ai-btn {{aiLoading?'loading':''}}" bindtap="aiListen">{{aiLoading ? '🤖 AI 正在听…' : '🤖 AI 听听哪里不对'}}</view>
+        <view hover-class="tap-hover" class="ai-btn {{aiLoading?'loading':''}}" bindtap="aiListen">{{aiLoading ? '🤖 AI 正在听…' : '🤖 AI 听听哪里不对'}}</view>
         <view class="ai-card" wx:if="{{aiFeedback}}">
           <view class="ai-verdict">{{aiFeedback.verdict}}</view>
           <view class="ai-issue" wx:for="{{aiFeedback.issues}}" wx:key="*this">· {{item}}</view>
@@ -186,9 +186,9 @@
       <view class="rate-title">说得怎么样？</view>
       <view class="rate-btns">
         <!-- 「流利」是成人抽象词，二年级以下没有这个概念，儿童模式换成即时可感的评价 -->
-        <view class="rate-btn again" data-q="0" bindtap="rate">{{isKid ? '🔁 再读一次' : '🔁 再练练'}}</view>
-        <view class="rate-btn ok" data-q="1" bindtap="rate">{{isKid ? '👍 读得不错' : '👍 基本流利'}}</view>
-        <view class="rate-btn great" data-q="2" bindtap="rate">{{isKid ? '🌟 读得真好' : '🌟 很流利'}}</view>
+        <view hover-class="tap-hover" class="rate-btn again" data-q="0" bindtap="rate">{{isKid ? '🔁 再读一次' : '🔁 再练练'}}</view>
+        <view hover-class="tap-hover" class="rate-btn ok" data-q="1" bindtap="rate">{{isKid ? '👍 读得不错' : '👍 基本流利'}}</view>
+        <view hover-class="tap-hover" class="rate-btn great" data-q="2" bindtap="rate">{{isKid ? '🌟 读得真好' : '🌟 很流利'}}</view>
       </view>
     </view>
 

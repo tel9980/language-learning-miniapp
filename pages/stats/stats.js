@@ -4,10 +4,12 @@ const sentences = require('../../utils/sentences')
 const recordings = require('../../utils/recordings')
 const achievements = require('../../utils/achievements')
 const shareCopy = require('../../utils/share-copy')
+const prompt = require('../../utils/prompt')
 const theme = require('../../utils/theme')
 const familyBackup = require('../../utils/family-backup')
 const ttsCache = require('../../utils/tts-cache')
 const onlineData = require('../../utils/online-data')
+const logger = require('../../utils/logger')
 const { getWords } = require('../../utils/words')
 const modePicker = require('../../utils/mode-picker')
 
@@ -19,13 +21,19 @@ Page({
     stats: {}, mastered: 0, accuracy: 0, dailyGoal: 20,
     levels: [], days: [], speak: {},
     calendar: [], unlockedCount: 0, badges: [], shareTitle: '',
-    feedbackEnabled: true, fontScale: 1, darkMode: false, ttsCacheKb: 0, voiceprintAgreed: false
+    feedbackEnabled: true, fontScale: 1, darkMode: false, ttsCacheKb: 0, voiceprintAgreed: false,
+    recCount: 0, recKb: 0, recMaxMb: 6
   },
   onShow() {
     this.syncTheme()
     this.refresh()
     // 发音缓存体积（离线缓存 mp3 用掉了多少本地空间）
     this.setData({ ttsCacheKb: Math.round(ttsCache.totalBytes() / 1024) })
+    // 录音占用（第十轮）：录音才是 6MB 的大头，之前一点都不显示
+    try {
+      const ru = recordings.usage()
+      this.setData({ recCount: ru.count, recKb: Math.round(ru.bytes / 1024), recMaxMb: Math.round(ru.maxBytes / 1048576) })
+    } catch (e) { logger.warn('[stats] 读取录音占用失败', e) }
   },
   refresh() {
     const lang = storage.getCurrentLang()
@@ -278,22 +286,16 @@ Page({
 
   editGoal() {
     const that = this
-    wx.showModal({
+    prompt.askNumber({
       title: '设置每日目标',
       content: '请输入每天要复习的单词数（1-200）',
-      editable: true,
-      placeholderText: String(this.data.dailyGoal),
-      success(res) {
-        if (res.confirm) {
-          const n = parseInt(res.content, 10)
-          if (n >= 1 && n <= 200) {
-            storage.setDailyGoal(n)
-            that.setData({ dailyGoal: n })
-            wx.showToast({ title: '已保存', icon: 'success' })
-          } else {
-            wx.showToast({ title: '请输入 1-200 的数字', icon: 'none' })
-          }
-        }
+      min: 1,
+      max: 200,
+      value: this.data.dailyGoal,
+      done(n) {
+        storage.setDailyGoal(n)
+        that.setData({ dailyGoal: n })
+        wx.showToast({ title: '已保存', icon: 'success' })
       }
     })
   },
@@ -401,6 +403,8 @@ Page({
   openVoiceprint() {
     wx.navigateTo({ url: '/pages/voiceprint/voiceprint' })
   },
+
+  goRecordings() { wx.navigateTo({ url: '/pages/recordings/recordings' }) },
 
   clearTtsCache() {
     const that = this

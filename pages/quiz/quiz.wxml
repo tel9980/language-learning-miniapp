@@ -47,6 +47,15 @@
     </view>
   </block>
 
+  <!-- 空状态（第十轮）：队列为空时 current 为 null，原来两个分支都不渲染 → 整页纯白 -->
+  <view class="card empty-box" wx:if="{{!finished && !current}}">
+    <view class="empty-emoji">📭</view>
+    <view class="empty-title">暂时没有可测验的内容</view>
+    <view class="empty-tip">这个语种的词库还没导进来，或者当前范围的词都学完了。先去学几个新词，再回来测验。</view>
+    <button class="btn-primary empty-btn" bindtap="goLearn">去学新词</button>
+    <button class="btn-ghost empty-btn" bindtap="goStats">查看统计</button>
+  </view>
+
   <!-- 结果页 -->
   <view class="card result" wx:if="{{finished}}">
     <view class="result-emoji">{{accuracy>=80?'🎉':(accuracy>=60?'👍':'💪')}}</view>

@@ -1,8 +1,8 @@
 <view class="container {{themeClass}}">
   <!-- 模式切换 -->
   <view class="mode-tabs">
-    <view class="mode-tab {{mode==='due'?'active':''}}" bindtap="setMode" data-mode="due">待复习 ({{dueCount}})</view>
-    <view class="mode-tab {{mode==='new'?'active':''}}" bindtap="setMode" data-mode="new">学新词</view>
+    <view hover-class="tap-hover" class="mode-tab {{mode==='due'?'active':''}}" bindtap="setMode" data-mode="due">待复习 ({{dueCount}})</view>
+    <view hover-class="tap-hover" class="mode-tab {{mode==='new'?'active':''}}" bindtap="setMode" data-mode="new">学新词</view>
   </view>
 
   <!-- 学新词时可选分类：不选按词库顺序，考试词会一直排在最前面 -->
@@ -14,7 +14,7 @@
 
   <!-- 卡片 -->
   <view class="card-wrap" wx:if="{{current}}">
-    <view class="flashcard {{flipped?'flipped':''}}" bindtap="flip" bindtouchstart="onTouchStart" bindtouchend="onTouchEnd">
+    <view hover-class="tap-hover" class="flashcard {{flipped?'flipped':''}}" bindtap="flip" bindtouchstart="onTouchStart" bindtouchend="onTouchEnd">
       <view class="face front">
         <view class="category">{{current.category}}</view>
         <view class="word">{{current.word}}</view>
@@ -36,11 +36,11 @@
     </view>
 
     <!-- 发音按钮 -->
-    <view class="speak-btn" catchtap="speak" wx:if="{{flipped || mode==='new'}}">🔊 听发音</view>
+    <view hover-class="tap-hover" class="speak-btn" catchtap="speak" wx:if="{{flipped || mode==='new'}}">🔊 听发音</view>
 
     <!-- 学新词时才需要「这词我不用学」的出口：待复习模式里这些词已经学过，
          再让你标记等于改历史，所以只在学新词时出现 -->
-    <view class="known-skip" catchtap="markKnown" wx:if="{{mode==='new'}}">
+    <view hover-class="tap-hover" class="known-skip" catchtap="markKnown" wx:if="{{mode==='new'}}">
       ✓ 早就认识，别当新词推给我
     </view>
 
@@ -71,21 +71,21 @@
     <!-- 第九轮：新词全学完后不能只有一句「都学完了」，得告诉我们下一步能干什么 -->
     <view class="next-steps" wx:if="{{mode!=='due' && !catEmpty && nextDue>0}}">
       <view class="next-title">接下来可以</view>
-      <view class="next-btn" bindtap="goSpeak">🎤 去练句子（口语跟读）</view>
-      <view class="next-btn" bindtap="setMode" data-mode="due">📖 复习到期的 {{nextDue}} 个词</view>
-      <view class="next-btn" bindtap="goStats">🏆 看看我的统计</view>
+      <view hover-class="tap-hover" class="next-btn" bindtap="goSpeak">🎤 去练句子（口语跟读）</view>
+      <view hover-class="tap-hover" class="next-btn" bindtap="setMode" data-mode="due">📖 复习到期的 {{nextDue}} 个词</view>
+      <view hover-class="tap-hover" class="next-btn" bindtap="goStats">🏆 看看我的统计</view>
     </view>
     <view class="next-steps" wx:elif="{{mode!=='due' && !catEmpty}}">
       <view class="next-title">接下来可以</view>
-      <view class="next-btn" bindtap="goSpeak">🎤 去练句子（口语跟读）</view>
-      <view class="next-btn" bindtap="goStats">🏆 看看我的统计</view>
+      <view hover-class="tap-hover" class="next-btn" bindtap="goSpeak">🎤 去练句子（口语跟读）</view>
+      <view hover-class="tap-hover" class="next-btn" bindtap="goStats">🏆 看看我的统计</view>
     </view>
   </view>
 
   <view class="progress-line" wx:if="{{current}}">{{index+1}} / {{queueLen}} · {{langName}}{{catValue?' · '+catValue:''}}</view>
 
   <!-- 误点「早就认识」的后悔药：标错了能一键退回来 -->
-  <view class="known-undo" wx:if="{{mode==='new' && knownCount>0}}" catchtap="restoreKnown">
+  <view hover-class="tap-hover" class="known-undo" wx:if="{{mode==='new' && knownCount>0}}" catchtap="restoreKnown">
     已标记认识的词 {{knownCount}} 个 · 点这里恢复
   </view>
 </view>

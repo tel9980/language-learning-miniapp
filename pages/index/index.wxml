@@ -5,14 +5,14 @@
         <view class="greeting">你好，{{myName}} 👋</view>
         <view class="hero-title">今天也开口说一说吧</view>
       </view>
-      <view class="lang-badge" bindtap="switchLang">{{langFlag}} {{langName}} ▾</view>
+      <view class="lang-badge" hover-class="tap-hover" bindtap="switchLang">{{langFlag}} {{langName}} ▾</view>
     </view>
     <!-- 拆成两件事：左边改「显示模式」，右边才是「换人」。
          以前整条都是一个「切换家人档案」，用户根本想不到改模式要先去换人。 -->
     <view class="profile-bar">
       <view class="avatar">{{myAvatar}}</view>
-      <view class="profile-name" bindtap="openMode">{{myName}} · {{modeName}}模式 ›</view>
-      <view class="muted switch-people" bindtap="goProfiles">👪 换人</view>
+      <view class="profile-name" hover-class="tap-hover" bindtap="openMode">{{myName}} · {{modeName}}模式 ›</view>
+      <view class="muted switch-people" hover-class="tap-hover" bindtap="goProfiles">👪 换人</view>
     </view>
     <view class="hero-stats">
       <view class="hero-stat">
@@ -30,7 +30,7 @@
     </view>
   </view>
 
-  <view class="speak-cta card" bindtap="goSpeak">
+  <view class="speak-cta card" hover-class="tap-hover" bindtap="goSpeak">
     <view class="cta-icon">🎤</view>
     <view class="cta-body">
       <view class="cta-title">开始口语练习</view>
@@ -40,7 +40,7 @@
     <view class="arrow">›</view>
   </view>
 
-  <view class="today-cta card" bindtap="goToday">
+  <view class="today-cta card" hover-class="tap-hover" bindtap="goToday">
     <view class="cta-icon">📋</view>
     <view class="cta-body">
       <view class="cta-title">今日待练</view>
@@ -50,7 +50,7 @@
     <view class="arrow">›</view>
   </view>
 
-  <view class="goal card" bindtap="editGoal">
+  <view class="goal card" hover-class="tap-hover" bindtap="editGoal">
     <view class="row between">
       <view class="title">今日复习目标</view>
       <view class="muted">{{today.reviewed}} / {{dailyGoal}} ›</view>
@@ -62,7 +62,7 @@
   </view>
 
   <view class="entry-list">
-    <view class="entry card" bindtap="goLearn">
+    <view class="entry card" hover-class="tap-hover" bindtap="goLearn">
       <view class="entry-icon learn">📚</view>
       <view class="entry-body">
         <view class="entry-title">单词学习</view>
@@ -71,7 +71,7 @@
       <view class="entry-badge" wx:if="{{dueCount > 0}}">{{dueCount}} 待复习</view>
       <view class="arrow">›</view>
     </view>
-    <view class="entry card" bindtap="goQuiz">
+    <view class="entry card" hover-class="tap-hover" bindtap="goQuiz">
       <view class="entry-icon quiz">✏️</view>
       <view class="entry-body">
         <view class="entry-title">小测验</view>
@@ -79,7 +79,7 @@
       </view>
       <view class="arrow">›</view>
     </view>
-    <view class="entry card" bindtap="goDictation">
+    <view class="entry card" hover-class="tap-hover" bindtap="goDictation">
       <view class="entry-icon dictation">🎧</view>
       <view class="entry-body">
         <view class="entry-title">听写练习</view>
@@ -87,7 +87,7 @@
       </view>
       <view class="arrow">›</view>
     </view>
-    <view class="entry card" bindtap="goStats">
+    <view class="entry card" hover-class="tap-hover" bindtap="goStats">
       <view class="entry-icon stats">📊</view>
       <view class="entry-body">
         <view class="entry-title">进度统计</view>
@@ -95,7 +95,7 @@
       </view>
       <view class="arrow">›</view>
     </view>
-    <view class="entry card" bindtap="goSearch">
+    <view class="entry card" hover-class="tap-hover" bindtap="goSearch">
       <view class="entry-icon search">🔎</view>
       <view class="entry-body">
         <view class="entry-title">查词</view>
@@ -103,7 +103,7 @@
       </view>
       <view class="arrow">›</view>
     </view>
-    <view class="entry card" bindtap="goWrong">
+    <view class="entry card" hover-class="tap-hover" bindtap="goWrong">
       <view class="entry-icon wrong">📕</view>
       <view class="entry-body">
         <view class="entry-title">错词本</view>
@@ -111,7 +111,7 @@
       </view>
       <view class="arrow">›</view>
     </view>
-    <view class="entry card" bindtap="goRecordings">
+    <view class="entry card" hover-class="tap-hover" bindtap="goRecordings">
       <view class="entry-icon record">🎧</view>
       <view class="entry-body">
         <view class="entry-title">我的录音</view>
@@ -123,7 +123,7 @@
 
   <view class="family-section">
     <view class="section-label">👪 家人朋友</view>
-    <view class="entry card" bindtap="goFamily">
+    <view class="entry card" hover-class="tap-hover" bindtap="goFamily">
       <view class="entry-icon family">🏆</view>
       <view class="entry-body">
         <view class="entry-title">家庭排行榜</view>
@@ -131,7 +131,7 @@
       </view>
       <view class="arrow">›</view>
     </view>
-    <view class="entry card" bindtap="goFamilyRecordings">
+    <view class="entry card" hover-class="tap-hover" bindtap="goFamilyRecordings">
       <view class="entry-icon famrec">🎧</view>
       <view class="entry-body">
         <view class="entry-title">全家录音墙 <text class="red-dot" wx:if="{{unreadComments > 0}}">{{unreadComments}}</text></view>
@@ -139,7 +139,7 @@
       </view>
       <view class="arrow">›</view>
     </view>
-    <view class="entry card" bindtap="goShare">
+    <view class="entry card" hover-class="tap-hover" bindtap="goShare">
       <view class="entry-icon share">📣</view>
       <view class="entry-body">
         <view class="entry-title">邀请朋友</view>
@@ -147,7 +147,7 @@
       </view>
       <view class="arrow">›</view>
     </view>
-    <view class="entry card" bindtap="goReminder">
+    <view class="entry card" hover-class="tap-hover" bindtap="goReminder">
       <view class="entry-icon remind">⏰</view>
       <view class="entry-body">
         <view class="entry-title">学习提醒</view>

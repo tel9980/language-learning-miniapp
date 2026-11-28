@@ -7,11 +7,15 @@ const practiceTimer = require('../../utils/practice-timer')
 
 const INTERVALS = storage.INTERVALS
 
+// 首帧语言名（第十轮）：初始 data 原来写死 langName: '英语'，onShow 才覆盖，
+// 学日语的用户每次进页面都会先闪一下「英语」。这里在模块加载时就按当前语种算好。
+const _firstLangMeta = getLangMeta(storage.getCurrentLang())
+
 Page({
   behaviors: [theme],
   data: {
-    lang: 'en',
-    langName: '英语',
+    lang: storage.getCurrentLang(),
+    langName: _firstLangMeta.name,
     items: [],
     total: 0,
     expandedId: '',

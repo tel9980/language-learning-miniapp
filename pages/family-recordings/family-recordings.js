@@ -1,5 +1,6 @@
 const theme = require('../../utils/theme')
 const family = require('../../utils/family')
+const prompt = require('../../utils/prompt')
 
 Page({
   behaviors: [theme],
@@ -60,17 +61,15 @@ Page({
 
   askComment(id) {
     const that = this
-    wx.showModal({
+    prompt.askText({
       title: '写点评',
       content: '给这段录音一句鼓励或建议',
-      editable: true,
-      placeholderText: '发音很棒，继续加油！',
-      success(res) {
-        if (res.confirm && res.content && res.content.trim()) {
-          family.addComment(id, res.content.trim())
-          that.refresh()
-          wx.showToast({ title: '已点评', icon: 'success' })
-        }
+      value: '',
+      maxLen: 40,
+      done(text) {
+        family.addComment(id, text)
+        that.refresh()
+        wx.showToast({ title: '已点评', icon: 'success' })
       }
     })
   }

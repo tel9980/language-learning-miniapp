@@ -416,6 +416,7 @@ function speak(text, slow, handlers) {
             else if (handlers.onError) handlers.onError()
           })
         } catch (e) {
+          logger.warn('[audio] 插件合成抛错，回落到在线源', e)
           if (handlers.onError) handlers.onError()
         }
         return
@@ -473,6 +474,7 @@ function speak(text, slow, handlers) {
         })
       } catch (e) {
         // 连下载都起不来：退回让播放器自己去拉 URL（老基础库/异常情况）
+        logger.warn('[audio] downloadFile 启动失败，改为直连', s && s.id, e)
         if (done || token !== dlToken) return
         done = true
         clearDownloadTimer()
