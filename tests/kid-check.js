@@ -89,6 +89,35 @@ const res = {
   quizBad: qq.filter(x => kidMode.hideCategory(catOf(x))).length
 }
 
+// 口语页「单词」模式的池子 + 错词本：同样是取词入口，也要跟着模式走
+const session = require(path.join(ROOT, 'utils/speak-session'))
+function wordBad(list) {
+  return (list || []).filter(function (x) { return kidMode.hideCategory(catOf(x)) }).length
+}
+const poolKid = session.buildQueue({ lang: 'en', track: 'word', isKid: true })
+const poolStd = session.buildQueue({ lang: 'en', track: 'word', isKid: false })
+res.speakKidBad = wordBad(poolKid)
+res.speakStdBad = wordBad(poolStd)
+res.speakKidTotal = poolKid.length
+res.speakStdTotal = poolStd.length
+
+// 造一条「大人做错的四级词」，看它会不会漏进孩子的错词本
+const pk = require(path.join(ROOT, 'utils/progress-keys'))
+const examWord = require(path.join(ROOT, 'utils/words')).getWords('en')
+  .filter(w => w.category === '四级')[0]
+const gi = pk.shardIndexOf(examWord.id)
+const shard = {}
+shard[examWord.id] = { level: 1, reps: 1, lapses: 2, ef: 2.5, dueAt: Date.now() - 1000 }
+// 同一个分片里已有的记录要保留，否则会把别人的进度冲掉
+const existRaw = wx.getStorageSync(profile.nsKey(pk.shardKeyAt(gi)))
+if (existRaw) Object.assign(shard, JSON.parse(existRaw))
+wx.setStorageSync(profile.nsKey(pk.shardKeyAt(gi)), JSON.stringify(shard))
+storage.invalidate()
+
+const wrong = loadPage('pages/wrong/wrong.js')
+wrong.onShow()
+res.wrongHasExam = (wrong.data.items || []).some(x => x.id === examWord.id)
+
 // 切回标准模式：同一批页面实例应当自己恢复（_sig / _quizKid 会识别出模式变了）
 profile.setMode(profile.current(), 'normal')
 learn.onShow()

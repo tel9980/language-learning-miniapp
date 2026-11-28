@@ -199,7 +199,7 @@ Page({
 
   // 汇总某语种下全部可跟读条目（词 + 句 + 对话台词 + 自建），实现见 utils/speak-session.js
   allItems(lang) {
-    return session.allItems(lang)
+    return session.allItems(lang, !!this.data.isKid)
   },
 
   buildQueueAndLoad() {
@@ -207,7 +207,9 @@ Page({
       lang: storage.getCurrentLang(),
       track: this.data.track,
       levelName: this.data.levelNames[this.data.levelIndex],
-      sceneIndex: this.data.sceneIndex
+      sceneIndex: this.data.sceneIndex,
+      // 儿童模式：单词池只留适龄分类（见 utils/speak-session.js）
+      isKid: !!this.data.isKid
     })
     this._queue = queue
     this._memoIndex = 0

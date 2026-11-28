@@ -4,6 +4,7 @@ const storage = require('../../utils/storage')
 const { getWords, getLangMeta } = require('../../utils/words')
 const pager = require('../../utils/pager')
 const practiceTimer = require('../../utils/practice-timer')
+const kidMode = require('../../utils/kid-mode')
 
 const INTERVALS = storage.INTERVALS
 
@@ -51,7 +52,9 @@ Page({
 
   refresh() {
     const prog = storage.getProgress()
-    const words = getWords(this.data.lang)
+    // 儿童模式也要过滤：错词是本机所有档案共用的（大人做错的四级/考研词
+    // lapses 也会大于 0），不过滤就会出现在孩子的错词本里。
+    const words = kidMode.allowedWords(getWords(this.data.lang), !!this.data.isKid)
     const items = []
     words.forEach(function (w) {
       const p = prog[w.id]

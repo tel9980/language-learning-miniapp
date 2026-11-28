@@ -2653,6 +2653,16 @@ async function runTailTests() {
     ok(/kidMode\.allowedWords\(storage\.getDueWords\(lang\)/.test(indexSrc), '首页待复习数要过儿童模式')
     ok(/const kidMode = require\('\.\.\/\.\.\/utils\/kid-mode'\)/.test(indexSrc), '首页要 require kid-mode')
 
+    // Q6b 口语页与错词本要把 isKid 传下去
+    const sessSrc = read('utils/speak-session.js')
+    const speakSrc2 = read('pages/speak/speak.js')
+    const wrongSrc = read('pages/wrong/wrong.js')
+    ok(/kidMode\.allowedWords\(getWords\(lang\), !!o\.isKid\)/.test(sessSrc), '口语单词池要过儿童模式')
+    ok(/s\.isKid \? 'kid' : 'std'/.test(sessSrc), '口语队列签名要含 isKid')
+    ok(/isKid: !!this\.data\.isKid/.test(speakSrc2), '口语页要把 isKid 传进 buildQueue')
+    ok(/session\.allItems\(lang, !!this\.data\.isKid\)/.test(speakSrc2), '口语页 allItems 要传 isKid')
+    ok(/kidMode\.allowedWords\(getWords\(this\.data\.lang\)/.test(wrongSrc), '错词本要过儿童模式')
+
     // Q7 真的跑一遍：打完桩把档案切成儿童模式，三个取词入口都不许出现被藏的 7 个分类
     const sp = require('child_process')
     const nodePath = require('path')
@@ -2667,6 +2677,12 @@ async function runTailTests() {
     eq(r.learnHasExam, false, '儿童模式学习页分类里不该有四级')
     eq(r.quizBad, 0, '儿童模式测验不该出现被藏分类的词')
     eq(r.stdTotal, enAll.length, '切回标准模式应为全部词数')
+
+    // Q8 口语页的单词池、错词本同为取词入口
+    eq(r.speakKidBad, 0, '儿童模式口语单词池不该有被藏分类的词')
+    ok(r.speakStdBad > 0, '标准模式口语单词池本来就该包含考试词')
+    eq(r.speakKidTotal, kidMod.allowedWords(enAll, true).length, '儿童模式口语单词池应等于适龄词数')
+    eq(r.wrongHasExam, false, '儿童模式错词本不该出现被藏分类的词')
   })()
 
   // K. 对练（我说中文，给我目标语言的说法）

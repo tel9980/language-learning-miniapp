@@ -8,12 +8,16 @@ const speaking = require('./speaking')
 const sentences = require('./sentences')
 const custom = require('./custom-items')
 const { getWords } = require('./words')
+const kidMode = require('./kid-mode')
 
 // 汇总某语种下全部可跟读条目（词 + 句 + 对话台词 + 自建）
-function allItems(lang) {
+// isKid 时单词部分只留适龄分类（句子/对话/自建不分类，照旧全留）——
+// 否则儿童模式在口语页切到「单词」模式，还是会被推财务/考研词。
+function allItems(lang, isKid) {
   // 自建素材存的是 { text, cn }，练习页统一按 { word, meaning } 取值，必须归一化
   const mine = custom.toPracticeItems(storage.getCustomItems(lang))
-  return getWords(lang).concat(sentences.getAllItems(lang)).concat(mine)
+  return kidMode.allowedWords(getWords(lang), !!isKid)
+    .concat(sentences.getAllItems(lang)).concat(mine)
 }
 
 // 按「模式 + 分类/场景」拼队列：没练过的排前面，练过的排后面。
@@ -26,7 +30,8 @@ function buildQueue(opts) {
   const sceneIndex = o.sceneIndex || 0
   let pool = []
   if (track === 'word') {
-    pool = getWords(lang).map(w => Object.assign({}, w, { kind: 'word' }))
+    pool = kidMode.allowedWords(getWords(lang), !!o.isKid)
+      .map(w => Object.assign({}, w, { kind: 'word' }))
   } else if (track === 'sentence') {
     pool = sentences.getSentences(lang, level === '全部' ? null : level).map(s => sentences.toItem(s, 'st'))
   } else if (track === 'custom') {
@@ -60,9 +65,11 @@ function progress(index, total) {
 }
 
 // 队列签名：切换分类/场景/语种/模式时队列会重建，靠它判断「能不能沿用上次位置」
+// 儿童模式也算一个维度：切模式后单词池范围变了，不能沿用上一轮的位置
 function signature(state) {
   const s = state || {}
-  return [s.track, s.levelIndex, s.sceneIndex, storage.getCurrentLang(), s.mode].join('|')
+  return [s.track, s.levelIndex, s.sceneIndex, storage.getCurrentLang(), s.mode,
+    s.isKid ? 'kid' : 'std'].join('|')
 }
 
 module.exports = { allItems, buildQueue, progress, signature }
