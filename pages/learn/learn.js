@@ -8,6 +8,7 @@ const localAudio = require('../../utils/local-audio')
 const kidMode = require('../../utils/kid-mode')
 const practiceTimer = require('../../utils/practice-timer')
 const pageTimers = require('../../utils/page-timers')
+const badges = require('../../utils/badges')
 
 // 首帧语言名（第十轮）：初始 data 原来写死 langName: '英语'，onShow 才覆盖，
 // 学日语的用户每次进页面都会先闪一下「英语」。这里在模块加载时就按当前语种算好。
@@ -142,6 +143,8 @@ Page({
     const w = this.data.current
     if (!w) return
     storage.review(w.id, q)
+    // 徽章解锁提示（第十二轮）：以前只有统计页会算徽章，解锁了当时看不到
+    badges.check()
     this._advance()
   },
   // 「早就认识」：这词不用学，直接推到最远间隔，别再当新词推给我

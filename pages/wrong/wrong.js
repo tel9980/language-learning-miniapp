@@ -5,6 +5,7 @@ const { getWords, getLangMeta } = require('../../utils/words')
 const pager = require('../../utils/pager')
 const practiceTimer = require('../../utils/practice-timer')
 const kidMode = require('../../utils/kid-mode')
+const badges = require('../../utils/badges')
 
 const INTERVALS = storage.INTERVALS
 
@@ -115,6 +116,9 @@ Page({
     const cur = this.data.current
     if (!cur) return
     storage.review(cur.id, q)
+    // 错词本里答对（q>=1）就销掉一格，减到 0 这个词就毕业、下次刷新不再出现
+    if (q >= 1) storage.clearLapse(cur.id)
+    badges.check()
     const next = this.data.reviewIndex + 1
     if (next >= this.data.items.length) {
       this.setData({ doneCount: this.data.items.length })

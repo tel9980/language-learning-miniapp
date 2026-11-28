@@ -47,6 +47,11 @@ page {
    现在改成按倍率直接给 rpx，和下面 .theme-kid 的写法保持一致。
 
    倍率：小 0.9 / 大 1.18 / 超大 1.35（与 pages/stats/stats.js 的 scales 一致） */
+/* 长单词降档（第十二轮）：.word / .stage-word 在大字号下会被长单词撑破卡片，
+   见 pages/learn/learn.wxss 的 .word 注释。这里给每档补一条 .long，
+   优先级 0,3,0 高于 .word（0,2,0）与 .theme-xl .word（0,2,0），
+   所以不受 app.wxss 与页面 wxss 的加载先后影响。 */
+
 .theme-sm .word { font-size: 65rpx; }
 .theme-sm .stage-word { font-size: 58rpx; }
 .theme-sm .stage-word.sentence { font-size: 32rpx; }
@@ -64,6 +69,8 @@ page {
 .theme-sm .title { font-size: 32rpx; }
 .theme-sm .subtitle { font-size: 23rpx; }
 .theme-sm .muted { font-size: 22rpx; }
+.theme-sm .word.long { font-size: 52rpx; }
+.theme-sm .stage-word.long { font-size: 50rpx; }
 
 .theme-lg .word { font-size: 85rpx; }
 .theme-lg .stage-word { font-size: 76rpx; }
@@ -82,6 +89,8 @@ page {
 .theme-lg .title { font-size: 42rpx; }
 .theme-lg .subtitle { font-size: 31rpx; }
 .theme-lg .muted { font-size: 28rpx; }
+.theme-lg .word.long { font-size: 68rpx; }
+.theme-lg .stage-word.long { font-size: 64rpx; }
 
 .theme-xl .word { font-size: 97rpx; }
 .theme-xl .stage-word { font-size: 86rpx; }
@@ -100,6 +109,8 @@ page {
 .theme-xl .title { font-size: 49rpx; }
 .theme-xl .subtitle { font-size: 35rpx; }
 .theme-xl .muted { font-size: 32rpx; }
+.theme-xl .word.long { font-size: 74rpx; }
+.theme-xl .stage-word.long { font-size: 68rpx; }
 
 /* 儿童模式：整页放大，而不是只放大标题。
    以前儿童模式只把 5 类元素放大 12%，例句正文、按钮、选项、进度一个字都没变——
@@ -107,6 +118,8 @@ page {
    由 utils/theme.js 在档案是儿童模式时把 .theme-kid 加到 root view 上。
    注意 .stage-word.sentence 必须单独写：它和 .stage-word 同优先级，页面样式在后会盖掉。 */
 .theme-kid .word { font-size: 82rpx; }
+.theme-kid .word.long { font-size: 68rpx; }
+.theme-kid .stage-word.long { font-size: 62rpx; }
 .theme-kid .stage-word { font-size: 72rpx; }
 .theme-kid .stage-word.sentence { font-size: 42rpx; }
 .theme-kid .meaning { font-size: 44rpx; }

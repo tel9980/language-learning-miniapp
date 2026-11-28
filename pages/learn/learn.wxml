@@ -17,7 +17,7 @@
     <view hover-class="tap-hover" class="flashcard {{flipped?'flipped':''}}" bindtap="flip" bindtouchstart="onTouchStart" bindtouchend="onTouchEnd">
       <view class="face front">
         <view class="category">{{current.category}}</view>
-        <view class="word">{{current.word}}</view>
+        <view class="word {{current.word.length > 10 ? 'long' : ''}}">{{current.word}}</view>
         <view class="phonetic" wx:if="{{current.phonetic}}">{{current.phonetic}}</view>
         <view class="tap-hint">点击卡片查看释义 👆</view>
       </view>

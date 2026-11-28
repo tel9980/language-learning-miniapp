@@ -47,9 +47,17 @@ function hydrate(def) {
   inst.setData = function (o, cb) { Object.assign(inst.data, o); if (cb) cb.call(inst) }
   return inst
 }
+// 模块被 require 缓存后 Page() 不会再跑，所以每个文件的定义要自己留一份。
+// （这里踩过：不清 lastPage 时，第二次取 search 拿到的是上一个页面的定义）
+const defs = {}
 function loadPage(rel) {
-  require(path.join(ROOT, rel))
-  return hydrate(lastPage)
+  if (!defs[rel]) {
+    lastPage = null
+    require(path.join(ROOT, rel))
+    if (!lastPage) throw new Error('没能加载页面定义：' + rel)
+    defs[rel] = lastPage
+  }
+  return hydrate(defs[rel])
 }
 
 const storage = require(path.join(ROOT, 'utils/storage'))
@@ -118,9 +126,48 @@ const wrong = loadPage('pages/wrong/wrong.js')
 wrong.onShow()
 res.wrongHasExam = (wrong.data.items || []).some(x => x.id === examWord.id)
 
+// 搜索页（第十二轮）：这是第 7 个取词入口，以前完全没过儿童模式，
+// 孩子打开搜索、什么都不输，第一屏全是 abandon / ability / accept 这种四级词。
+profile.setMode(profile.current(), 'kid')
+const searchKid = loadPage('pages/search/search.js')
+searchKid.onLoad()
+searchKid.onShow()
+res.searchKidBad = (searchKid.data.results || []).filter(x => kidMode.hideCategory(catOf(x))).length
+res.searchKidCats = (searchKid.data.catInfo || []).length
+res.searchKidHasExam = (searchKid.data.catInfo || []).some(c => /四级/.test(c.name))
+res.searchKidTotal = (searchKid.data.results || []).length
+
+// 今日待练去重（第十二轮）：同一个词既到期、又答错过，会同时进「到期」和「错词」两栏。
+// 这里造一个「日常」分类的词（不受儿童模式影响），看清单里会不会出现两条。
+const dailyWord = require(path.join(ROOT, 'utils/words')).getWords('en')
+  .filter(w => w.category === '日常')[0]
+const dgi = pk.shardIndexOf(dailyWord.id)
+const dshard = {}
+dshard[dailyWord.id] = { level: 1, reps: 1, lapses: 2, ef: 2.5, dueAt: Date.now() - 60000 }
+const dExist = wx.getStorageSync(profile.nsKey(pk.shardKeyAt(dgi)))
+if (dExist) Object.assign(dshard, JSON.parse(dExist))
+wx.setStorageSync(profile.nsKey(pk.shardKeyAt(dgi)), JSON.stringify(dshard))
+storage.invalidate()
+
+const today = loadPage('pages/today/today.js')
+today.onShow()
+const tItems = today.data.items || []
+const tIds = tItems.map(x => x.sayId).filter(Boolean)
+res.todayTotal = today.data.total
+res.todayShown = tItems.length
+res.todayDup = tIds.length - new Set(tIds).size
+res.todayHasTarget = tItems.some(x => x.sayId === dailyWord.id)
+
 // 切回标准模式：同一批页面实例应当自己恢复（_sig / _quizKid 会识别出模式变了）
 profile.setMode(profile.current(), 'normal')
 learn.onShow()
 res.stdTotal = learn.data.totalWords
+
+// 搜索页在标准模式下应当恢复成全部 21 个分类、且不过滤
+const searchStd = loadPage('pages/search/search.js')
+searchStd.onLoad()
+searchStd.onShow()
+res.searchStdCats = (searchStd.data.catInfo || []).length
+res.searchStdBad = (searchStd.data.results || []).filter(x => kidMode.hideCategory(catOf(x))).length
 
 process.stdout.write('\n' + JSON.stringify(res) + '\n')

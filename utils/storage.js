@@ -9,6 +9,9 @@ const KEY_PROGRESS = 'lp_progress_v1'   // { [wordId]: { level, ef, reps, lapses
 const KEY_STATS    = 'lp_stats_v1'      // 累计统计
 const KEY_SETTINGS = 'lp_settings_v1'   // 设置
 const KEY_DAILY    = 'lp_daily_v1'      // { 'YYYY-MM-DD': { learned, reviewed, correct, total } }
+// 每日数据只留这么多天（第十二轮）：以前一个 key 都不删，用一年就是 365 条、约 20KB，
+// 而且只增不减。统计页的打卡日历最多看 28 天，留 400 天（一年多）足够复盘。
+const DAILY_KEEP   = 400
 const KEY_CUSTOM   = 'lp_custom_items_v1' // 用户自建跟读素材
 const KEY_THEME    = 'lp_theme_v1'      // 无障碍主题状态（字号/深色）
 
@@ -326,6 +329,17 @@ function getProgress() { return clone(loadProgress()) }
 function getStats() { return read(KEY_STATS, defaults().stats) }
 function getDaily() { return read(KEY_DAILY, {}) }
 
+// 超过 DAILY_KEEP 天就删最老的。键是 'YYYY-MM-DD'，字典序就是时间序，不用转 Date。
+// 平时只有一次 Object.keys 的开销；真超过 400 条才排序，所以热路径不受影响。
+function trimDaily(daily) {
+  const keys = Object.keys(daily)
+  if (keys.length <= DAILY_KEEP) return daily
+  keys.sort()
+  const drop = keys.length - DAILY_KEEP
+  for (let i = 0; i < drop; i++) delete daily[keys[i]]
+  return daily
+}
+
 // 取待复习词：已学过且 dueAt <= 现在
 function getDueWords(lang) {
   const prog = getProgress()
@@ -443,6 +457,22 @@ function restoreKnown() {
 }
 
 // 复习打分：quality 0=不记得 3=模糊 5=记得（兼容口语三档 0/1/2）
+// 错词本毕业（第十二轮）：lapses 以前只增不减，答错一次就永远挂在错词本里，
+// 答对 20 次也出不来，用久了错词本等于「所有曾经错过的词」。
+// 这里答对一次减一，减到 0 就毕业。只在「真答对」的地方调（测验 / 听写 / 错词本复习），
+// 学习页的自评「记得」不算——那是用户自己说的，信号弱，不该用来销账。
+// 返回剩余 lapses（0 表示已毕业）。
+function clearLapse(wordId) {
+  const prog = loadProgress()
+  const p = prog[wordId]
+  if (!p || !(p.lapses > 0)) return 0
+  const next = Object.assign({}, p, { lapses: p.lapses - 1 })
+  prog[wordId] = next
+  const shard = shardIndexOf(wordId)
+  writeDeferred(shardKeyAt(shard), shardSliceOf(shard))
+  return next.lapses
+}
+
 function review(wordId, quality) {
   const prog = loadProgress()   // 直接用合并视图，避免 440 条整表克隆
   const stats = getStats()
@@ -486,6 +516,7 @@ function review(wordId, quality) {
   const shard = shardIndexOf(wordId)
   writeDeferred(shardKeyAt(shard), shardSliceOf(shard))
   writeDeferred(KEY_STATS, stats)
+  trimDaily(daily)
   writeDeferred(KEY_DAILY, daily)
   return p
 }
@@ -502,6 +533,7 @@ function quizAnswer(correct) {
   if (correct) d.correct += 1
   daily[tk] = d
   writeDeferred(KEY_STATS, stats)
+  trimDaily(daily)
   writeDeferred(KEY_DAILY, daily)
 }
 
@@ -521,6 +553,7 @@ function addPracticeSeconds(sec) {
   const d = daily[tk] || { learned: 0, reviewed: 0, correct: 0, total: 0 }
   d.practiceSec = (d.practiceSec || 0) + n
   daily[tk] = d
+  trimDaily(daily)
   writeDeferred(KEY_DAILY, daily)
   return d.practiceSec
 }
@@ -667,7 +700,7 @@ module.exports = {
   addPracticeSeconds, getPracticeSeconds, getGuardianAgreed, setGuardianAgreed, getKidAiUnlocked, setKidAiUnlocked, kidRestSeen, markKidRestSeen,
   getCustomItems, addCustomItems, removeCustomItem,
   getProgress, getStats, getDaily, getDueWords, getNewWords, getToday,
-  review, quizAnswer, getMasteredCount, INTERVALS,
+  review, quizAnswer, getMasteredCount, INTERVALS, clearLapse,
   markKnown, getKnownIds, restoreKnown, KNOWN_AHEAD_DAYS,
   exportData, importData, migrateProgress, invalidate, flush,
   FLUSH_DELAY, flushAll, PROGRESS_SHARDS, writeProgressAll

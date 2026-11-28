@@ -7,6 +7,7 @@ const sentences = require('../../utils/sentences')
 const sentenceProgress = require('../../utils/sentence-progress')
 const practiceTimer = require('../../utils/practice-timer')
 const kidMode = require('../../utils/kid-mode')
+const badges = require('../../utils/badges')
 
 Page({
   behaviors: [theme],
@@ -32,15 +33,20 @@ Page({
     // 做完 9 题切去查词页再回来，题目全换成新的，等于白做。
     // 但「接着做」只在模式没变时成立：切到儿童模式后，上一轮排好的成年题
     // 不能再继续考，必须按新范围重出一套。
-    if (this.data.queue.length && !this.data.finished && this._quizKid === !!this.data.isKid) return
+    // 语种也要算进「接着做」的条件（第十二轮）：以前只看 isKid，
+    // 做到第 5 题切到日语再回来，还是那 10 道英语题。
+    const lang = storage.getCurrentLang()
+    if (this.data.queue.length && !this.data.finished &&
+        this._quizKid === !!this.data.isKid && this._quizLang === lang) return
     this.buildQuiz()
   },
   onHide() { practiceTimer.stop(); storage.flushAll() },
   onUnload() { practiceTimer.stop(); storage.flushAll() },
   buildQuiz() {
     const lang = storage.getCurrentLang()
-    // 记下这套题是按哪种模式出的（见 onShow 的「接着做」判断）
+    // 记下这套题是按哪种模式 + 哪个语种出的（见 onShow 的「接着做」判断）
     this._quizKid = !!this.data.isKid
+    this._quizLang = lang
     // 儿童模式不考四级/六级/考研/财务/工作/科技那些词，出题范围跟学习页保持一致
     const all = kidMode.allowedWords(getWords(lang), this.data.isKid)
     const prog = storage.getProgress()
@@ -93,9 +99,14 @@ Page({
       if (cur.learned) sentenceProgress.review(cur.id, right ? 5 : 0, 'quiz')
     } else if (cur && cur.learned && cur.id) {
       storage.review(cur.id, right ? 2 : 0)
+      // 答对一次就把错词本的「错 N 次」销掉一格（第十二轮）：以前 lapses 只增不减，
+      // 一个词答错一次就永远留在错词本里，答对 20 次也出不来。
+      if (right) storage.clearLapse(cur.id)
     } else {
       storage.quizAnswer(right)
     }
+    // 徽章解锁提示（第十二轮）：以前只有统计页会算，解锁了当时看不到
+    badges.check()
     const patch = {
       revealed: true, isRight: right,
       correctCount: this.data.correctCount + (right ? 1 : 0),

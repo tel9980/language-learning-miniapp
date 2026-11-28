@@ -2612,6 +2612,9 @@ async function runTailTests() {
     ok(/const msg = \(err && \(err\.errMsg \|\| err\.message\)\) \|\| ''/.test(audioLocal), 'onError 读得到错误文案')
     ok(/UNPLAYABLE_RE\.test\(msg\)[\s\S]{0,120}_localUnplayable = true/.test(audioLocal), '网络源也认 access denied')
 
+  // 子进程实测结果（Q7 跑一次，R 段复用同一份，不重复 spawn）
+  let kidRes = null
+
   // Q. 儿童模式切换（m11005「切到儿童模式字库没跟着切换」）
   // 这一组守的是「切模式之后，每个取词入口是不是立刻换成新模式的范围」。
   // 全都是行为 bug，静态断言只能守形状，所以下面每条都对着具体的代码路径。
@@ -2668,6 +2671,7 @@ async function runTailTests() {
     const nodePath = require('path')
     const out = sp.execFileSync(process.execPath, [nodePath.join(__dirname, 'kid-check.js')], { encoding: 'utf8' })
     const r = JSON.parse(out.trim().split('\n').pop())
+    kidRes = r
     ok(r.dict === 10, '儿童模式听写队列应有 10 题，实际 ' + r.dict)
     eq(r.dictBad, 0, '儿童模式听写不该出现被藏分类的词')
     const kidMod = require('../utils/kid-mode')
@@ -2683,6 +2687,142 @@ async function runTailTests() {
     ok(r.speakStdBad > 0, '标准模式口语单词池本来就该包含考试词')
     eq(r.speakKidTotal, kidMod.allowedWords(enAll, true).length, '儿童模式口语单词池应等于适龄词数')
     eq(r.wrongHasExam, false, '儿童模式错词本不该出现被藏分类的词')
+  })()
+
+  // R. 第十二轮：长单词顶出卡片、搜索页儿童过滤、错词本毕业、待练去重、徽章提示、daily 裁剪
+  // 这一组全是用户能直接看到的行为 bug，静态断言只守形状，数值都来自真跑。
+  ;(function () {
+    // R1 长单词降档：学习页卡片可用宽 606rpx（container 32×2 + .face 40×2），
+    //    97rpx 时 accommodation 要 770rpx，会左右对称顶出卡片。
+    const learnWxmlR = read('pages/learn/learn.wxml')
+    const learnWxssR = read('pages/learn/learn.wxss')
+    const speakWxmlR = read('pages/speak/speak.wxml')
+    const speakWxssR = read('pages/speak/speak.wxss')
+    const appWxssR = read('app.wxss')
+    ok(/current\.word\.length > 10 \? 'long'/.test(learnWxmlR), '学习页长单词要降一档字号')
+    ok(/\.word\.long \{[^}]*font-size/.test(learnWxssR), '学习页要有 .word.long')
+    ok(/\.word \{[^}]*overflow-wrap: break-word/.test(learnWxssR), '学习页 .word 要有 overflow-wrap 兜底')
+    // 口语页必须带 track==='word' 守卫：句子 track 的 current.word 永远是一整句，
+    // 不加守卫会把所有句子都当成「长单词」降档。
+    ok(/track==='word' && current\.word\.length > 10 \? 'long'/.test(speakWxmlR),
+      '口语页长单词降档必须带 track 守卫')
+    ok(/\.stage-word\.long \{[^}]*font-size/.test(speakWxssR), '口语页要有 .stage-word.long')
+    ok(/\.stage-word \{[^}]*overflow-wrap: break-word/.test(speakWxssR), '口语页 .stage-word 要有 overflow-wrap')
+    ;['sm', 'lg', 'xl', 'kid'].forEach(function (t) {
+      ok(new RegExp('\\.theme-' + t + ' \\.word\\.long ').test(appWxssR), '第 ' + t + ' 档要有 .word.long 覆盖')
+      ok(new RegExp('\\.theme-' + t + ' \\.stage-word\\.long ').test(appWxssR), '第 ' + t + ' 档要有 .stage-word.long 覆盖')
+    })
+    // 真实不变量：用最窄假设（每字符 0.5em）估宽，凡是在 97rpx 下必然溢出卡片的词，
+    // 长度都必须 > 10 —— 也就是一定会被 .long 接住。用最窄假设是为了保证这条断言
+    // 不会因为字体表估宽偏大而误报。
+    const enForWidth = require('../utils/words').getWords('en')
+    const CARD_W = 606
+    const mustOverflow = enForWidth.filter(function (w) { return w.word.length * 0.5 * 97 > CARD_W })
+    ok(mustOverflow.length > 0, '应该存在必然溢出的长词（否则这条断言没意义）')
+    eq(mustOverflow.filter(function (w) { return w.word.length <= 10 }).length, 0,
+      '所有必然溢出的词都要被 length>10 的降档接住')
+
+    // R2 搜索页是第 7 个取词入口（前 6 个上一批修过，只有它还漏着）
+    const searchSrcR = read('pages/search/search.js')
+    ok(/kidMode\.allowedWords\(getWordsByCategory\(lang, cat\)/.test(searchSrcR), '搜索结果要过儿童模式')
+    ok(/const kidChanged = this\._catKid !== kidMode\.isKidOf\(this\)/.test(searchSrcR),
+      '切模式后搜索页的分类下拉要跟着换')
+    ok(/isKid \? kidMode\.filterCategories\(all\) : all/.test(searchSrcR),
+      '大人不该被过滤分类（无条件过滤会让大人也只剩 13 类）')
+
+    // R3 错词本毕业：fsrs 的 lapses 只增不减，答错一次就永远留在错词本里
+    ok(typeof storage.clearLapse === 'function', 'storage 要导出 clearLapse')
+    const lapseWord = 'en_002'
+    storage.review(lapseWord, 0)
+    storage.review(lapseWord, 0)
+    eq(storage.getProgress()[lapseWord].lapses, 2, '答错两次 lapses=2')
+    eq(storage.clearLapse(lapseWord), 1, '答对一次销掉一格')
+    eq(storage.clearLapse(lapseWord), 0, '再答对一次就毕业')
+    eq(storage.clearLapse(lapseWord), 0, '已毕业再调不能变成负数')
+    eq(storage.getProgress()[lapseWord].lapses, 0, 'lapses 不该为负')
+    const quizSrcR = read('pages/quiz/quiz.js')
+    const dictSrcR = read('pages/dictation/dictation.js')
+    const wrongSrcR = read('pages/wrong/wrong.js')
+    ok(/if \(right\) storage\.clearLapse\(cur\.id\)/.test(quizSrcR), '测验答对要销错词标记')
+    ok(/if \(right\) storage\.clearLapse\(cur\.id\)/.test(dictSrcR), '听写答对要销错词标记')
+    ok(/if \(q >= 1\) storage\.clearLapse\(cur\.id\)/.test(wrongSrcR), '错词本答对要销错词标记')
+
+    // R4 今日待练去重：同一个词既到期又答错过，会同时进「到期」和「错词」两栏
+    const todaySrcR = read('pages/today/today.js')
+    ok(/const PRIORITY = \{ due: 0, wrong: 1, focus: 2, sent: 3, sentmore: 9 \}/.test(todaySrcR),
+      '今日待练要按类型优先级去重')
+    ok(/return v === undefined \? 9 : v/.test(todaySrcR),
+      '优先级不能用 || 取默认值（due 是 0，会被抬成 9，错词反而压过到期）')
+
+    // R5 徽章解锁提示：compute() 以前只有统计页调用，解锁了当时看不到
+    const badgeMod = require('../utils/badges')
+    ok(typeof badgeMod.check === 'function' && typeof badgeMod.snapshot === 'function',
+      'utils/badges.js 要导出 check / snapshot')
+    const snap = badgeMod.snapshot()
+    ;['speakTimes', 'fluent', 'streak', 'mastered', 'dialogues', 'recordings'].forEach(function (k) {
+      ok(typeof snap[k] === 'number', 'badge snapshot 要有数字字段 ' + k)
+    })
+    // 首次运行必须静默建档：老用户一更新就被十几条 toast 淹没是不能接受的
+    wx.removeStorageSync(badgeMod.KEY)
+    eq(badgeMod.check().length, 0, '首次 check 只记录不弹')
+    const stR = storage.getStats()
+    const oldStreak = stR.streak || 0
+    stR.streak = 7
+    // 必须先 flush()：invalidate() 内部第一步就是 flush，会把缓存里的旧值写回去，
+    // 把这里刚塞进去的 streak 覆盖掉（踩过：徽章一直不解锁）。
+    storage.flush()
+    wx.setStorageSync(profile.nsKey('lp_stats_v1'), JSON.stringify(stR))
+    storage.invalidate()
+    const freshR = badgeMod.check()
+    ok(freshR.some(function (b) { return b.id === 'streak_7' }),
+      '连续打卡 7 天要提示「坚持一周」徽章')
+    eq(badgeMod.check().length, 0, '同一个徽章不该提示第二次')
+    stR.streak = oldStreak
+    storage.flush()
+    wx.setStorageSync(profile.nsKey('lp_stats_v1'), JSON.stringify(stR))
+    storage.invalidate()
+    // 五个动作点都要接上，否则徽章只在统计页可见
+    ;[['pages/learn/learn.js', '学习'], ['pages/quiz/quiz.js', '测验'],
+      ['pages/dictation/dictation.js', '听写'], ['pages/wrong/wrong.js', '错词本'],
+      ['pages/speak/speak.js', '口语']].forEach(function (pair) {
+      const src = read(pair[0])
+      ok(/badges\.check\(\)/.test(src), pair[1] + '页要在动作后检查徽章')
+      ok(/require\('\.\.\/\.\.\/utils\/badges'\)/.test(src), pair[1] + '页要 require badges')
+    })
+
+    // R6 每日数据裁剪：以前一个 key 都不删，用一年就是 365 条只增不减
+    const storageSrcR = read('utils/storage.js')
+    ok(/const DAILY_KEEP   = 400/.test(storageSrcR), '每日数据要留 400 天上限')
+    ok(/function trimDaily\(daily\)/.test(storageSrcR), '要有 trimDaily')
+    eq((storageSrcR.match(/trimDaily\(daily\)/g) || []).length, 4,
+      'trimDaily 的 1 处定义 + review/quizAnswer/addPracticeSeconds 3 处调用')
+    // 真造 500 天历史，跑一次 review 看会不会裁到 400
+    const bigDaily = {}
+    for (let i = 0; i < 500; i++) {
+      const d = new Date(2024, 0, 1)
+      d.setDate(d.getDate() + i)
+      bigDaily[storage.todayKey(d)] = { learned: 1, reviewed: 1, correct: 1, total: 1 }
+    }
+    wx.setStorageSync(profile.nsKey('lp_daily_v1'), JSON.stringify(bigDaily))
+    storage.invalidate()
+    storage.review('en_003', 5)
+    storage.flushAll()
+    const trimmed = JSON.parse(wx.getStorageSync(profile.nsKey('lp_daily_v1')))
+    eq(Object.keys(trimmed).length, 400, '500 天历史应被裁到 400 天')
+    ok(Object.keys(trimmed).sort().pop() === storage.todayKey(), '裁剪后必须保留今天')
+
+    // R7 子进程实测（复用 Q7 那次，不重复 spawn）：搜索页与今日待练的真实数值
+    ok(kidRes, 'Q7 的子进程结果要能拿到')
+    if (kidRes) {
+      eq(kidRes.searchKidBad, 0, '儿童模式搜索结果不该出现被藏分类的词')
+      eq(kidRes.searchKidHasExam, false, '儿童模式搜索页分类下拉不该有四级')
+      ok(kidRes.searchStdCats > kidRes.searchKidCats,
+        '标准模式的分类数应多于儿童模式（' + kidRes.searchStdCats + ' vs ' + kidRes.searchKidCats + '）')
+      ok(kidRes.searchStdBad > 0, '标准模式搜索本来就该搜得到考试词')
+      eq(kidRes.todayDup, 0, '今日待练不该出现同一个词两条')
+      eq(kidRes.todayHasTarget, true, '既到期又错过的词仍要出现在待练清单里')
+      eq(kidRes.todayTotal, 1, '同一个词既到期又错过时，清单只该有 1 条（去重前是 2 条）')
+    }
   })()
 
   // K. 对练（我说中文，给我目标语言的说法）

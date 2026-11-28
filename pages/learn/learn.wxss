@@ -17,7 +17,14 @@
 .front { background: linear-gradient(160deg, #4A6CF7, #6E8BFF); color: #fff; }
 .back { background: #fff; transform: rotateY(180deg); }
 .category { position: absolute; top: 40rpx; font-size: 22rpx; background: rgba(255,255,255,0.2); padding: 8rpx 20rpx; border-radius: 999rpx; }
-.word { font-size: 72rpx; font-weight: 800; letter-spacing: 2rpx; }
+/* 长单词降一档字号（第十二轮）：卡片可用宽只有 606rpx
+   （container padding 32×2 + .face padding 40×2），而 accommodation 这种
+   13 个字母的词按 Arial Bold 算是 7.67em —— 72rpx 时 578rpx 刚好放得下，
+   但「大 / 儿童 / 超大」三档会顶出卡片（97rpx 时 770rpx，比卡片宽 164rpx）。
+   阈值取 >10 是算出来的：97rpx 下溢出的 15 个词最短也是 11 个字母。
+   overflow-wrap 是最后一道兜底，万一以后加了更长的词也不会撑破。 */
+.word { font-size: 72rpx; font-weight: 800; letter-spacing: 2rpx; overflow-wrap: break-word; }
+.word.long { font-size: 56rpx; letter-spacing: 1rpx; }
 .phonetic { font-size: 30rpx; opacity: 0.85; margin-top: 20rpx; }
 .tap-hint { position: absolute; bottom: 44rpx; font-size: 24rpx; opacity: 0.8; }
 .word-small { font-size: 34rpx; color: #4A6CF7; font-weight: 700; }

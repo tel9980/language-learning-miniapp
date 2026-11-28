@@ -84,7 +84,7 @@
     <view wx:if="{{track==='dialogue' && current.role && !rolePlay}}" class="role-tag">{{current.role}}</view>
 
     <!-- 逐词高亮（K歌字幕） -->
-    <view class="stage-word {{track==='sentence'||track==='dialogue'||track==='custom'?'sentence':''}} {{karaokeOn?'karaoke':''}}">
+    <view class="stage-word {{track==='sentence'||track==='dialogue'||track==='custom'?'sentence':''}} {{track==='word' && current.word.length > 10 ? 'long' : ''}} {{karaokeOn?'karaoke':''}}">
       <block wx:if="{{karaokeOn && karaokeTokens.length}}">
         <text wx:for="{{karaokeTokens}}" wx:key="index" wx:for-index="idx" class="k-token {{idx===karaokeIdx?'active':''}}">{{item.text}}</text>
       </block>

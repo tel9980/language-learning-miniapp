@@ -29,7 +29,11 @@
 .dot.on { background: #4A6CF7; width: 36rpx; border-radius: 999rpx; }
 .dot.done { background: #A9BCFF; }
 .role-tag { display: inline-block; font-size: 22rpx; color: #E08A1E; background: #FFF7EC; padding: 6rpx 18rpx; border-radius: 999rpx; margin-bottom: 16rpx; }
-.stage-word { font-size: 64rpx; font-weight: 800; color: #4A6CF7; line-height: 1.3; }
+.stage-word { font-size: 64rpx; font-weight: 800; color: #4A6CF7; line-height: 1.3; overflow-wrap: break-word; }
+/* 长单词降档（第十二轮）：.stage-word 可用宽 686rpx，正常 64rpx 放得下
+   （accommodation 7.67em = 491rpx），但 .theme-xl 的 86rpx 是 660+26=686rpx，
+   正好贴着边。长词降到 68rpx 后是 547rpx，留出余量。 */
+.stage-word.long { font-size: 58rpx; letter-spacing: 0; }
 .stage-word.sentence { font-size: 36rpx; line-height: 1.5; font-weight: 700; }
 .stage-phonetic { font-size: 28rpx; color: #8A94A6; margin-top: 12rpx; }
 .stage-meaning { font-size: 30rpx; margin-top: 16rpx; }

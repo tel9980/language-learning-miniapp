@@ -22,6 +22,7 @@ const pageTimers = require('../../utils/page-timers')
 const screen = require('../../utils/screen')
 const logger = require('../../utils/logger')
 const shareCopy = require('../../utils/share-copy')
+const badges = require('../../utils/badges')
 
 // 跟读模式：word=单词 | sentence=句子 | dialogue=情景对话 | custom=自建素材
 Page({
@@ -552,6 +553,8 @@ Page({
       // 关键：落盘成功后临时文件已被移走，后续播放必须用 entry.filePath
       if (entry && entry.filePath) that._recFilePath = entry.filePath
       else wx.showToast({ title: '录音没能存下来（空间可能已满）', icon: 'none' })
+      // 「留下声音」徽章按录音条数解锁，存下来才查
+      if (entry) badges.check()
       that._savePromise = null
       return entry
     })
@@ -823,6 +826,9 @@ Page({
     if (!this.data.current || this.data.justRated) return
     const cur = this.data.current
     speaking.record(cur.id, q, this._lastScore)
+    // 徽章解锁提示（第十二轮）：口语次数 / 流利数 / 对话数都在这里变，
+    // 以前徽章只有统计页会算，练完什么都看不到
+    badges.check()
     const schedQ = q === 0 ? 0 : (q === 1 ? 3 : 5)
     this._reviewItem(cur.id, schedQ)
     if (q === 0) feedback.warn(); else feedback.success()

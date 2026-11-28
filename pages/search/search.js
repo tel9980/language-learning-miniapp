@@ -8,6 +8,7 @@ const sentences = require('../../utils/sentences')
 const nav = require('../../utils/nav')
 const audio = require('../../utils/audio')
 const aiLookup = require('../../utils/ai-lookup')
+const kidMode = require('../../utils/kid-mode')
 
 // 句子/对话台词/自建素材各显示多少条（词库那边有「加载更多」，这两栏够看就行）
 const SEC_LIMIT = 20
@@ -45,7 +46,12 @@ Page({
 
   _applyLang(lang) {
     const meta = getLangMeta(lang)
-    const cats = getExamCategories(lang)
+    // 儿童模式只列适龄分类（第十二轮）：以前分类下拉一直是 getExamCategories 全量，
+    // 孩子照样能选「四级」「考研」，和「只留基础分类」自相矛盾。
+    const isKid = kidMode.isKidOf(this)
+    const all = getExamCategories(lang)
+    const cats = isKid ? kidMode.filterCategories(all) : all
+    this._catKid = isKid
     this.setData({
       lang: lang,
       langName: meta.name,
@@ -65,7 +71,10 @@ Page({
   onShow() {
     this.syncTheme()
     const lang = storage.getCurrentLang()
-    if (lang !== this.data.lang) {
+    // 切了儿童模式，分类下拉要换成适龄的那几个；当前选中的分类可能已经不存在了，
+    // 所以一并把 catIndex 归零（否则 picker 的 value 会指到空位）。
+    const kidChanged = this._catKid !== kidMode.isKidOf(this)
+    if (lang !== this.data.lang || kidChanged) {
       this._applyLang(lang)
       this.setData({ catIndex: 0 })
     }
@@ -145,7 +154,10 @@ Page({
     const lang = this.data.lang
     const catInfo = this.data.catInfo[this.data.catIndex - 1]
     const cat = catInfo ? catInfo.name : ''
-    let words = getWordsByCategory(lang, cat)
+    // 儿童模式过滤（第十二轮）：这是同类漏洞的第 7 处——学习页、到期队列、
+    // 首页待复习、听写、测验、口语单词池、错词本都修过，只有搜索页还是全库。
+    // 实测修前儿童模式下搜「全部单词」，30 条结果 30 条都是四级/六级词。
+    let words = kidMode.allowedWords(getWordsByCategory(lang, cat), kidMode.isKidOf(this))
     // 只看收藏
     if (this.data.showMode === 'fav') {
       const favs = favorites.list(lang)

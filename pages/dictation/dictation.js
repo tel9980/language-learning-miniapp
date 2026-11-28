@@ -12,6 +12,7 @@ const audio = require('../../utils/audio')
 const practiceTimer = require('../../utils/practice-timer')
 const pageTimers = require('../../utils/page-timers')
 const screen = require('../../utils/screen')
+const badges = require('../../utils/badges')
 
 const ROUND = 10
 
@@ -35,7 +36,15 @@ Page({
   },
   onShow() {
     this.syncTheme()
-    practiceTimer.start(!!this.data.isKid)
+    // 语种变了要重出一轮（第十二轮）：以前 onShow 什么都不判断，
+    // 听写到一半切到日语，回来还在听写英语。
+    // 顺带把儿童模式的变化也覆盖了（onLoad 里已经先 syncTheme 再 build，
+    // 但那是首次；这里处理「中途切模式」）。
+    // build() 会把这一轮的语种/模式记进 _builtLang/_builtKid
+    const lang = storage.getCurrentLang()
+    const kid = !!this.data.isKid
+    if (this._builtLang && (this._builtLang !== lang || this._builtKid !== kid)) this.build()
+    practiceTimer.start(kid)
     // 屏幕常亮（第十一轮）：听写要思考，手也不动，息屏就白想
     screen.on()
   },
@@ -53,6 +62,9 @@ Page({
 
   build() {
     const lang = storage.getCurrentLang()
+    // 记下这一轮是按哪个语种 / 哪种模式出的，onShow 靠它判断要不要重出
+    this._builtLang = lang
+    this._builtKid = !!this.data.isKid
     const now = Date.now()
     let queue = []
     if (this.data.mode === 'dlg') {
@@ -142,7 +154,11 @@ Page({
       sentenceProgress.review(cur.id, right ? 5 : 0, 'dictation')
     } else {
       storage.review(cur.id, right ? 2 : 0)
+      // 同上：听写答对也算「真的记住了」，销掉一格错词标记
+      if (right) storage.clearLapse(cur.id)
     }
+    // 徽章解锁提示（第十二轮）：以前只有统计页会算，解锁了当时看不到
+    badges.check()
     this.setData({
       revealed: true, isRight: right,
       hasAnswer: gaveUp && !right,

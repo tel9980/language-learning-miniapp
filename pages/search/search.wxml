@@ -44,6 +44,9 @@
         <view class="detail-label">例句</view>
         <view class="detail-en">{{item.example}}</view>
         <view class="detail-cn">{{item.exampleCn}}</view>
+        <!-- 去跟读这个词（第十二轮）：句子结果一直有「去跟读这句」，
+             单词结果只有播放和收藏，想练发音只能退出去在口语页翻队列找它。 -->
+        <view class="mini-btn" data-id="{{item.id}}" catchtap="practiceOne">🎤 去跟读这个词</view>
       </view>
     </view>
 

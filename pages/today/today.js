@@ -106,13 +106,43 @@ Page({
       }
     })
 
-    this._all = items
-    this._pager.reset(items.length)
+    // 去重（第十二轮）：同一个词可能既到期、又答错过，于是同时进「到期」和「错词」两栏，
+    // 清单上出现两条一模一样的词。实测造 3 个既到期又错过的词，清单变成 6 条。
+    // 按优先级只留一条：到期 > 错词 > 口语重点 > 句子。
+    const PRIORITY = { due: 0, wrong: 1, focus: 2, sent: 3, sentmore: 9 }
+    // 注意不能写 `PRIORITY[it.type] || 9`：due 的优先级是 0，会被 || 当成假值抬到 9，
+    // 结果「错词」反而压过「到期」。用 === undefined 判断。
+    function rank(t) { const v = PRIORITY[t]; return v === undefined ? 9 : v }
+    const best = {}
+    items.forEach(function (it) {
+      if (!it.sayId) return
+      const cur = best[it.sayId]
+      if (!cur || rank(it.type) < rank(cur.type)) best[it.sayId] = it
+    })
+    const seen = {}
+    const list = []
+    items.forEach(function (it) {
+      if (!it.sayId) { list.push(it); return }
+      if (seen[it.sayId]) return
+      seen[it.sayId] = true
+      list.push(best[it.sayId])
+    })
+    // 三个数字也要跟着去重后的清单走，否则「待复习 3 + 错词 3」但列表只有 3 条，
+    // 用户会以为漏了东西。
+    let dueShown = 0, wrongShown = 0, focusShown = 0
+    list.forEach(function (it) {
+      if (it.type === 'due') dueShown++
+      else if (it.type === 'wrong') wrongShown++
+      else if (it.type === 'focus') focusShown++
+    })
+
+    this._all = list
+    this._pager.reset(list.length)
     this.setData({
-      items: this._pager.slice(items), total: items.length, hasMore: this._pager.hasMore,
-      dueCount: dueCount, focusCount: focusItems.length, wrongCount: wrongCount,
+      items: this._pager.slice(list), total: list.length, hasMore: this._pager.hasMore,
+      dueCount: dueShown, focusCount: focusShown, wrongCount: wrongShown,
       sentDueCount: sentDueCount,
-      allDone: items.length === 0
+      allDone: list.length === 0
     })
   },
 
